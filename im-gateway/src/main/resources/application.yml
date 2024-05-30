@@ -1,0 +1,16 @@
+server:
+  port: 8094
+
+dubbo:
+  application:
+    name: gateway-server #网关服务
+  protocol:
+    name: dubbo #dubbo协议
+    port: -1 #dubbo端口 -1 代表随机端口
+  registry:
+    id: zk-registry
+    address: zookeeper://127.0.0.1:2181 #zookeeper地址及端口号
+  config-center:
+    address: zookeeper://127.0.0.1:2181
+  metadata-report:
+    address: zookeeper://127.0.0.1:2181
