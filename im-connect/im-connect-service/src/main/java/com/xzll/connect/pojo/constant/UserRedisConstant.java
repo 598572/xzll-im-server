@@ -22,18 +22,27 @@ public class UserRedisConstant {
     public final static String LOGIN_STATUS_PREFIX = "user_login_status:";
 
     public enum UserStatus {
-
-        ON_LINE,
         /**
-         * 聊天消息
+         * 离线
          */
-        OFF_LINE;
+        OFF_LINE(0),
 
-        UserStatus() {
+        //将来可能置忙
+
+        /**
+         * 在线
+         */
+        ON_LINE(5);
+
+        private final Integer value;
+
+        UserStatus(Integer value) {
+            this.value = value;
         }
 
-
-
+        public Integer getValue() {
+            return value;
+        }
     }
 
 

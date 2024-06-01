@@ -3,11 +3,9 @@ package com.xzll.connect.netty.heart;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
- * Function:
- *
- * @author hzz
- * 019-01-20 17:15
- * @since JDK 1.8
+ * @Author: hzz
+ * @Date: 2024/6/1 17:26:24
+ * @Description:
  */
 public interface HeartBeatHandler {
 

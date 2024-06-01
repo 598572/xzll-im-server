@@ -1,20 +1,21 @@
 package com.xzll.common.util;
 
+import cn.hutool.core.lang.Assert;
 import io.netty.channel.Channel;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+import org.apache.commons.lang3.StringUtils;
 
-/**
- * Function:
- *
- * @author hzz
- *         019/1/9 00:57
- * @since JDK 1.8
- */
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+
 public class NettyAttrUtil {
 
     private static final AttributeKey<String> ATTR_KEY_READER_TIME = AttributeKey.valueOf("readerTime");
-
+    public static final String LINK = ":";
+    private static final ConcurrentHashMap<String, Integer> ipport = new ConcurrentHashMap<>(1);
+    ;
 
     public static void updateReaderTime(Channel channel, Long time) {
         channel.attr(ATTR_KEY_READER_TIME).set(time.toString());
@@ -33,5 +34,35 @@ public class NettyAttrUtil {
     private static String getAttribute(Channel channel, AttributeKey<String> key) {
         Attribute<String> attr = channel.attr(key);
         return attr.get();
+    }
+
+    public static void setIpPort(String ip, Integer port) {
+        ipport.put(ip, port);
+    }
+
+
+    public static Map.Entry<String, Integer> getIpPortMap() {
+        return ipport.entrySet().stream().findFirst().orElseThrow();
+
+    }
+
+    public static String getIpPortStr() {
+        return ipport.entrySet().stream().map(x -> x.getKey() + LINK + x.getValue()).findFirst().orElse(null);
+    }
+
+    public static String getIpStr(String ipPortStr) {
+        if (StringUtils.isBlank(ipPortStr)) {
+            return null;
+        }
+        String[] split = StringUtils.split(LINK);
+        return split[0];
+    }
+
+    public static Integer getPortInt(String ipPortStr) {
+        Assert.isTrue(StringUtils.isNotBlank(ipPortStr), "ip端口为空");
+        String[] split = StringUtils.split(LINK);
+        String port = split[1];
+        Assert.isTrue(StringUtils.isNotBlank(port), "解析不到端口");
+        return Integer.valueOf(port);
     }
 }

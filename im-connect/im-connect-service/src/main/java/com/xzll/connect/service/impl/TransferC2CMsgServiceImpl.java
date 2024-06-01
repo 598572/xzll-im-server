@@ -1,21 +1,12 @@
 package com.xzll.connect.service.impl;
 
-import cn.hutool.extra.spring.SpringUtil;
-import cn.hutool.json.JSONUtil;
+
 import com.xzll.common.pojo.BaseResponse;
 import com.xzll.connect.api.TransferC2CMsgApi;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
-import com.xzll.connect.netty.channel.ChannelManager;
-
-import com.xzll.connect.pojo.constant.UserRedisConstant;
-import com.xzll.connect.pojo.dto.C2CMsgRequestDTO;
-import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboService;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import javax.annotation.Resource;
 
 /**

@@ -1,10 +1,10 @@
 package com.xzll.connect.netty.heart;
 
 
+import com.xzll.common.constant.ImCommonEnum;
 import com.xzll.common.util.NettyAttrUtil;
 
 import com.xzll.connect.config.IMCenterServiceImplApolloConfig;
-import com.xzll.connect.netty.channel.ChannelManager;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,10 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * Function:
- *
- * @author hzz
- * @since JDK 1.8
+ * @Author: hzz
+ * @Date: 2024/6/1 17:30:01
+ * @Description:
  */
 @Slf4j
 @Service
@@ -32,7 +31,7 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         Long lastReadTime = NettyAttrUtil.getReaderTime(ctx.channel());
         long now = System.currentTimeMillis();
         if (lastReadTime != null && now - lastReadTime > heartBeatTime) {
-            String userId = ChannelManager.getUserIdByChannelId(ctx.channel().id().asLongText());
+            String userId = ctx.channel().attr(ImCommonEnum.USER_ID_KEY).get();
             if (!StringUtils.isEmpty(userId)) {
                 log.warn("客户端[{}]心跳超时[{}]ms，需要关闭连接!", userId, now - lastReadTime);
             }

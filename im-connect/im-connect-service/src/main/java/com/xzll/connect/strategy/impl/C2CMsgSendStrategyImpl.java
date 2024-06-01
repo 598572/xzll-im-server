@@ -5,11 +5,12 @@ import cn.hutool.json.JSONUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.api.TransferC2CMsgApi;
 import com.xzll.common.pojo.MsgBaseRequest;
-import com.xzll.connect.netty.channel.ChannelManager;
 
 
+import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.pojo.constant.UserRedisConstant;
 import com.xzll.connect.pojo.dto.C2CMsgRequestDTO;
 import com.xzll.connect.pojo.dto.MessageInfoDTO;
@@ -33,7 +34,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.validation.constraints.NotNull;
-import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.Objects;
 
@@ -46,19 +46,14 @@ import java.util.Objects;
 @Service
 public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements MsgHandlerStrategy {
 
-    private static final String RECEIVE_URL = "http://{0}:{1}/msg/transferSendMsg";
     private static final String TAG = "[客户端发送单聊消息]_";
 
     @Autowired
-    private RedisTemplate<String,String> redisTemplate;
+    private RedisTemplate<String, String> redisTemplate;
     @Autowired
     private ObjectMapper objectMapper;
-    @DubboReference(parameters = {"router","address"})
+    @DubboReference(parameters = {"router", "address"})
     private TransferC2CMsgApi transferC2CMsgApi;
-//    @Autowired
-//    private UserSessionUpsertMsgSaveService userSessionUpsertMsgSaveService;
-//    @Autowired
-//    private MsgService msgService;
 
     /**
      * 策略适配
@@ -100,13 +95,13 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
 
         String channelIdByUserId = receiveUserData.getChannelIdByUserId();
         Channel targetChannel = receiveUserData.getTargetChannel();
-        String serverJson = receiveUserData.getServerJson();
+        String ipPortStr = receiveUserData.getRouteAddress();
         String userStatus = receiveUserData.getUserStatus();
         ServerInfoDTO serverInfoDTO = receiveUserData.getServerInfoDTO();
         log.info((TAG + "接收者id:{},在线状态:{},channelId:{},serverInfo:{}"), packet.getToUserId(), userStatus, channelIdByUserId, serverInfoDTO);
 
         //3. 根据接收人状态做对应的处理
-        if (null != targetChannel && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)) {
+        if (null != targetChannel && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
             // 直接发送
             log.info((TAG + "用户{}在线且在本台机器上,将直接发送"), packet.getToUserId());
             super.msgSendTemplate(TAG, targetChannel, JSONUtil.toJsonStr(msgBaseRequest));
@@ -115,16 +110,12 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
             // 更新消息状态为离线
             this.updateC2cMsgStatus(packet);
         } else if (Objects.isNull(targetChannel) && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)
-                && StringUtils.isNotBlank(serverJson)) {
-            log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToUserId(), serverJson);
-            String requestUrl = MessageFormat.format(RECEIVE_URL, serverInfoDTO.getAddr(), String.valueOf(serverInfoDTO.getPort()));
-
-
+                && StringUtils.isNotBlank(ipPortStr)) {
+            log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToUserId(), ipPortStr);
             // 根据provider的ip,port创建Address实例
-            Address address = new Address("10.220.47.253", 20880);//todo
+            Address address = new Address(NettyAttrUtil.getIpStr(ipPortStr), NettyAttrUtil.getPortInt(ipPortStr));
             RpcContext.getContext().setObjectAttachment("address", address);
             transferC2CMsgApi.transferC2CMsg(msgBaseRequest);
-//            super.msgTransferTemplate(requestUrl, TAG, JsonUtil.toJson(msgBaseRequest));
         }
         log.info((TAG + "exchange_method_end."));
     }
@@ -132,15 +123,11 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
 
     @Override
     public BaseResponse receiveAndSendMsg(MsgBaseRequest msg) {
-
         log.info((TAG + "receiveAndSendMsg_method_start."));
 
         C2CMsgRequestDTO packet = supportPojo(msg);
-        String channelIdByUserId = ChannelManager.getChannelIdByUserId(String.valueOf(packet.getToUserId()));
-        Channel fromChannel = ChannelManager.findChannel(ChannelManager.getChannelIdByUserId(String.valueOf(packet.getFromUserId())));
-        Channel targetChannel = ChannelManager.findChannel(channelIdByUserId);
-
-        String userStatus = redisTemplate.opsForValue().get(UserRedisConstant.LOGIN_STATUS_PREFIX + channelIdByUserId);
+        Channel targetChannel = LocalChannelManager.getChannelByUserId(packet.getToUserId());
+        String userStatus = (String) redisTemplate.opsForHash().get(UserRedisConstant.LOGIN_STATUS_PREFIX, packet.getToUserId());
         //二次校验接收人在线状态
         if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
             log.info((TAG + "跳转后用户{}不在线,将直接发送消息"), packet.getToUserId());

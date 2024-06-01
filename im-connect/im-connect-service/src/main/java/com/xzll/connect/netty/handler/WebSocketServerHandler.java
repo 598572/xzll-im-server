@@ -4,16 +4,16 @@ package com.xzll.connect.netty.handler;
 import cn.hutool.extra.spring.SpringUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
+import com.xzll.common.constant.ImCommonEnum;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.connect.config.IMCenterServiceImplApolloConfig;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
-import com.xzll.connect.netty.channel.ChannelManager;
+import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.netty.heart.HeartBeatHandler;
 import com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl;
 
 import com.xzll.connect.pojo.constant.Constant;
-import com.xzll.connect.pojo.dto.ServerInfoDTO;
+import com.xzll.connect.pojo.constant.UserRedisConstant;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -26,9 +26,9 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.net.InetAddress;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,23 +44,14 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> {
 
 
-//    @Override
-//    protected void channelRead0(ChannelHandlerContext channelHandlerContext, Object o) throws Exception {
-//
-//    }
-
-
     private static final HeartBeatHandler heartBeatHandler = SpringUtil.getBean(NettyServerHeartBeatHandlerImpl.class);
     private static final HandlerDispatcher handlerDispatcher = SpringUtil.getBean(HandlerDispatcher.class);
-//    private static final RedisCache redisCache = SpringBeanFactory.getBean(RedisCache.class);
-    private static final IMCenterServiceImplApolloConfig IM_CENTER_SERVICE_APOLLO_CONFIG = SpringUtil.getBean(IMCenterServiceImplApolloConfig.class);
+    private static final RedisTemplate<String, String> redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
     private static final ThreadPoolTaskExecutor threadPoolTaskExecutor = SpringUtil.getBean(ThreadPoolTaskExecutor.class);
-//    private static final MsgService msgService = SpringUtil.getBean(MsgService.class);
-//
-//
-//    //这里用来对连接数进行记数,每两秒输出到控制台
+
+    //这里用来对连接数进行记数,每两秒输出到控制台
     private static final AtomicInteger nConnection = new AtomicInteger();
-//
+
     static {
         Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
             System.out.println("连接数: " + nConnection.get());
@@ -69,24 +60,13 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     private WebSocketServerHandshaker handShaker;
 
-
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        //添加连接
-        log.info("客户端加入连接 {}", ctx.channel().id().asLongText());
+        super.channelActive(ctx);
         String channelId = ctx.channel().id().asLongText();
-        ChannelManager.addChannel(ctx.channel());
-
-        ServerInfoDTO serverInfoDTO = new ServerInfoDTO();
-        serverInfoDTO.setAddr(InetAddress.getLocalHost().getHostAddress());
-        serverInfoDTO.setPort(IM_CENTER_SERVICE_APOLLO_CONFIG.getImHttpPort());
-
-        //设置用户登录的服务器信息
-//        redisCache.set(UserRedisConstant.ROUTE_PREFIX + channelId, JsonUtil.toJson(serverInfoDTO), IM_CENTER_SERVICE_APOLLO_CONFIG.getServerExpire());
-//        //设置用户状态
-//        redisCache.set(UserRedisConstant.LOGIN_STATUS_PREFIX + channelId, UserRedisConstant.UserStatus.ON_LINE.name(), IM_CENTER_SERVICE_APOLLO_CONFIG.getServerExpire());
-
-        //todo 修改状态为在线
+        //添加连接
+        log.info("客户端加入连接channelId: {}", channelId);
+        //不能在此处设置用户信息 因为在这个阶段无法拿到uid新增 attr设置的只能是本地 不能垮进程
         nConnection.incrementAndGet();
     }
 
@@ -104,16 +84,16 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        //断开连接
-        log.info("客户端断开连接：{}", ctx.channel().id().asLongText());
         String channelId = ctx.channel().id().asLongText();
-        ChannelManager.removeChannel(ctx.channel());
-
+        //断开连接
+        log.info("客户端断开连接：{}", channelId);
+        String uid = ctx.channel().attr(ImCommonEnum.USER_ID_KEY).get();
         //清除用户登录的服务器信息
-//        redisCache.deleteKey(UserRedisConstant.ROUTE_PREFIX + channelId);
-//        //清除用户登录状态
-//        redisCache.deleteKey(UserRedisConstant.LOGIN_STATUS_PREFIX + channelId);
-
+        LocalChannelManager.removeUserChannel(uid);
+        //清楚用户登录信息
+        redisTemplate.opsForHash().delete(UserRedisConstant.ROUTE_PREFIX, uid);
+        //清除用户登录状态
+        redisTemplate.opsForHash().delete(UserRedisConstant.LOGIN_STATUS_PREFIX, uid);
         nConnection.decrementAndGet();
     }
 
@@ -144,13 +124,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         ctx.flush();
-//        ThreadContext.remove(TraceContexHolder.TRACE_ID);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         ctx.close();
-//        ThreadContext.remove(TraceContexHolder.TRACE_ID);
         log.error("[WebSocketServerHandler]_出现异常 ,e : ", cause);
     }
 
@@ -180,20 +158,17 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         if (handShaker == null) {
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
         } else {
-            ChannelManager.addUserChannel(uidStr, ctx.channel().id().asLongText());
             ChannelFuture handshake = handShaker.handshake(ctx.channel(), req);
             if (handshake.isSuccess()) {
-                System.out.println("握手成功");
-                //TODO 从mongo中查询离线消息，并发送
-//                RpcOffLineMessageAo rpcOffLineMessageAo = new RpcOffLineMessageAo();
-//                rpcOffLineMessageAo.setPageNo(1);
-//                rpcOffLineMessageAo.setPageSize(15);
-//                rpcOffLineMessageAo.setCurrentUserId(uid2);
-//                PageModel<List<MessageInfoDo>> offLineMsg = msgService.findOffLineMsg(rpcOffLineMessageAo);
+                //TODO 用户登录的信息 <uid,机器ip端口> 存入redis
+                //下边两步需要保证原子性 todo
+                //设置当前用户登录的机器ip+端口  (设置用户登录的服务器信息 此处不设置过多信息 只设置用户登录的机器信息 方便快捷 存取无需转json )
+                redisTemplate.opsForHash().put(UserRedisConstant.ROUTE_PREFIX, uidStr, NettyAttrUtil.getIpPortStr());
+                //设置用户状态为在线
+                redisTemplate.opsForHash().put(UserRedisConstant.LOGIN_STATUS_PREFIX, uidStr, UserRedisConstant.UserStatus.ON_LINE.getValue().toString());
 
-
-                //TODO 发送完成后，将状态和用户所在服务信息存入redis
-
+                log.info("握手成功");
+                //TODO 用户上线 此时需要处理离线消息
             } else {
                 log.warn("握手失败: {}", JSONUtil.toJsonStr(handshake));
             }
@@ -207,7 +182,6 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      * @param frame
      */
     private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
-
         //判断是否是关闭连接的指令
         if (frame instanceof CloseWebSocketFrame) {
             log.info("[WebSocketServerHandler]_消息类型: close");
@@ -268,6 +242,5 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             f.addListener(ChannelFutureListener.CLOSE);
         }
     }
-
 
 }

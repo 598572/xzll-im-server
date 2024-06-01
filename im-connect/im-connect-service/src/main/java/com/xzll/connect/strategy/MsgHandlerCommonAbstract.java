@@ -3,12 +3,12 @@ package com.xzll.connect.strategy;
 
 import cn.hutool.extra.spring.SpringUtil;
 import cn.hutool.json.JSONUtil;
-import com.alibaba.fastjson.JSON;
+
 
 import com.xzll.common.pojo.BaseResponse;
 import com.xzll.common.pojo.MsgBaseResponse;
-import com.xzll.connect.netty.channel.ChannelManager;
 
+import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.pojo.constant.UserRedisConstant;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
@@ -41,7 +41,7 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * @param redisTemplate
      * @return
      */
-    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedisTemplate<String,String> redisTemplate) {
+    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedisTemplate<String, String> redisTemplate) {
         if (redisTemplate == null) {
             redisTemplate = SpringUtil.getBean(RedisTemplate.class);
         }
@@ -50,17 +50,14 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
         }
         ReceiveUserDataDTO build = null;
         try {
-            String channelIdByUserId = ChannelManager.getChannelIdByUserId(toUserId);
-            Channel targetChannel = ChannelManager.findChannel(channelIdByUserId);
-            String serverJson = redisTemplate.opsForValue().get(UserRedisConstant.ROUTE_PREFIX + channelIdByUserId);
-            String userStatus = redisTemplate.opsForValue().get(UserRedisConstant.LOGIN_STATUS_PREFIX + channelIdByUserId);
-            ServerInfoDTO serverInfoDTO = JSON.parseObject(serverJson, ServerInfoDTO.class);
+            Channel targetChannel = LocalChannelManager.getChannelByUserId(toUserId);
+            String ipPort = (String) redisTemplate.opsForHash().get(UserRedisConstant.ROUTE_PREFIX, toUserId);
+            String userStatus = (String) redisTemplate.opsForHash().get(UserRedisConstant.LOGIN_STATUS_PREFIX, toUserId);
             build = ReceiveUserDataDTO.builder()
-                    .channelIdByUserId(channelIdByUserId)
+                    .channelIdByUserId(targetChannel.id().asLongText())
                     .targetChannel(targetChannel)
-                    .serverJson(serverJson)
                     .userStatus(userStatus)
-                    .serverInfoDTO(serverInfoDTO)
+                    .routeAddress(ipPort)
                     .build();
         } catch (Exception e) {
             log.error("getReceiveUserData_获取接收者信息失败 toUserId:{},e:", toUserId, e);

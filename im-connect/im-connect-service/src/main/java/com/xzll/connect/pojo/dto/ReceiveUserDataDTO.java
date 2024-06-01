@@ -16,6 +16,8 @@ public class ReceiveUserDataDTO {
     private String channelIdByUserId;
     private Channel targetChannel;
     private String serverJson;
+    //ip:port
+    private String routeAddress;
     private String userStatus;
     private ServerInfoDTO serverInfoDTO;
     private String toUserId;
