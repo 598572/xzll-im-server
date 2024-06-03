@@ -41,13 +41,13 @@
 //    private static final String TAG = "[企业总线发送系统消息]_";
 //    private static final String RECEIVE_URL = "http://{0}:{1}/msg/transferSendMsg";
 //
-//    @Autowired
+//    @Resource
 //    private ThreadPoolTaskExecutor threadPool;
-//    @Autowired
+//    @Resource
 //    private RedisCache redisCache;
-//    @Autowired
+//    @Resource
 //    private ObjectMapper objectMapper;
-//    @Autowired
+//    @Resource
 //    private MsgService msgService;
 //
 //    /**

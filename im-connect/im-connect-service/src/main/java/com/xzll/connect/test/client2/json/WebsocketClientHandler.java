@@ -1,7 +1,7 @@
 
 package com.xzll.connect.test.client2.json;
 
-import com.xzll.common.constant.ImCommonEnum;
+import com.xzll.common.constant.ImConstant;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -32,7 +32,7 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
 
   @Override
   public void channelActive(ChannelHandlerContext ctx) throws Exception {
-    System.out.println("客户端连接建立,当前uid:"+ctx.channel().attr(ImCommonEnum.USER_ID_KEY).get());
+    System.out.println("客户端连接建立,当前uid:"+ctx.channel().attr(ImConstant.USER_ID_KEY).get());
     // 在通道连接成功后发送握手连接
     handshaker.handshake(ctx.channel());
     super.channelActive(ctx);

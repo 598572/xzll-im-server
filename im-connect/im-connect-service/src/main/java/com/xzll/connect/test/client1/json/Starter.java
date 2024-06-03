@@ -12,7 +12,7 @@ import java.net.URISyntaxException;
 public class Starter {
 
     public static void start(String[] args) {
-        WebsocketClient websocketClient = new WebsocketClient("127.0.0.1", 55907);
+        WebsocketClient websocketClient = new WebsocketClient("127.0.0.1", 16059);
         try {
             websocketClient.run();
         } catch (InterruptedException e) {

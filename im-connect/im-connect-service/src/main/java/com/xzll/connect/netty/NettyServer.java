@@ -11,10 +11,11 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
 import java.net.InetSocketAddress;
 
 /**
@@ -26,9 +27,9 @@ import java.net.InetSocketAddress;
 @Component
 public class NettyServer implements CommandLineRunner {
 
-    @Autowired
+    @Resource
     private IMCenterServiceImplApolloConfig imCenterServiceImplApolloConfig;
-    @Autowired
+    @Resource
     private RedisTemplate<String, String> redisTemplate;
 
 //    @PostConstruct

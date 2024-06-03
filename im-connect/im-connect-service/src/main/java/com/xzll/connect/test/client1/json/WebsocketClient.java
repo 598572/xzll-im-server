@@ -3,9 +3,9 @@ package com.xzll.connect.test.client1.json;
 
 
 import cn.hutool.json.JSONUtil;
-import com.xzll.common.constant.ImCommonEnum;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.MsgBaseRequest;
-import com.xzll.connect.pojo.dto.C2CMsgRequestDTO;
+import com.xzll.common.pojo.C2CMsgRequestDTO;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -20,7 +20,6 @@ import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 
@@ -28,8 +27,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Scanner;
 import java.util.UUID;
-
-import static com.xzll.common.constant.ImCommonEnum.USER_ID;
 
 /**
  * @Author: hzz
@@ -66,7 +63,7 @@ public class WebsocketClient {
         // 设置Bootstrap
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(group);
-        bootstrap.channel(NioSocketChannel.class).attr(ImCommonEnum.USER_ID_KEY, VALUE);
+        bootstrap.channel(NioSocketChannel.class).attr(ImConstant.USER_ID_KEY, VALUE);
 
         WebSocketClientHandshaker webSocketClientHandshaker = WebSocketClientHandshakerFactory
                 .newHandshaker(wsUri, WebSocketVersion.V13, null, true, entries, 100 * 1024 * 1024);

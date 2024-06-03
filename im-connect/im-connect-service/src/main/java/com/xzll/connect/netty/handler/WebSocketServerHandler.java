@@ -4,7 +4,7 @@ package com.xzll.connect.netty.handler;
 import cn.hutool.extra.spring.SpringUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
-import com.xzll.common.constant.ImCommonEnum;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
@@ -87,7 +87,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         String channelId = ctx.channel().id().asLongText();
         //断开连接
         log.info("客户端断开连接：{}", channelId);
-        String uid = ctx.channel().attr(ImCommonEnum.USER_ID_KEY).get();
+        String uid = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
         //清除用户登录的服务器信息
         LocalChannelManager.removeUserChannel(uid);
         //清楚用户登录信息

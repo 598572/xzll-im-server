@@ -30,10 +30,10 @@ public class MsgBaseResponse<T> {
         private int secondLevelMsgType;
     }
 
-    public static <T> MsgBaseResponse buildPushToClientData(MsgBaseRequest.MsgType msgType, T data, Map<String, String> extraMap) {
+    public static <T> MsgBaseResponse buildPushToClientData(MsgBaseRequest msgType, T data, Map<String, String> extraMap) {
         MsgType msgTypeResponse = new MsgType();
-        msgTypeResponse.setFirstLevelMsgType(msgType.getFirstLevelMsgType());
-        msgTypeResponse.setSecondLevelMsgType(msgType.getSecondLevelMsgType());
+        msgTypeResponse.setFirstLevelMsgType(msgType.getMsgType().getFirstLevelMsgType());
+        msgTypeResponse.setSecondLevelMsgType(msgType.getMsgType().getSecondLevelMsgType());
         return new MsgBaseResponse(msgTypeResponse, data, extraMap);
     }
 

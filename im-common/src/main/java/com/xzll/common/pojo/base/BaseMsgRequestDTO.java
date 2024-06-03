@@ -1,4 +1,5 @@
-package com.xzll.connect.pojo.dto.base;
+package com.xzll.common.pojo.base;
+
 
 import com.xzll.common.pojo.MsgBaseRequest;
 import lombok.Getter;

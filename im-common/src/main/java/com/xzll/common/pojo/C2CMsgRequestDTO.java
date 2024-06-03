@@ -1,6 +1,6 @@
-package com.xzll.connect.pojo.dto;
+package com.xzll.common.pojo;
 
-import com.xzll.connect.pojo.dto.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.base.BaseMsgRequestDTO;
 import lombok.Getter;
 import lombok.Setter;
 

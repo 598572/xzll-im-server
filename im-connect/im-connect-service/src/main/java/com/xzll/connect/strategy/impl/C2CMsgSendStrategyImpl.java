@@ -10,9 +10,10 @@ import com.xzll.connect.api.TransferC2CMsgApi;
 import com.xzll.common.pojo.MsgBaseRequest;
 
 
+import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.pojo.constant.UserRedisConstant;
-import com.xzll.connect.pojo.dto.C2CMsgRequestDTO;
+import com.xzll.common.pojo.C2CMsgRequestDTO;
 import com.xzll.connect.pojo.dto.MessageInfoDTO;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
@@ -28,11 +29,11 @@ import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.RpcContext;
 
 import org.apache.dubbo.rpc.cluster.router.address.Address;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import javax.validation.constraints.NotNull;
 import java.util.Collections;
 import java.util.Objects;
@@ -48,12 +49,14 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
 
     private static final String TAG = "[客户端发送单聊消息]_";
 
-    @Autowired
+    @Resource
     private RedisTemplate<String, String> redisTemplate;
-    @Autowired
+    @Resource
     private ObjectMapper objectMapper;
     @DubboReference(parameters = {"router", "address"})
     private TransferC2CMsgApi transferC2CMsgApi;
+    @Resource
+    private C2CMsgProvider c2CMsgProvider;
 
     /**
      * 策略适配
@@ -105,6 +108,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
             // 直接发送
             log.info((TAG + "用户{}在线且在本台机器上,将直接发送"), packet.getToUserId());
             super.msgSendTemplate(TAG, targetChannel, JSONUtil.toJsonStr(msgBaseRequest));
+            c2CMsgProvider.sendC2CMsg(packet);
         } else if (null == userStatus && null == targetChannel) {
             log.info((TAG + "用户{}不在线，将消息保存至离线表中"), packet.getToUserId());
             // 更新消息状态为离线

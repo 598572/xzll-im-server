@@ -43,11 +43,11 @@
 //    private static final String RECEIVE_URL = "http://{0}:{1}/msg/transferWithdrawMsg";
 //    private static final String TAG = "[客户端发送撤回消息]_";
 //
-//    @Autowired
+//    @Resource
 //    private RedisCache redisCache;
-//    @Autowired
+//    @Resource
 //    private ObjectMapper objectMapper;
-//    @Autowired
+//    @Resource
 //    private MsgService msgService;
 //
 //    /**

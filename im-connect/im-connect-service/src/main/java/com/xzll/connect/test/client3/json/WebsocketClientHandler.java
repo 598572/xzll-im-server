@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.common.pojo.MsgBaseResponse;
-import com.xzll.connect.pojo.dto.C2CMsgRequestDTO;
+import com.xzll.common.pojo.C2CMsgRequestDTO;
 import com.xzll.connect.pojo.enums.MsgStatusEnum;
 import com.xzll.connect.pojo.enums.MsgTypeEnum;
 import com.xzll.connect.pojo.response.dto.ClientReceivedMsgAckDTO;

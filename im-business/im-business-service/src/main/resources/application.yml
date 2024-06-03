@@ -14,3 +14,16 @@ dubbo:
     address: zookeeper://127.0.0.1:2181
   metadata-report:
     address: zookeeper://127.0.0.1:2181
+
+spring:
+  # datasource 数据源配置内容，对应 DataSourceProperties 配置属性类
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/xzll_im?useSSL=false&useUnicode=true&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root # 数据库账号
+    password: 123456 # 数据库密码
+
+# MyBatis配置
+mybatis:
+  # 搜索指定包
+  typeAliasesPackage: com.xzll.*.mapper

@@ -1,6 +1,6 @@
 package com.xzll.connect.pojo.response.dto;
 
-import com.xzll.connect.pojo.dto.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.base.BaseMsgRequestDTO;
 import com.xzll.connect.pojo.enums.MsgStatusEnum;
 import com.xzll.connect.pojo.response.dto.base.BaseMsgResponseDTO;
 import lombok.Data;

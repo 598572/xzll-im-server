@@ -1,6 +1,6 @@
 package com.xzll.connect.netty.handler;
 
-import com.xzll.common.constant.ImCommonEnum;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -35,7 +35,7 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
             log.info("token:{}，uid:{}", token,uid);
             //todo 从权限系统根据token 获取userId
             LocalChannelManager.addUserChannel(uid,ctx.channel());
-            ctx.channel().attr(ImCommonEnum.USER_ID_KEY).setIfAbsent(uid);
+            ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
             //成功后移除该handler
             ctx.pipeline().remove(this);
             ctx.fireChannelRead(msg);
