@@ -27,15 +27,14 @@ import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
-import org.apache.dubbo.rpc.RpcContext;
 
-import org.apache.dubbo.rpc.cluster.router.address.Address;
-
+import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
+import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import javax.validation.constraints.NotNull;
+
 import java.util.Collections;
 import java.util.Objects;
 
@@ -68,7 +67,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
      * @return
      */
     @Override
-    public boolean support(@NotNull MsgBaseRequest.MsgType msgType) {
+    public boolean support( MsgBaseRequest.MsgType msgType) {
         return MsgBaseRequest.checkSupport(msgType, MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode(), MsgTypeEnum.SecondLevelMsgType.C2C.getCode());
     }
 
@@ -119,9 +118,14 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         } else if (Objects.isNull(targetChannel) && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)
                 && StringUtils.isNotBlank(ipPortStr)) {
             log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToUserId(), ipPortStr);
-            // 根据provider的ip,port创建Address实例
-            Address address = new Address(NettyAttrUtil.getIpStr(ipPortStr), NettyAttrUtil.getPortInt(ipPortStr));
-            RpcContext.getContext().setObjectAttachment("address", address);
+
+            // 根据provider的ip,port创建Address实例并调用
+            //dubbo 2.7.13 使用此方式指定 ip:port 调用
+            //Address address = new Address(NettyAttrUtil.getIpStr(ipPortStr), NettyAttrUtil.getPortInt(ipPortStr));
+            //RpcContext.getContext().setObjectAttachment("address", address);
+
+            //dubbo 3.x 使用此方式指定 ip:port 调用 官方建议：[必须每次都设置，而且设置后必须马上发起调用]
+            UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPortStr), NettyAttrUtil.getPortInt(ipPortStr), false));
             transferC2CMsgApi.transferC2CMsg(msgBaseRequest);
         }
         log.info((TAG + "exchange_method_end."));
