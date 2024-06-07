@@ -1,15 +1,13 @@
 package com.xzll.connect.controller;
 
-
-import com.alibaba.dubbo.config.annotation.Reference;
 import com.xzll.business.api.RpcTestApi;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+
 
 import java.util.Map;
 
@@ -19,16 +17,13 @@ import java.util.Map;
  * @Description:
  */
 
-@RestController
-@RequestMapping("/xzll/client")
-public class TestController {
+@Component
+public class TestDubbo {
+
+    private static final Logger logger = LoggerFactory.getLogger(TestDubbo.class);
 
 
-
-    private static final Logger logger = LoggerFactory.getLogger(TestController.class);
-
-
-    @Reference
+    @DubboReference
     private RpcTestApi rpcTestApi;
 
     @PostMapping(value = "/testImClient")

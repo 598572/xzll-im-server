@@ -11,6 +11,7 @@ import com.xzll.common.pojo.MsgBaseRequest;
 
 
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
+import com.xzll.connect.config.IMConnectServerConfig;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.pojo.constant.UserRedisConstant;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
@@ -57,6 +58,8 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private TransferC2CMsgApi transferC2CMsgApi;
     @Resource
     private C2CMsgProvider c2CMsgProvider;
+    @Resource
+    private IMConnectServerConfig nacosConfig;
 
     /**
      * 策略适配
@@ -136,6 +139,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
             log.info((TAG + "跳转后用户{}不在线,将直接发送消息"), packet.getToUserId());
             super.msgSendTemplate(TAG, targetChannel, JSONUtil.toJsonStr(msg));
+            c2CMsgProvider.sendC2CMsg(packet);
         } else {
             log.info((TAG + "跳转后用户{}不在线,将消息保存至离线表中"), packet.getToUserId());
             this.updateC2cMsgStatus(packet);

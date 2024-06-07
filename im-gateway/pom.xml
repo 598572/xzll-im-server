@@ -53,11 +53,48 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!--nacos配置中心-->
+		<dependency>
+			<groupId>com.alibaba.cloud</groupId>
+			<artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+		</dependency>
+
+		<!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bootstrap</artifactId>
+		</dependency>
+
+
 	</dependencies>
 
 
 
 
+	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources/</directory>
+				<!--会使用profiles中的properties 来替换 includes为true文件的变量占位符 -->
+				<filtering>true</filtering>
+				<includes>
+					<include>**/*.yml</include>
+					<include>**/*.yaml</include>
+					<include>**/*.properties</include>
+					<include>**/*.xml</include>
+					<include>**/*.json</include>
+					<include>**/*.pem</include>
+					<include>**/*.jks</include>
+
+				</includes>
+				<excludes>
+					<exclude>*.jks</exclude>
+				</excludes>
+			</resource>
+		</resources>
+
+	</build>
 
 
 </project>

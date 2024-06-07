@@ -26,6 +26,8 @@
 
     <properties>
         <java.version>11</java.version>
+        <spring.cloud.version>Greenwich.SR6</spring.cloud.version>
+        <alibaba.cloud.version>2.1.4.RELEASE</alibaba.cloud.version>
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
         <springboot.version>2.1.13.RELEASE</springboot.version>
         <netty.version>4.1.21.Final</netty.version>
@@ -37,6 +39,7 @@
         <mapstruct.version>1.4.2.Final</mapstruct.version>
         <mapstruct.extensions.spring.version>0.1.1</mapstruct.extensions.spring.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <nacos.group.name>xzll-im</nacos.group.name>
     </properties>
 
     <dependencies>
@@ -51,27 +54,50 @@
     <dependencyManagement>
         <dependencies>
 
-<!--            <dependency>-->
-<!--                <groupId>org.springframework.boot</groupId>-->
-<!--                <artifactId>spring-boot-dependencies</artifactId>-->
-<!--                <version>${springboot.version}</version>-->
-<!--            </dependency>-->
+            <!--需要有这个 不然的话 解析不了bootstrap文件-->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring.cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!--springcloud的父依赖 nacos需要用到-->
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>${alibaba.cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
-            <!-- Dubbo -->
-<!--            <dependency>-->
-<!--                <groupId>org.apache.dubbo</groupId>-->
-<!--                <artifactId>dubbo-bom</artifactId>-->
-<!--                <version>${dubbo.version}</version>-->
-<!--                <type>pom</type>-->
-<!--                <scope>import</scope>-->
-<!--            </dependency>-->
 
-<!--            <dependency>-->
-<!--                <groupId>org.apache.dubbo</groupId>-->
-<!--                <artifactId>dubbo-dependencies-zookeeper-curator5</artifactId>-->
-<!--                <version>${dubbo.version}</version>-->
-<!--                <type>pom</type>-->
-<!--            </dependency>-->
+            <!--此配置比较重要，如果没有此配置 可能出现dubbo和其他jar冲突的情况，将报错：
+               An attempt was made to call a method that does not exist. The attempt was made from the following location:
+                   org.apache.dubbo.config.spring.beans.factory.annotation.ReferenceAnnotationBeanPostProcessor.<init>(ReferenceAnnotationBeanPostProcessor.java:106)
+               The following method did not exist:
+                   'void org.apache.dubbo.config.spring.beans.factory.annotation.ReferenceAnnotationBeanPostProcessor.setClassValuesAsString(boolean)'
+               The method's class, org.apache.dubbo.config.spring.beans.factory.annotation.ReferenceAnnotationBeanPostProcessor, is available from the following locations:
+                   jar:file:/Users/hzz/.m2/repository/org/apache/dubbo/dubbo/2.7.13/dubbo-2.7.13.jar!/org/apache/dubbo/config/spring/beans/factory/annotation/ReferenceAnnotationBeanPostProcessor.class
+               It was loaded from the following location:
+                   file:/Users/hzz/.m2/repository/org/apache/dubbo/dubbo/2.7.13/dubbo-2.7.13.jar
+               Action:
+               Correct the classpath of your application so that it contains a single, compatible version of org.apache.dubbo.config.spring.beans.factory.annotation.ReferenceAnnotationBeanPostProcessor
+               解决方式就是配置如下jar 来自github: https://github.com/alibaba/spring-cloud-alibaba/issues/2310
+            -->
+            <dependency>
+                <groupId>com.alibaba.spring</groupId>
+                <artifactId>spring-context-support</artifactId>
+                <version>1.0.11</version>
+            </dependency>
+
+            <!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-starter-bootstrap</artifactId>
+                <version>3.0.0</version>
+            </dependency>
+
 
             <dependency>
                 <groupId>org.apache.rocketmq</groupId>
@@ -163,6 +189,7 @@
 <!--                <version>0.2.1</version>-->
 <!--            </dependency>-->
 
+            <!--务必使用apache的方式！ springcloud 中的dubbo已经被标记为过时 不推荐使用了-->
             <dependency>
                 <groupId>org.apache.dubbo</groupId>
                 <artifactId>dubbo-spring-boot-starter</artifactId>
@@ -184,6 +211,14 @@
                 <artifactId>curator-client</artifactId>
                 <version>4.3.0</version>
             </dependency>
+
+            <!--如果单纯使用springboot集成nacos 则使用此方式 但是此方式有问题读不到bootstrap.yml文件 原因可能是boot不支持对bootstarp.yml的文件读取，但是我又不想像官网那样把命名空间dataid配到注解中，所以不用这种方式了：https://nacos.io/zh-cn/docs/quick-start-spring-boot.html-->
+            <!--            <dependency>-->
+<!--                <groupId>com.alibaba.boot</groupId>-->
+<!--                <artifactId>nacos-config-spring-boot-starter</artifactId>-->
+<!--                <version>${nacos.version}</version>-->
+<!--            </dependency>-->
+
 
             <dependency>
                 <groupId>log4j</groupId>
@@ -357,6 +392,52 @@
 <!--            </plugin>-->
 <!--        </plugins>-->
     </build>
+
+    <profiles>
+        <profile>
+            <id>dev</id>
+            <activation>
+                <!--默认激活dev环境-->
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <!--替换bootstrap.properties中的 ${nacos.serverAddress}变量-->
+                <nacos.serverAddr>127.0.0.1:8848</nacos.serverAddr>
+                <nacos.config.namespace>dev_id</nacos.config.namespace><!--               f407f750-961e-44f2-80d7-6983374ad1e0-->
+                <boot.profile>dev</boot.profile>
+                <nacos.config.groupname>${nacos.group.name}</nacos.config.groupname>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>test</id>
+            <activation>
+            </activation>
+            <properties>
+                <!--模拟test环境-->
+                <!--替换bootstrap.properties中的 ${nacos.serverAddr}变量-->
+                <nacos.serverAddr>127.0.0.1:8848</nacos.serverAddr>
+                <!--根据test的命名空间 填写此处的命名空间ID-->
+                <nacos.config.namespace>test_id</nacos.config.namespace>
+                <boot.profile>test</boot.profile>
+                <nacos.config.groupname>${nacos.group.name}</nacos.config.groupname>
+            </properties>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <activation>
+            </activation>
+            <properties>
+                <!--模拟prod环境-->
+                <!--替换bootstrap.properties中的 ${nacos.serverAddr}变量-->
+                <nacos.serverAddr>127.0.0.1:8848</nacos.serverAddr>
+                <!--根据prod的命名空间 填写此处的命名空间ID-->
+                <nacos.config.namespace>pro_id</nacos.config.namespace>
+                <nacos.config.groupname>${nacos.group.name}</nacos.config.groupname>
+                <boot.profile>prod</boot.profile>
+            </properties>
+        </profile>
+    </profiles>
 
 
 </project>

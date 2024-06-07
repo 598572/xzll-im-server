@@ -4,10 +4,9 @@ package com.xzll.connect.netty.heart;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.util.NettyAttrUtil;
 
-import com.xzll.connect.config.IMCenterServiceImplApolloConfig;
+import com.xzll.connect.config.IMConnectServerConfig;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -23,12 +22,12 @@ import javax.annotation.Resource;
 public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
 
     @Resource
-    private IMCenterServiceImplApolloConfig imCenterServiceImplApolloConfig;
+    private IMConnectServerConfig imConnectServerConfig;
 
     @Override
     public void process(ChannelHandlerContext ctx) {
 
-        long heartBeatTime = imCenterServiceImplApolloConfig.getHeartBeatTime() * 1000;
+        long heartBeatTime = imConnectServerConfig.getHeartBeatTime() * 1000;
 
         Long lastReadTime = NettyAttrUtil.getReaderTime(ctx.channel());
         long now = System.currentTimeMillis();

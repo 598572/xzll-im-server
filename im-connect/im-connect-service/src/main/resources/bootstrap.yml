@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: imConnect
+    profiles:
+      active: @boot.profile@
+  cloud:
+    nacos:
+      config:
+        server-addr: @nacos.serverAddr@   # 使用 @占位 ，最终 读取maven配置
+        file-extension: yaml
+        namespace: @nacos.config.namespace@
+        group: @nacos.group.name@
+        prefix: ${spring.application.name} # 每个服务不同，无需往maven配
+logging:
+  level:
+    com.alibaba: DEBUG
+    org.springframework.cloud: DEBUG

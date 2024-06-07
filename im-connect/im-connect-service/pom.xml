@@ -14,6 +14,25 @@
 
 
     <dependencies>
+        <dependency>
+            <groupId>com.xzll</groupId>
+            <artifactId>im-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.dubbo</groupId>
+            <artifactId>dubbo-spring-boot-starter</artifactId>
+        </dependency>
+        <!--ZooKeeper客户端-->
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-framework</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-recipes</artifactId>
+        </dependency>
+
 
 
         <dependency>
@@ -21,9 +40,18 @@
             <artifactId>redisson-spring-boot-starter</artifactId>
         </dependency>
 
+
+
+
         <dependency>
-            <groupId>com.xzll</groupId>
-            <artifactId>im-common</artifactId>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
         </dependency>
 
 
@@ -40,7 +68,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <!-- 去除内嵌tomcat -->
+            <!-- 去除内嵌tomcat 此connect 服务是netty做的长连接服务， 无需使用tomcat -->
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>
@@ -60,7 +88,10 @@
             <artifactId>im-business-api</artifactId>
         </dependency>
 
-
+        <dependency>
+            <groupId>com.alibaba.spring</groupId>
+            <artifactId>spring-context-support</artifactId>
+        </dependency>
 
 
         <!-- dubbo -->
@@ -80,20 +111,49 @@
 <!--            </exclusions>-->
 <!--        </dependency>-->
 
-        <dependency>
-            <groupId>org.apache.dubbo</groupId>
-            <artifactId>dubbo-spring-boot-starter</artifactId>
-        </dependency>
-        <!--ZooKeeper客户端-->
-        <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-framework</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-recipes</artifactId>
-        </dependency>
+        <!--如果单纯使用springboot集成nacos 则使用此方式 但是此方式有问题读不到bootstrap.yml文件 原因可能是boot不支持对bootstarp.yml的文件读取，但是我又不想像官网那样把命名空间dataid配到注解中，所以不用这种方式了：https://nacos.io/zh-cn/docs/quick-start-spring-boot.html-->
+        <!--        <dependency>-->
+        <!--            <groupId>com.alibaba.boot</groupId>-->
+        <!--            <artifactId>nacos-config-spring-boot-starter</artifactId>-->
+        <!--        </dependency>-->
+
+
+        <!--        <dependency>-->
+        <!--            <groupId>org.springframework.cloud</groupId>-->
+        <!--            <artifactId>spring-cloud-commons-dependencies</artifactId>-->
+        <!--            <version>2.1.6.RELEASE</version>-->
+        <!--        </dependency>-->
+
+        <!--配置文件处理器 实测：不配也能解析bootstrap.yml-->
+        <!--        <dependency>-->
+        <!--            <groupId>org.springframework.boot</groupId>-->
+        <!--            <artifactId>spring-boot-configuration-processor</artifactId>-->
+        <!--            <optional>true</optional>-->
+        <!--        </dependency>-->
 
     </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources/</directory>
+                <!--会使用profiles中的properties 来替换 includes为true文件的变量占位符 -->
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/*.yml</include>
+                    <include>**/*.yaml</include>
+                    <include>**/*.properties</include>
+                    <include>**/*.xml</include>
+                    <include>**/*.json</include>
+                    <include>**/*.pem</include>
+                    <include>**/*.jks</include>
+                </includes>
+                <excludes>
+                    <exclude>*.jks</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
+    </build>
 
 </project>

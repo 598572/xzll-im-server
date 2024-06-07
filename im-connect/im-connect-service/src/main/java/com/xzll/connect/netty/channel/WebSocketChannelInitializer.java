@@ -1,7 +1,7 @@
 package com.xzll.connect.netty.channel;
 
 import cn.hutool.extra.spring.SpringUtil;
-import com.xzll.connect.config.IMCenterServiceImplApolloConfig;
+import com.xzll.connect.config.IMConnectServerConfig;
 import com.xzll.connect.netty.handler.AuthHandler;
 import com.xzll.connect.netty.handler.WebSocketServerHandler;
 import io.netty.channel.ChannelInitializer;
@@ -27,11 +27,11 @@ public class WebSocketChannelInitializer extends ChannelInitializer<SocketChanne
     @Override
     protected void initChannel(SocketChannel ch) {
 
-        IMCenterServiceImplApolloConfig imCenterServiceImplApolloConfig = SpringUtil.getBean(IMCenterServiceImplApolloConfig.class);
+        IMConnectServerConfig imConnectServerConfig = SpringUtil.getBean(IMConnectServerConfig.class);
 
         ChannelPipeline pipeline = ch.pipeline();
         // 在调试期加入日志功能，从而可以打印出报文的请求和响应细节
-        if (imCenterServiceImplApolloConfig.isDebug()) {
+        if (imConnectServerConfig.isDebug()) {
             pipeline.addLast(new LoggingHandler(LogLevel.DEBUG));
         }
 
