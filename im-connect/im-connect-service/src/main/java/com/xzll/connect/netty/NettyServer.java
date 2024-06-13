@@ -19,6 +19,8 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.net.InetSocketAddress;
 
+import static com.xzll.common.constant.ImConstant.RedisConstant.NETTY_IP_PORT;
+
 /**
  * @Author: hzz
  * @Date: 2024/6/1 10:19:34
@@ -27,6 +29,7 @@ import java.net.InetSocketAddress;
 @Slf4j
 @Component
 public class NettyServer implements ApplicationRunner {
+
 
     @Resource
     private IMConnectServerConfig imConnectServerConfig;
@@ -60,7 +63,7 @@ public class NettyServer implements ApplicationRunner {
             int usableLocalPort = imConnectServerConfig.getPort();
 
             //将来 每一个服务的ip和端口 是要注册到zk中 以便客户请求连接时进行路由
-            redisTemplate.opsForHash().put("netty_ip_port", hostAddress, String.valueOf(usableLocalPort));
+            redisTemplate.opsForHash().put(NETTY_IP_PORT, hostAddress, String.valueOf(usableLocalPort));
             //存储到本地，登录时 每一个用户对应一个机器的信息 <c1,s1> 保存到redis 使用 map存储
             NettyAttrUtil.setIpPort(hostAddress, usableLocalPort);
             channel = bootstrap.bind(new InetSocketAddress(usableLocalPort)).sync().channel();

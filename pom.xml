@@ -5,7 +5,8 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.1.13.RELEASE</version>
+        <!--        <version>2.1.13.RELEASE</version>-->
+        <version>2.7.0</version>
         <relativePath/>
     </parent>
     <packaging>pom</packaging>
@@ -17,6 +18,7 @@
 
     <modules>
         <module>im-gateway</module>
+        <module>im-auth</module>
         <module>im-connect</module>
         <module>im-business</module>
         <module>im-console</module>
@@ -26,20 +28,34 @@
 
     <properties>
         <java.version>11</java.version>
-        <spring.cloud.version>Greenwich.SR6</spring.cloud.version>
-        <alibaba.cloud.version>2.1.4.RELEASE</alibaba.cloud.version>
+
+        <!--老版本-->
+        <!--        <spring.cloud.version>Greenwich.SR6</spring.cloud.version>-->
+        <!--        <alibaba.cloud.version>2.1.4.RELEASE</alibaba.cloud.version>-->
+        <!--        <springboot.version>2.1.13.RELEASE</springboot.version>-->
+        <!--        <dubbo.version>2.7.13</dubbo.version>-->
+        <!--        <netty.version>4.1.21.Final</netty.version> -->
+
+        <!--升级后的新版本-->
+        <spring.cloud.version>2021.0.3</spring.cloud.version>
+        <alibaba.cloud.version>2021.0.1.0</alibaba.cloud.version>
+        <springboot.version>2.7.0</springboot.version>
+        <dubbo.version>3.0.7</dubbo.version>
+        <curator.version>4.3.0</curator.version>
+        <netty.version>4.1.75.Final</netty.version>
+
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
-        <springboot.version>2.1.13.RELEASE</springboot.version>
-        <netty.version>4.1.21.Final</netty.version>
         <fastjson.version>1.2.46</fastjson.version>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <redisson.version>3.14.0</redisson.version>
-        <dubbo.version>2.7.15</dubbo.version>
         <mapstruct.version>1.4.2.Final</mapstruct.version>
         <mapstruct.extensions.spring.version>0.1.1</mapstruct.extensions.spring.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <nacos.group.name>xzll-im</nacos.group.name>
+
+        <spring-cloud-starter-oauth2.version>2.2.5.RELEASE</spring-cloud-starter-oauth2.version>
+        <nimbus-jose-jwt.version>9.23</nimbus-jose-jwt.version>
     </properties>
 
     <dependencies>
@@ -117,10 +133,11 @@
                 <artifactId>mysql-connector-java</artifactId>
                 <version>8.0.23</version>
             </dependency>
+            <!--The dependencies of some of the beans in the application context form a cycle: | com.github.pagehelper.autoconfigure.PageHelperAutoConfiguration-->
             <dependency>
                 <groupId>com.github.pagehelper</groupId>
                 <artifactId>pagehelper-spring-boot-starter</artifactId>
-                <version>1.3.0</version>
+                <version>1.4.1</version>
             </dependency>
 
             <dependency>
@@ -179,45 +196,68 @@
                 <artifactId>spring-boot-starter-test</artifactId>
                 <version>${springboot.version}</version>
                 <scope>test</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>ch.qos.logback</groupId>
+                        <artifactId>logback-classic</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <!--不排除的话将会和 log4j-slf4j-impl冲突，具体见：https://stackoverflow.com/questions/32366586/using-log4j2-with-slf4j-java-lang-stackoverflowerror-->
+                        <artifactId>log4j-to-slf4j</artifactId>
+                        <groupId>org.apache.logging.log4j</groupId>
+                    </exclusion>
+                </exclusions>
+
             </dependency>
 
 
-
-<!--            <dependency>-->
-<!--                <groupId>com.alibaba.boot</groupId>-->
-<!--                <artifactId>dubbo-spring-boot-starter</artifactId>-->
-<!--                <version>0.2.1</version>-->
-<!--            </dependency>-->
+            <!--            <dependency>-->
+            <!--                <groupId>com.alibaba.boot</groupId>-->
+            <!--                <artifactId>dubbo-spring-boot-starter</artifactId>-->
+            <!--                <version>0.2.1</version>-->
+            <!--            </dependency>-->
 
             <!--务必使用apache的方式！ springcloud 中的dubbo已经被标记为过时 不推荐使用了-->
             <dependency>
                 <groupId>org.apache.dubbo</groupId>
                 <artifactId>dubbo-spring-boot-starter</artifactId>
-                <version>2.7.13</version>
+                <version>${dubbo.version}</version>
             </dependency>
             <!--ZooKeeper客户端-->
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-framework</artifactId>
-                <version>4.3.0</version>
+                <version>${curator.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-recipes</artifactId>
-                <version>4.3.0</version>
+                <version>${curator.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.curator</groupId>
                 <artifactId>curator-client</artifactId>
-                <version>4.3.0</version>
+                <version>${curator.version}</version>
+            </dependency>
+            <!--此jar必须有 在dubbo2.7.13时 没有也行 ，但是升级到dubbo3.x时 需要依赖此jar否则报错： java.lang.NoClassDefFoundError: org/apache/curator/x/discovery/ServiceDiscoveryBuilder -->
+            <dependency>
+                <groupId>org.apache.curator</groupId>
+                <artifactId>curator-x-discovery</artifactId>
+                <version>${curator.version}</version>
+            </dependency>
+            <!--dubbo指定ip调用依赖此jar-->
+            <dependency>
+                <groupId>org.apache.dubbo.extensions</groupId>
+                <artifactId>dubbo-cluster-specify-address-dubbo3</artifactId>
+                <version>1.0.0</version>
             </dependency>
 
             <!--如果单纯使用springboot集成nacos 则使用此方式 但是此方式有问题读不到bootstrap.yml文件 原因可能是boot不支持对bootstarp.yml的文件读取，但是我又不想像官网那样把命名空间dataid配到注解中，所以不用这种方式了：https://nacos.io/zh-cn/docs/quick-start-spring-boot.html-->
             <!--            <dependency>-->
-<!--                <groupId>com.alibaba.boot</groupId>-->
-<!--                <artifactId>nacos-config-spring-boot-starter</artifactId>-->
-<!--                <version>${nacos.version}</version>-->
-<!--            </dependency>-->
+            <!--                <groupId>com.alibaba.boot</groupId>-->
+            <!--                <artifactId>nacos-config-spring-boot-starter</artifactId>-->
+            <!--                <version>${nacos.version}</version>-->
+            <!--            </dependency>-->
 
 
             <dependency>
@@ -384,13 +424,13 @@
 
     <build>
 
-<!--        <plugins>-->
-<!--            <plugin>-->
-<!--                <groupId>org.springframework.boot</groupId>-->
-<!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
-<!--                <version>2.1.13.RELEASE</version>-->
-<!--            </plugin>-->
-<!--        </plugins>-->
+        <!--        <plugins>-->
+        <!--            <plugin>-->
+        <!--                <groupId>org.springframework.boot</groupId>-->
+        <!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
+        <!--                <version>2.1.13.RELEASE</version>-->
+        <!--            </plugin>-->
+        <!--        </plugins>-->
     </build>
 
     <profiles>
@@ -403,7 +443,8 @@
             <properties>
                 <!--替换bootstrap.properties中的 ${nacos.serverAddress}变量-->
                 <nacos.serverAddr>127.0.0.1:8848</nacos.serverAddr>
-                <nacos.config.namespace>dev_id</nacos.config.namespace><!--               f407f750-961e-44f2-80d7-6983374ad1e0-->
+                <nacos.config.namespace>dev_id
+                </nacos.config.namespace><!--               f407f750-961e-44f2-80d7-6983374ad1e0-->
                 <boot.profile>dev</boot.profile>
                 <nacos.config.groupname>${nacos.group.name}</nacos.config.groupname>
             </properties>

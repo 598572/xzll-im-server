@@ -11,7 +11,11 @@ spring:
         namespace: @nacos.config.namespace@
         group: @nacos.group.name@
         prefix: ${spring.application.name} # 每个服务不同，无需往maven配
-logging:
-  level:
-    com.alibaba: DEBUG
-    org.springframework.cloud: DEBUG
+      discovery:
+        server-addr: @nacos.serverAddr@
+
+#排查问题时使用
+#logging:
+#  level:
+#    com.alibaba: DEBUG
+#    org.springframework.cloud: DEBUG

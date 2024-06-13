@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<parent>
+		<artifactId>xzll-im-parent</artifactId>
+		<groupId>com.xzll</groupId>
+		<version>0.0.1-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath> <!-- lookup parent from repository -->
+
+	</parent>
+	<modelVersion>4.0.0</modelVersion>
+
+	<artifactId>im-auth</artifactId>
+
+
+
+	<dependencies>
+
+
+
+		<dependency>
+			<groupId>com.xzll</groupId>
+			<artifactId>im-common</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!--nacos配置中心-->
+		<dependency>
+			<groupId>com.alibaba.cloud</groupId>
+			<artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+		</dependency>
+
+		<!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bootstrap</artifactId>
+		</dependency>
+
+		<!--nacos注册中心-->
+		<dependency>
+			<groupId>com.alibaba.cloud</groupId>
+			<artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-oauth2</artifactId>
+			<version>${spring-cloud-starter-oauth2.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.nimbusds</groupId>
+			<artifactId>nimbus-jose-jwt</artifactId>
+			<version>${nimbus-jose-jwt.version}</version>
+		</dependency>
+		<!-- redis -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+
+	</dependencies>
+
+
+
+
+	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources/</directory>
+				<!--会使用profiles中的properties 来替换 includes为true文件的变量占位符 -->
+				<filtering>true</filtering>
+				<includes>
+					<include>**/*.yml</include>
+					<include>**/*.yaml</include>
+					<include>**/*.properties</include>
+					<include>**/*.xml</include>
+					<include>**/*.json</include>
+					<include>**/*.pem</include>
+					<include>**/*.jks</include>
+				</includes>
+				<excludes>
+					<exclude>*.jks</exclude>
+				</excludes>
+			</resource>
+
+			<!--此处需要指定filtering=false 如果filter是true的话 将会进行占位符的替换，造成jwt读取失败（应该是jwt中存在@符号），并且包含jwt.jks-->
+			<!--简单来说就是编译打包时不对jwt文件中的@替换-->
+			<resource>
+				<directory>src/main/resources/</directory>
+				<filtering>false</filtering>
+				<includes>
+					<include>**/*.jks</include>
+				</includes>
+			</resource>
+		</resources>
+
+	</build>
+
+
+</project>

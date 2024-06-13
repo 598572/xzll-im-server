@@ -26,7 +26,7 @@ public class BaseResponse<T> implements Serializable{
 	 * 返回成功，沒有data值
 	 */
 	public static <T> BaseResponse<T> returnResultSuccess() {
-		return setResult(AnwserCode.SUCCESS.getCode(), AnwserCode.SUCCESS.getMessage(), null);
+		return setResult(AnswerCode.SUCCESS.getCode(), AnswerCode.SUCCESS.getMessage(), null);
 	}
 
 	/**
@@ -36,7 +36,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @return
 	 */
 	public static <T> BaseResponse<T> returnResultSuccess(T data) {
-		return setResult(AnwserCode.SUCCESS.getCode(), AnwserCode.SUCCESS.getMessage(), data);
+		return setResult(AnswerCode.SUCCESS.getCode(), AnswerCode.SUCCESS.getMessage(), data);
 	}
 
 	/**
@@ -53,7 +53,7 @@ public class BaseResponse<T> implements Serializable{
 	 * 返回成功
 	 */
 	public static <T> BaseResponse<T> returnResultSuccess(String msg, T data) {
-		return setResult(AnwserCode.SUCCESS.getCode(), msg, data);
+		return setResult(AnswerCode.SUCCESS.getCode(), msg, data);
 	}
 
 	/**
@@ -83,7 +83,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @param <T>
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultError(ImAnwserCode anwserCode) {
+	public static <T> BaseResponse<T> returnResultError(ImAnswerCode anwserCode) {
 		if(anwserCode == null) {
 			return returnResultError("操作失败");
 		}
