@@ -1,104 +1,156 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<parent>
-		<artifactId>xzll-im-parent</artifactId>
-		<groupId>com.xzll</groupId>
-		<version>0.0.1-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath> <!-- lookup parent from repository -->
+    <parent>
+        <artifactId>xzll-im-parent</artifactId>
+        <groupId>com.xzll</groupId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath> <!-- lookup parent from repository -->
 
-	</parent>
-	<modelVersion>4.0.0</modelVersion>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
 
-	<artifactId>im-gateway</artifactId>
-
-
-
-	<dependencies>
+    <artifactId>im-gateway</artifactId>
 
 
-
-		<dependency>
-			<groupId>com.xzll</groupId>
-			<artifactId>im-common</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>com.xzll</groupId>
-			<artifactId>im-connect-api</artifactId>
-		</dependency>
+    <dependencies>
 
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+        <dependency>
+            <groupId>com.xzll</groupId>
+            <artifactId>im-common</artifactId>
+        </dependency>
 
-		<dependency>
-			<groupId>org.apache.dubbo</groupId>
-			<artifactId>dubbo-spring-boot-starter</artifactId>
-		</dependency>
-<!--		&lt;!&ndash;ZooKeeper客户端&ndash;&gt;-->
-		<dependency>
-			<groupId>org.apache.curator</groupId>
-			<artifactId>curator-framework</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.curator</groupId>
-			<artifactId>curator-recipes</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.curator</groupId>
-			<artifactId>curator-x-discovery</artifactId>
-		</dependency>
+        <dependency>
+            <groupId>com.xzll</groupId>
+            <artifactId>im-connect-api</artifactId>
+        </dependency>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.apache.dubbo</groupId>
+            <artifactId>dubbo-spring-boot-starter</artifactId>
+        </dependency>
+        <!--		&lt;!&ndash;ZooKeeper客户端&ndash;&gt;-->
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-framework</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-recipes</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-x-discovery</artifactId>
+        </dependency>
 
-		<!--nacos配置中心-->
-		<dependency>
-			<groupId>com.alibaba.cloud</groupId>
-			<artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
-		</dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
-		<!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-bootstrap</artifactId>
-		</dependency>
+        <!--nacos配置中心-->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-config</artifactId>
+        </dependency>
+
+        <!--nacos注册中心 网关也得有，否则找不到注册中心的服务 No servers available for service: imAuth, 即： gateway 无法进行请求转发 -->
+        <dependency>
+            <groupId>com.alibaba.cloud</groupId>
+            <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+        </dependency>
+
+        <!--需要此jar包 如果不配这个 bootstarp.yml文件将不会被识别为spring配置文件,也就是bootstrap.yml文件将不会有小绿树叶标识-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-bootstrap</artifactId>
+        </dependency>
+
+        <!--网关鉴权相关-->
+
+        <!--网关服务使用webflux响应式编程，弃用tomcat-->
+        <!--		<dependency>-->
+        <!--			<groupId>org.springframework.boot</groupId>-->
+        <!--			<artifactId>spring-boot-starter-web</artifactId>-->
+        <!--		</dependency>-->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!--gateway转发时 负载均衡-->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>${nimbus-jose-jwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!---此处需要指定版本为5.7.0 否则报错：Caused by: java.lang.ClassNotFoundException: org.springframework.security.oauth2.core.ClaimAccessor-->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-core</artifactId>
+            <version>5.7.0</version>
+        </dependency>
 
 
-	</dependencies>
+    </dependencies>
 
 
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources/</directory>
+                <!--会使用profiles中的properties 来替换 includes为true文件的变量占位符 -->
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/*.yml</include>
+                    <include>**/*.yaml</include>
+                    <include>**/*.properties</include>
+                    <include>**/*.xml</include>
+                    <include>**/*.json</include>
+                    <include>**/*.pem</include>
+                    <include>**/*.jks</include>
 
+                </includes>
+                <excludes>
+                    <exclude>*.jks</exclude>
+                </excludes>
+            </resource>
+        </resources>
 
-	<build>
-		<resources>
-			<resource>
-				<directory>src/main/resources/</directory>
-				<!--会使用profiles中的properties 来替换 includes为true文件的变量占位符 -->
-				<filtering>true</filtering>
-				<includes>
-					<include>**/*.yml</include>
-					<include>**/*.yaml</include>
-					<include>**/*.properties</include>
-					<include>**/*.xml</include>
-					<include>**/*.json</include>
-					<include>**/*.pem</include>
-					<include>**/*.jks</include>
-
-				</includes>
-				<excludes>
-					<exclude>*.jks</exclude>
-				</excludes>
-			</resource>
-		</resources>
-
-	</build>
+    </build>
 
 
 </project>
