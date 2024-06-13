@@ -22,10 +22,11 @@
 1. RocketMQ【解耦、削峰】
 1. Mybatis Plus【ORM】
 1. Mysql【数据存储】
+2. GateWay 【网关】
+1. Oauth2 + Spring Security 【权限】
 
 - 待集成
-1. GateWay 【网关】
-1. Oauth2 + Spring Security 【权限】
+
 1. Sentinel 【限流】
 1. docker+k8s【项目部署】
 1. prometheus + grafana【服务监控】
