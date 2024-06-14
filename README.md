@@ -14,18 +14,19 @@
 想要实现上边的几点，将不可避免的需要集成很多中间件或框架，如下：
 
 ## 本项目涉及到的 ***【技术】***
-1. SpringBoot
-1. Netty【长连接服务器】
-1. Nacos【配置中心】
-1. Dubbo【rpc调用，利用长连接做消息转发】
-1. Redis【缓存，分布式锁】
-1. RocketMQ【解耦、削峰】
-1. Mybatis Plus【ORM】
-1. Mysql【数据存储】
-2. GateWay 【网关】
-1. Oauth2 + Spring Security 【权限】
+- **已集成**
+1. SpringBoot【项目搭建】✅
+1. Netty【长连接服务器】✅
+1. Spring Cloud Alibaba Nacos【配置中心】✅
+1. Dubbo【rpc调用，利用长连接做消息转发】✅
+1. Redis【缓存，分布式锁】✅
+1. RocketMQ【解耦、削峰】✅
+1. Mybatis Plus【ORM】✅
+1. Mysql【数据存储】✅
+2. Spring Cloud GateWay 【网关】✅
+1. Oauth2 + Spring Security 【权限】✅
 
-- 待集成
+- **待集成**
 
 1. Sentinel 【限流】
 1. docker+k8s【项目部署】
@@ -36,12 +37,14 @@
 1. 等等
 
 ## 本项目涉及到的 ***【功能点】***
-1. 登录
-1. 单聊
-1. 群聊
+1. 登录【已实现】✅
+1. 单聊【已实现】✅
+1. 群聊【准备采用写扩散模型】
+2. 消息送达ack【保证消息可靠不丢失】
+3. 消息有序性【通过消息id来实现】
 1. 撤回
 1. 已读
-1. 离线消息
+1. 离线消息【push+pull】
 1. 最近会话
 1. 等... 
 
