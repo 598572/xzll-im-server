@@ -33,8 +33,8 @@ import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-import static com.xzll.common.constant.ImConstant.RedisConstant.IMSERVER_ROUND_COUNTER_KEY;
-import static com.xzll.common.constant.ImConstant.RedisConstant.NETTY_IP_PORT;
+import static com.xzll.common.constant.ImConstant.RedisKeyConstant.IM_SERVER_ROUND_COUNTER_KEY;
+import static com.xzll.common.constant.ImConstant.RedisKeyConstant.NETTY_IP_PORT;
 
 /**
  * @Author: hzz
@@ -117,7 +117,7 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
 
         //【轮询】
         int seatCount = addressDTOS.size();
-        long current = redisTemplate.opsForValue().increment(IMSERVER_ROUND_COUNTER_KEY) - 1;
+        long current = redisTemplate.opsForValue().increment(IM_SERVER_ROUND_COUNTER_KEY) - 1;
         long index = current % seatCount;
 
         ImServerAddressDTO roundResult = addressDTOS.get((int) index);

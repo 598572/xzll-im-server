@@ -17,6 +17,13 @@
         <dependency>
             <groupId>com.xzll</groupId>
             <artifactId>im-common</artifactId>
+            <!--需移除，因为本服务是非servlet服务，不移除，启动会报错-->
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>javax.servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

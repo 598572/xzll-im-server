@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 /**
  * @Author: hzz
  * @Date: 2024/6/11 11:05:14
- * @Description: 用户管理业务类 后期可能会移到数据库
+ * @Description: 用户管理业务类 后期一定会移到数据库
  */
 @Slf4j
 @Service
@@ -39,6 +39,7 @@ public class UserServiceImpl implements UserDetailsService {
     @PostConstruct
     public void initData() {
         String password = passwordEncoder.encode("123456");
+
         userList = new ArrayList<>();
         userList.add(new UserDTO(1L, "xzll", password, 1, CollUtil.toList("ADMIN")));
         userList.add(new UserDTO(2L, "hzz", password, 1, CollUtil.toList("TEST")));

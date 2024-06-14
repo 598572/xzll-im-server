@@ -35,5 +35,16 @@ public class Oauth2Config {
     private String jwtPassword;
     private String jwtAlias;
 
+    /**
+     * 用户token 的过期时间
+     */
+    private Integer tokenTimeOut;
+    /**
+     * 刷新时间 一般很久
+     */
+    private Integer refreshToken;
+
+
+
 
 }
