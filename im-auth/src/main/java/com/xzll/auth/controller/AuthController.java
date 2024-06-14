@@ -1,18 +1,24 @@
 package com.xzll.auth.controller;
 
+import com.xzll.auth.config.nacos.Oauth2Config;
 import com.xzll.auth.domain.Oauth2TokenDto;
+import com.xzll.common.constant.ImConstant;
+import com.xzll.common.pojo.AnswerCode;
 import com.xzll.common.pojo.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.provider.endpoint.TokenEndpoint;
+import org.springframework.security.oauth2.provider.token.TokenStore;
+import org.springframework.util.Assert;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 import javax.annotation.Resource;
 import java.security.Principal;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @Author: hzz
@@ -23,8 +29,16 @@ import java.util.Map;
 @Slf4j
 @RequestMapping("/oauth")
 public class AuthController {
+
     @Resource
     private TokenEndpoint tokenEndpoint;
+
+    @Resource
+    private TokenStore tokenStore;
+    @Resource
+    private RedisTemplate<String, String> redisTemplate;
+    @Resource
+    private Oauth2Config oauth2Config;
 
     /**
      * Oauth2登录认证
@@ -35,10 +49,38 @@ public class AuthController {
         Oauth2TokenDto oauth2TokenDto = Oauth2TokenDto.builder()
                 .token(oAuth2AccessToken.getValue())
                 .refreshToken(oAuth2AccessToken.getRefreshToken().getValue())
-                .expiresIn(oAuth2AccessToken.getExpiresIn())
+                .expiresIn(oauth2Config.getTokenTimeOut())
                 .tokenHead("Bearer ").build();
+
+        //设置用户登录或的token和uid到redis
+        if (Objects.nonNull(oauth2TokenDto) && StringUtils.isNotBlank(oauth2TokenDto.getToken())) {
+            String uid = oAuth2AccessToken.getAdditionalInformation().getOrDefault("id", StringUtils.EMPTY).toString();
+            Assert.isTrue(StringUtils.isNotBlank(uid), "缺少用户id信息！");
+            redisTemplate.opsForValue().set(ImConstant.RedisKeyConstant.USER_TOKEN_KEY + oauth2TokenDto.getToken(), uid, oauth2Config.getTokenTimeOut());
+        }
         return BaseResponse.returnResultSuccess(oauth2TokenDto);
     }
+
+    //token 刷新接口 todo
+
+    /**
+     * 验证 jwt Token ，供 不走网关的服务验证token，走网关的话不走这个接口验证token
+     */
+    @GetMapping("/validate")
+    public BaseResponse<String> validateToken(@RequestParam String token) {
+        try {
+            OAuth2AccessToken accessToken = tokenStore.readAccessToken(token);
+            //空或者过期 返回token无效
+            if (accessToken == null || accessToken.isExpired()) {
+                return BaseResponse.returnResultError(AnswerCode.TOKEN_INVALID.getMessage());
+            }
+            return BaseResponse.returnResultSuccess(AnswerCode.SUCCESS.getMessage());
+        } catch (Exception e) {
+            log.error("验证token接口异常e:", e);
+            return BaseResponse.returnResultError("验证token接口异常: " + e.getMessage());
+        }
+    }
+
 
     /**
      * 填充im服务地址 此逻辑移到网关层 在响应时做处理

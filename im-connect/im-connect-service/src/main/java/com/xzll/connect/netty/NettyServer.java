@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.net.InetSocketAddress;
 
-import static com.xzll.common.constant.ImConstant.RedisConstant.NETTY_IP_PORT;
+import static com.xzll.common.constant.ImConstant.RedisKeyConstant.NETTY_IP_PORT;
 
 /**
  * @Author: hzz
