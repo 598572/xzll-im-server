@@ -34,6 +34,10 @@
 1. SkyWalking 【链路追踪】
 1. ElasticSearch【聊天记录等搜索】
 1. Jmeter+python脚本【压测】
+2. redis集群部署
+3. elasticsearch集群部署
+4. canal 数据同步 mysql同步到es
+5. mysql分库分表
 1. 等等
 
 ## 本项目涉及到的 ***【功能点】***
