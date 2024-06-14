@@ -19,12 +19,13 @@
 1. Netty【长连接服务器】✅
 1. Spring Cloud Alibaba Nacos【配置中心】✅
 1. Dubbo【rpc调用，利用长连接做消息转发】✅
+2. zookeeper【暂时用处只是dubbo注册，后期如果没有其他用处可能移除，让dubbo注册到nacos】
 1. Redis【缓存，分布式锁】✅
 1. RocketMQ【解耦、削峰】✅
 1. Mybatis Plus【ORM】✅
 1. Mysql【数据存储】✅
 2. Spring Cloud GateWay 【网关】✅
-1. Oauth2 + Spring Security 【权限】✅
+1. Oauth2 + Spring Security 【认证&鉴权】✅
 
 - **待集成**
 
