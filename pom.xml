@@ -44,6 +44,9 @@
         <curator.version>4.3.0</curator.version>
         <netty.version>4.1.75.Final</netty.version>
 
+        <!--暂时不用新版本es客户端-->
+<!--        <elasticsearch.java.client.version>7.17.5</elasticsearch.java.client.version>-->
+
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
         <fastjson.version>1.2.46</fastjson.version>
         <maven.compiler.source>11</maven.compiler.source>
@@ -251,6 +254,13 @@
                 <artifactId>dubbo-cluster-specify-address-dubbo3</artifactId>
                 <version>1.0.0</version>
             </dependency>
+
+            <!--此客户端较新，暂时不使用 先试用elasticsearch-rest-high-level-client  因为 elasticsearch-rest-high-level-client 更稳定 虽然他标识为 ：已过时的 -->
+<!--            <dependency>-->
+<!--                <groupId>co.elastic.clients</groupId>-->
+<!--                <artifactId>elasticsearch-java</artifactId>-->
+<!--                <version>${elasticsearch.java.client.version}</version>-->
+<!--            </dependency>-->
 
             <!--如果单纯使用springboot集成nacos 则使用此方式 但是此方式有问题读不到bootstrap.yml文件 原因可能是boot不支持对bootstarp.yml的文件读取，但是我又不想像官网那样把命名空间dataid配到注解中，所以不用这种方式了：https://nacos.io/zh-cn/docs/quick-start-spring-boot.html-->
             <!--            <dependency>-->

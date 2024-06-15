@@ -1,6 +1,6 @@
 package com.xzll.business.mapstruct;
 
-import com.xzll.business.entity.ImC2CMsgRecord;
+import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

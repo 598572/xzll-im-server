@@ -2,7 +2,7 @@ package com.xzll.business.mapper;
 
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.xzll.business.entity.ImC2CMsgRecord;
+import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

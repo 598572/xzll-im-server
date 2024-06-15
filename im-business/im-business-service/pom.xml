@@ -84,6 +84,24 @@
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
         </dependency>
 
+        <!-- 集成 Elasticsearch 内部已经包含 elasticsearch-rest-high-level-client-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+        </dependency>
+
+        <!-- Elasticsearch Java 客户端 比较新 保守期间还是用更稳定的  elasticsearch-rest-high-level-client 吧  -->
+<!--        <dependency>-->
+<!--            <groupId>co.elastic.clients</groupId>-->
+<!--            <artifactId>elasticsearch-java</artifactId>-->
+<!--        </dependency>-->
+
+        <!--稳定的es客户端 这里无需手动集成 因为 spring-boot-starter-data-elasticsearch 中已经集成了 -->
+<!--        <dependency>-->
+<!--            <groupId>org.elasticsearch.client</groupId>-->
+<!--            <artifactId>elasticsearch-rest-high-level-client</artifactId>-->
+<!--        </dependency>-->
+
 
     </dependencies>
 
