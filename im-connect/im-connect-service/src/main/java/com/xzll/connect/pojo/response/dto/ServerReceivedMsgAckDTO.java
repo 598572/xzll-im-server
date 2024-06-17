@@ -15,7 +15,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class ServerReceivedMsgAckDTO extends BaseMsgResponseDTO {
 
-    private String sessionId;
+    private String chatId;
     private Integer msgReceivedStatus;
     private String ackTextDesc;
     private Long receiveTime;
@@ -33,7 +33,7 @@ public class ServerReceivedMsgAckDTO extends BaseMsgResponseDTO {
         serverReceivedMsgAckDTO.setAckTextDesc(receiveStatus ? MsgStatusEnum.MsgSendStatus.SERVER_RECEIVED.getDesc() : MsgStatusEnum.MsgSendStatus.FAIL.getDesc())
                 .setMsgReceivedStatus(receiveStatus ? MsgStatusEnum.MsgSendStatus.SERVER_RECEIVED.getCode() : MsgStatusEnum.MsgSendStatus.FAIL.getCode())
                 .setReceiveTime(System.currentTimeMillis())
-                .setSessionId(packet.getSessionId())
+                .setChatId(packet.getChatId())
                 .setMsgType(packet.getMsgType());
         serverReceivedMsgAckDTO.setMsgId(packet.getMsgId());
         return serverReceivedMsgAckDTO;

@@ -2,6 +2,8 @@ package com.xzll.business.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.mapper.ImC2CMsgRecordMapper;
 import com.xzll.business.mapstruct.C2CMsgMapping;
@@ -15,9 +17,12 @@ import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -36,13 +41,31 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     @Resource
     private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
-
+    /**
+     * 保存单聊消息记录
+     *
+     * @param dto
+     */
     @Override
-    public void saveC2CMsg(C2CMsgRequestDTO dto) {
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public boolean saveC2CMsg(C2CMsgRequestDTO dto) {
         log.info("保存单聊消息入参:{}", JSONUtil.toJsonStr(dto));
         ImC2CMsgRecord imC2CMsgRecord = c2CMsgMapping.convertC2CMsgRecord(dto);
-        int row = imC2CMsgRecordMapper.insert(imC2CMsgRecord);
-        log.info("保存单聊消息结果:{}", row);
+        int row = 0;
+        if (Objects.isNull(dto.getRetryMsgFlag())) {
+            row = imC2CMsgRecordMapper.insert(imC2CMsgRecord);
+            log.info("保存单聊消息结果:{}", row);
+        } else {
+            //如果是重试消息 需要特殊处理
+            LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
+            ImC2CMsgRecord c2CMsgRecord = imC2CMsgRecordMapper.selectOne(msgRecord);
+            if (Objects.nonNull(c2CMsgRecord)) {
+                c2CMsgRecord.setRetryCount(c2CMsgRecord.getRetryCount() + 1);
+                row = imC2CMsgRecordMapper.updateById(c2CMsgRecord);
+                log.info("更新重试次数row:{}", row);
+            }
+        }
+        return row > 0;
     }
 
     @Override
@@ -67,7 +90,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
         NativeSearchQuery nativeSearchQuery = new NativeSearchQuery(matchAllQueryBuilder);
         //查询,获取查询结果
         SearchHits<MsgEntity> search = elasticsearchRestTemplate.search(nativeSearchQuery, MsgEntity.class);
-        log.info("查询到的数据:{}",JSONUtil.toJsonStr(search));
+        log.info("查询到的数据:{}", JSONUtil.toJsonStr(search));
         return search.getSearchHits().stream()
                 .map(hit -> hit.getContent())
                 .collect(Collectors.toList());

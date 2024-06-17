@@ -19,7 +19,6 @@ import javax.annotation.Resource;
 @Slf4j
 public class TransferC2CMsgServiceImpl implements TransferC2CMsgApi {
 
-    private static final String TAG = "[客户端发送单聊消息]_";
     @Resource
     private HandlerDispatcher handlerDispatcher;
 

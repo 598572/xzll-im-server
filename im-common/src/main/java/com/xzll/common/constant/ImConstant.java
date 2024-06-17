@@ -1,6 +1,10 @@
 package com.xzll.common.constant;
 
 import io.netty.util.AttributeKey;
+import org.checkerframework.checker.units.qual.C;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public interface ImConstant {
     public static final String USER_ID = "userId";
@@ -8,6 +12,12 @@ public interface ImConstant {
     public static final String TOKEN = "token";
 
     public static final String START_TIME = "startTime";
+
+
+    /**
+     * 默认的业务类型 方便后期区分不同业务线
+     */
+    public static final Integer DEFAULT_BIZ_TYPE = 100;
 
     public static final AttributeKey<String> USER_ID_KEY = AttributeKey.valueOf(USER_ID);
 
@@ -19,8 +29,26 @@ public interface ImConstant {
 
     }
 
+
+    /**
+     * 会话类型
+     */
+    public static class ChatType {
+        //单聊
+        public static final String C2C = "1";
+        //群聊
+        public static final String GROUP = "2";
+
+        public static final Map<String, String> CHAT_TYPE_MAP = new ConcurrentHashMap();
+
+        static {
+            CHAT_TYPE_MAP.put(C2C, C2C);
+            CHAT_TYPE_MAP.put(GROUP, GROUP);
+        }
+    }
+
     public static class TopicConstant {
-        public static final String XZLL_TEST_TOPIC = "xzll-c2cmsg-topic";
+        public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
     }
 
     public static class RedisKeyConstant {

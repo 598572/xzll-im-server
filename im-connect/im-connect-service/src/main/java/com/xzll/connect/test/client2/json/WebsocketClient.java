@@ -116,7 +116,7 @@ public class WebsocketClient {
                     C2CMsgRequestDTO c2CMsgRequestDTO = new C2CMsgRequestDTO();
                     c2CMsgRequestDTO.setMsgId(UUID.randomUUID().toString());
                     c2CMsgRequestDTO.setMsgContent(s);
-                    c2CMsgRequestDTO.setSessionId("网约车业务线_会话001");
+                    c2CMsgRequestDTO.setChatId("网约车业务线_会话001");
                     c2CMsgRequestDTO.setToUserId("111");
                     c2CMsgRequestDTO.setFromUserId("222");
                     c2CMsgRequestDTO.setFirstUserName("我是乘客-小李");

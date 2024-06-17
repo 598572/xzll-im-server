@@ -181,7 +181,7 @@ public class WebsocketClient {
                     C2CMsgRequestDTO c2CMsgRequestDTO = new C2CMsgRequestDTO();
                     c2CMsgRequestDTO.setMsgId(UUID.randomUUID().toString());
                     c2CMsgRequestDTO.setMsgContent(s);
-                    c2CMsgRequestDTO.setSessionId("23434344");
+                    c2CMsgRequestDTO.setChatId("23434344");
                     c2CMsgRequestDTO.setToUserId("222");
                     c2CMsgRequestDTO.setFromUserId("111");
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());

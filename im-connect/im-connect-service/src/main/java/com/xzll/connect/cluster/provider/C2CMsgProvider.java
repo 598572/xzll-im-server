@@ -31,12 +31,12 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean sendC2CMsg(C2CMsgRequestDTO dto) {
+    public boolean addC2CMsg(C2CMsgRequestDTO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();
             clusterEvent.setData(JSONUtil.toJsonStr(dto));
-            result = rocketMqProducerWrap.sendClusterEvent(ImConstant.TopicConstant.XZLL_TEST_TOPIC, clusterEvent);
+            result = rocketMqProducerWrap.sendClusterEvent(ImConstant.TopicConstant.XZLL_C2CMSG_TOPIC, clusterEvent);
             log.info("单聊发送消息结果:{}", result);
         } catch (Exception e) {
             log.error("rocketMq单聊消息发送失败:", e);

@@ -20,7 +20,7 @@ public class BaseMsgRequestDTO {
 
     private Long msgCreateTime;
 
-    private String sessionId;
+    private String chatId;
 
 
 }

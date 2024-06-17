@@ -67,6 +67,10 @@ public class ImC2CMsgRecord implements Serializable {
      * 消息类型
      */
     private Integer msgType;
+    /**
+     * 重试次数
+     */
+    private Integer retryCount;
 
     
 

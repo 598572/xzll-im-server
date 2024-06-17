@@ -105,7 +105,7 @@ public class WebsocketClient {
 
                     WithdrawMsgRequestDTO withdrawMsgRequestDTO = new WithdrawMsgRequestDTO();
                     withdrawMsgRequestDTO.setMsgId(s);
-                    withdrawMsgRequestDTO.setSessionId("网约车业务线_会话001");
+                    withdrawMsgRequestDTO.setChatId("网约车业务线_会话001");
                     withdrawMsgRequestDTO.setToUserId("1003");
                     withdrawMsgRequestDTO.setFromUserId("1002");
 

@@ -28,7 +28,7 @@ public class MakeData4Client2 {
         C2CMsgRequestDTO c2CMsgRequestDTO = new C2CMsgRequestDTO();
         c2CMsgRequestDTO.setMsgId(UUID.randomUUID().toString());
         c2CMsgRequestDTO.setMsgContent("hello我是黄壮壮_sender_1002");
-        c2CMsgRequestDTO.setSessionId("网约车业务线_9999");
+        c2CMsgRequestDTO.setChatId("网约车业务线_9999");
         c2CMsgRequestDTO.setToUserId("1003");
         c2CMsgRequestDTO.setFromUserId("1002");
         c2CMsgRequestDTO.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());

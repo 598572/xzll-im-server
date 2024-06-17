@@ -5,7 +5,9 @@ import cn.hutool.json.JSONUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.pojo.base.BaseMsgRequestDTO;
 import com.xzll.common.util.NettyAttrUtil;
+import com.xzll.common.util.msgId.MsgIdUtilsService;
 import com.xzll.connect.api.TransferC2CMsgApi;
 import com.xzll.common.pojo.MsgBaseRequest;
 
@@ -20,6 +22,7 @@ import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import com.xzll.connect.pojo.enums.MsgStatusEnum;
 import com.xzll.connect.pojo.enums.MsgTypeEnum;
+import com.xzll.connect.pojo.response.dto.ServerReceivedMsgAckDTO;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.Channel;
@@ -58,7 +61,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     @Resource
     private C2CMsgProvider c2CMsgProvider;
     @Resource
-    private IMConnectServerConfig nacosConfig;
+    private MsgIdUtilsService msgIdUtilsService;
 
     /**
      * 策略适配
@@ -90,10 +93,14 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     public void exchange(ChannelHandlerContext ctx, MsgBaseRequest msgBaseRequest) {
 
         log.info((TAG + "exchange_method_start."));
+
+        //消息id可能需要客户端传过来,因为有重试以及消息到达的顺序问题。但是id生成可以是基于长连接请求服务端，服务端来生成msgId
+        String msgId = msgIdUtilsService.generateMessageId(123, false);
+
         C2CMsgRequestDTO packet = this.supportPojo(msgBaseRequest);
 
-        //1. 处理会话记录和消息记录已经server ack
-//        userSessionUpsertMsgSaveService.updateC2CData(ctx, packet, this);
+        //1. 更新会话记录并保存消息记录（此处是消息表新增的唯一入口,将使用mq方式削峰解耦，避免大量写请求直接打到mysql）
+        c2CMsgProvider.addC2CMsg(packet);
 
         //2. 获取接收人登录，服务信息，根据状态进行处理
         ReceiveUserDataDTO receiveUserData = super.getReceiveUserDataTemplate(packet.getToUserId(), this.redisTemplate);
@@ -110,7 +117,6 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
             // 直接发送
             log.info((TAG + "用户{}在线且在本台机器上,将直接发送"), packet.getToUserId());
             super.msgSendTemplate(TAG, targetChannel, JSONUtil.toJsonStr(msgBaseRequest));
-            c2CMsgProvider.sendC2CMsg(packet);
         } else if (null == userStatus && null == targetChannel) {
             log.info((TAG + "用户{}不在线，将消息保存至离线表中"), packet.getToUserId());
             // 更新消息状态为离线
@@ -141,9 +147,8 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         String userStatus = (String) redisTemplate.opsForHash().get(UserRedisConstant.LOGIN_STATUS_PREFIX, packet.getToUserId());
         //二次校验接收人在线状态
         if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
-            log.info((TAG + "跳转后用户{}不在线,将直接发送消息"), packet.getToUserId());
+            log.info((TAG + "跳转后用户{}在线,将直接发送消息"), packet.getToUserId());
             super.msgSendTemplate(TAG, targetChannel, JSONUtil.toJsonStr(msg));
-            c2CMsgProvider.sendC2CMsg(packet);
         } else {
             log.info((TAG + "跳转后用户{}不在线,将消息保存至离线表中"), packet.getToUserId());
             this.updateC2cMsgStatus(packet);
@@ -160,7 +165,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
      */
     private void updateC2cMsgStatus(C2CMsgRequestDTO packet) {
         MessageInfoDTO build = MessageInfoDTO.builder()
-                .sessionId(packet.getSessionId())
+                .sessionId(packet.getChatId())
                 .msgId(packet.getMsgId())
                 .msgIds(Collections.singletonList(packet.getMsgId()))
                 .fromUserId(packet.getFromUserId())

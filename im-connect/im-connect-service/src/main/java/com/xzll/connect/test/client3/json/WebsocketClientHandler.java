@@ -93,7 +93,7 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
                 clientReceivedMsgAckDTO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
                 clientReceivedMsgAckDTO.setFromUserId("1003");
                 clientReceivedMsgAckDTO.setToUserId("1002");
-                clientReceivedMsgAckDTO.setSessionId(packet.getSessionId());
+                clientReceivedMsgAckDTO.setSessionId(packet.getChatId());
                 //模拟接收方已读 发送成功ack
                 clientReceivedMsgAckDTO.setSendStatus(MsgStatusEnum.MsgSendStatus.SUCCESS.getCode());
                 clientReceivedMsgAckDTO.setReadStatus(MsgStatusEnum.MsgReadStatus.READED.getCode());
