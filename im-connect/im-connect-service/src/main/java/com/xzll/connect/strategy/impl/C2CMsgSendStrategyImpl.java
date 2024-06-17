@@ -5,7 +5,6 @@ import cn.hutool.json.JSONUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.base.BaseMsgRequestDTO;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.util.msgId.MsgIdUtilsService;
 import com.xzll.connect.api.TransferC2CMsgApi;
@@ -13,16 +12,14 @@ import com.xzll.common.pojo.MsgBaseRequest;
 
 
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
-import com.xzll.connect.config.IMConnectServerConfig;
 import com.xzll.connect.netty.channel.LocalChannelManager;
-import com.xzll.connect.pojo.constant.UserRedisConstant;
+import com.xzll.common.constant.UserRedisConstant;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
 import com.xzll.connect.pojo.dto.MessageInfoDTO;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import com.xzll.connect.pojo.enums.MsgStatusEnum;
 import com.xzll.connect.pojo.enums.MsgTypeEnum;
-import com.xzll.connect.pojo.response.dto.ServerReceivedMsgAckDTO;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.Channel;

@@ -7,7 +7,7 @@
 //import com.xzll.connect.pojo.MsgBaseResponse;
 //import com.xzll.connect.pojo.ao.MsgBaseRequest;
 //import com.xzll.connect.pojo.base.BaseResponse;
-//import com.xzll.connect.pojo.constant.UserRedisConstant;
+//import com.xzll.common.constant.UserRedisConstant;
 //import com.xzll.connect.pojo.dto.MessageInfoDTO;
 //import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 //import com.xzll.connect.pojo.dto.ServerInfoDTO;

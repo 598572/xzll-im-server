@@ -4,8 +4,13 @@ import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
 import com.xzll.common.pojo.C2CServerAckDTO;
+import com.xzll.common.constant.UserRedisConstant;
+import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.api.ServerResponseAck2ClientApi;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
+import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +30,9 @@ public class C2CMsgHandler {
     private ImC2CMsgRecordService imC2CMsgRecordService;
     @DubboReference(check = false)
     private ServerResponseAck2ClientApi serverResponseAck2ClientApi;
+    @Resource
+    private RedisTemplate<String, String> redisTemplate;
+
 
     /**
      * 单聊消息
@@ -42,6 +50,9 @@ public class C2CMsgHandler {
             ackDTO.setToUserId(dto.getFromUserId());
             ackDTO.setChatId(dto.getChatId());
             ackDTO.setMsgId(dto.getMsgId());
+            //指定ip调用 与消息转发一样
+            String ipPort = (String) redisTemplate.opsForHash().get(UserRedisConstant.ROUTE_PREFIX, dto.getFromUserId());
+            UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), NettyAttrUtil.getPortInt(ipPort), false));
             serverResponseAck2ClientApi.serverResponseAck2Client(ackDTO);
         }
     }

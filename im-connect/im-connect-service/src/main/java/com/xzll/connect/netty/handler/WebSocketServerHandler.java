@@ -13,7 +13,7 @@ import com.xzll.connect.netty.heart.HeartBeatHandler;
 import com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl;
 
 import com.xzll.connect.pojo.constant.Constant;
-import com.xzll.connect.pojo.constant.UserRedisConstant;
+import com.xzll.common.constant.UserRedisConstant;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;

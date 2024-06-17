@@ -9,9 +9,8 @@ import com.xzll.common.pojo.BaseResponse;
 import com.xzll.common.pojo.MsgBaseResponse;
 
 import com.xzll.connect.netty.channel.LocalChannelManager;
-import com.xzll.connect.pojo.constant.UserRedisConstant;
+import com.xzll.common.constant.UserRedisConstant;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
-import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;

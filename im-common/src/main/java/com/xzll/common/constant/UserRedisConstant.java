@@ -1,4 +1,4 @@
-package com.xzll.connect.pojo.constant;
+package com.xzll.common.constant;
 
 import lombok.Getter;
 
