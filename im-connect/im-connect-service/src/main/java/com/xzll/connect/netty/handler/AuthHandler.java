@@ -62,7 +62,7 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
             FullHttpRequest request = (FullHttpRequest) msg;
             HttpHeaders headers = request.headers();
 
-            log.error("缺少必填参数token");
+
             if (Objects.isNull(headers) || headers.isEmpty() || StringUtils.isEmpty(headers.get(ImConstant.TOKEN))) {
                 log.error("缺少必填参数token,将关闭连接");
                 ctx.channel().close();

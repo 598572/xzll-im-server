@@ -103,6 +103,13 @@ public class BaseResponse<T> implements Serializable{
 		return new BaseResponse(code, msg, data);
 	}
 
+	public static <T> BaseResponse<T> setResult(AnswerCode answerCode, T data) {
+		return new BaseResponse(answerCode.getCode(), answerCode.getMessage(), data);
+	}
+	public static <T> BaseResponse<T> setResult(AnswerCode answerCode) {
+		return new BaseResponse(answerCode.getCode(), answerCode.getMessage(), null);
+	}
+
 	public int getCode() {
 		return code;
 	}

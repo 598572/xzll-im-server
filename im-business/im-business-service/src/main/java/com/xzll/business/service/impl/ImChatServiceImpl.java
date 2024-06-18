@@ -42,7 +42,7 @@ public class ImChatServiceImpl implements ImChatService {
      * @return
      */
     @Override
-    @Transactional(rollbackFor = Exception.class,propagation = Propagation.REQUIRED)
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public boolean saveOrUpdateC2CChat(C2CMsgRequestDTO dto) {
         log.info("写入或更新会话信息入参:{}", JSONUtil.toJsonStr(dto));
         String chatId = ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(dto.getFromUserId()), Long.valueOf(dto.getToUserId()));
@@ -59,7 +59,7 @@ public class ImChatServiceImpl implements ImChatService {
             ImChat imChatAdd = c2CChatMapping.convertAddC2CImChat(dto);
             row = imChatMapper.insert(imChatAdd);
         }
-        log.info("写入或更新会话信息入参:{}", row);
+        log.info("写入或更新会话信息结果:{}", row);
         return row > 0;
     }
 

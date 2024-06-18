@@ -2,9 +2,10 @@ package com.xzll.connect.test.client2.withdraw;
 
 
 import cn.hutool.json.JSONUtil;
+import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.connect.pojo.dto.WithdrawMsgRequestDTO;
-import com.xzll.connect.pojo.enums.MsgTypeEnum;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;

@@ -13,10 +13,10 @@ import javax.annotation.Resource;
 /**
  * @Author: hzz
  * @Date: 2021/9/3 12:47:09
- * @Description:
+ * @Description: 生产者配置
  */
 @Component
-public class RocketMqProducerAndConsumerConfig {
+public class RocketMqProducerConfig {
 
 	@Resource
 	private RocketMqConfig rocketMqConfig;

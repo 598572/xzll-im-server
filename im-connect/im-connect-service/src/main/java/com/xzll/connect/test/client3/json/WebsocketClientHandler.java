@@ -8,9 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.common.pojo.MsgBaseResponse;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
-import com.xzll.connect.pojo.enums.MsgStatusEnum;
-import com.xzll.connect.pojo.enums.MsgTypeEnum;
-import com.xzll.connect.pojo.response.dto.ClientReceivedMsgAckDTO;
+import com.xzll.common.constant.MsgStatusEnum;
+import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -93,10 +93,10 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
                 clientReceivedMsgAckDTO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
                 clientReceivedMsgAckDTO.setFromUserId("1003");
                 clientReceivedMsgAckDTO.setToUserId("1002");
-                clientReceivedMsgAckDTO.setSessionId(packet.getChatId());
+                clientReceivedMsgAckDTO.setChatId(packet.getChatId());
                 //模拟接收方已读 发送成功ack
-                clientReceivedMsgAckDTO.setSendStatus(MsgStatusEnum.MsgSendStatus.SUCCESS.getCode());
-                clientReceivedMsgAckDTO.setReadStatus(MsgStatusEnum.MsgReadStatus.READED.getCode());
+                //clientReceivedMsgAckDTO.setSendStatus(MsgStatusEnum.MsgSendStatus.SUCCESS.getCode());
+                clientReceivedMsgAckDTO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
 
                 MsgBaseResponse.MsgType responseType = new MsgBaseResponse.MsgType();
                 responseType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());

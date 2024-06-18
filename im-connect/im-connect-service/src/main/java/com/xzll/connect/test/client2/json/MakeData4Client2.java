@@ -3,10 +3,11 @@ package com.xzll.connect.test.client2.json;
 
 
 import cn.hutool.json.JSONUtil;
+import com.xzll.common.constant.MsgFormatEnum;
+import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.common.pojo.C2CMsgRequestDTO;
-import com.xzll.connect.pojo.enums.MsgFormatEnum;
-import com.xzll.connect.pojo.enums.MsgTypeEnum;
+
 
 import java.util.UUID;
 

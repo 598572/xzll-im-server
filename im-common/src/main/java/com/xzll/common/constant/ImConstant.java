@@ -60,5 +60,14 @@ public interface ImConstant {
 
     }
 
+    public static class ClusterEventTypeConstant {
+        //发送单聊消息
+        public static final int C2C_SEND_MSG = 10;
+        //离线消息
+        public static final int C2C_OFF_LINE_MSG = 20;
+        //客户端响应的 ack消息
+        public static final int C2C_CLIENT_RECEIVED_ACK_MSG = 30;
+    }
+
 
 }

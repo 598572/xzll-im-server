@@ -11,7 +11,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
-public class C2CServerAckDTO extends BaseMsgRequestDTO {
+public class C2CServerResponseAckDTO extends BaseMsgRequestDTO {
 
     /**
      * server ack 目标userId

@@ -1,4 +1,4 @@
-package com.xzll.connect.pojo.response.dto.base;
+package com.xzll.common.pojo.base;
 
 
 import com.xzll.common.pojo.MsgBaseRequest;

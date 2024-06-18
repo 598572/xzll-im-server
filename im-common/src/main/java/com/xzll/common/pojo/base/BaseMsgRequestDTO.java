@@ -5,6 +5,8 @@ import com.xzll.common.pojo.MsgBaseRequest;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 /**
  * @Author: hzz
  * @Date: 2022/1/18 18:09:06
@@ -12,7 +14,9 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-public class BaseMsgRequestDTO {
+public class BaseMsgRequestDTO implements Serializable {
+
+    private static final long serialVersionUID = -1L;
 
     private String msgId;
 

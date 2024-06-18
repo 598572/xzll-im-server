@@ -35,7 +35,7 @@ public interface MsgHandlerStrategy {
      * <p>
      * 处理接收到的跳转请求
      */
-    default BaseResponse receiveAndSendMsg(MsgBaseRequest msg) {
+    default BaseResponse<String> receiveAndSendMsg(MsgBaseRequest msg) {
         return null;
     }
 

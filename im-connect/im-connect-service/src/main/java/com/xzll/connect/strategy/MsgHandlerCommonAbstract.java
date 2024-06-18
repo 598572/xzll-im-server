@@ -53,7 +53,7 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
             String ipPort = (String) redisTemplate.opsForHash().get(UserRedisConstant.ROUTE_PREFIX, toUserId);
             String userStatus = (String) redisTemplate.opsForHash().get(UserRedisConstant.LOGIN_STATUS_PREFIX, toUserId);
             build = ReceiveUserDataDTO.builder()
-                    .channelIdByUserId(targetChannel.id().asLongText())
+                    .channelIdByUserId(targetChannel != null ? targetChannel.id().asLongText() : null)
                     .targetChannel(targetChannel)
                     .userStatus(userStatus)
                     .routeAddress(ipPort)

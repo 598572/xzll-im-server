@@ -54,13 +54,13 @@ public class NettyAttrUtil {
         if (StringUtils.isBlank(ipPortStr)) {
             return null;
         }
-        String[] split = StringUtils.split(LINK);
+        String[] split = StringUtils.split(ipPortStr, LINK);
         return split[0];
     }
 
     public static Integer getPortInt(String ipPortStr) {
         Assert.isTrue(StringUtils.isNotBlank(ipPortStr), "ip端口为空");
-        String[] split = StringUtils.split(LINK);
+        String[] split = StringUtils.split(ipPortStr, LINK);
         String port = split[1];
         Assert.isTrue(StringUtils.isNotBlank(port), "解析不到端口");
         return Integer.valueOf(port);

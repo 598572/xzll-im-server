@@ -7,6 +7,8 @@ import com.xzll.common.pojo.MsgBaseRequest;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.stereotype.Service;
+
 import javax.annotation.Resource;
 
 /**
@@ -15,7 +17,7 @@ import javax.annotation.Resource;
  * @Description:
  */
 @DubboService
-@org.springframework.stereotype.Service
+@Service
 @Slf4j
 public class TransferC2CMsgServiceImpl implements TransferC2CMsgApi {
 

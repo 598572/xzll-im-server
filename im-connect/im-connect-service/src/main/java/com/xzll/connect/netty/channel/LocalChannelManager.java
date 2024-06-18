@@ -3,6 +3,7 @@ package com.xzll.connect.netty.channel;
 import io.netty.channel.Channel;
 
 
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -32,6 +33,10 @@ public class LocalChannelManager {
      */
     public static Channel getChannelByUserId(String userId) {
         return userIdChannelMap.get(userId);
+    }
+
+    public static Set<String> getAllOnLineUserId() {
+        return userIdChannelMap.keySet();
     }
 
     /**

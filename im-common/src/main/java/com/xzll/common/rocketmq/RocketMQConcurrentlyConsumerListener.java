@@ -14,16 +14,16 @@ import java.util.List;
  * @Author: hzz
  *
  * @Date: 2023/2/28 18:13:17
- * @Description: 该类由创建consumer实例时候  通过new的方式注册到consumer上去
+ * @Description: 该类由创建consumer实例时候  通过new的方式注册到consumer上去 此为并发消费
  */
-public class RocketMQConsumerListener implements MessageListenerConcurrently {
-	private static final Logger logger = LoggerFactory.getLogger(RocketMQConsumerListener.class);
+public class RocketMQConcurrentlyConsumerListener implements MessageListenerConcurrently {
+	private static final Logger logger = LoggerFactory.getLogger(RocketMQConcurrentlyConsumerListener.class);
 
 
 	private ClusterConsumerEventHandler clusterConsumerEventHandler;
 
 	//该实例的对象创建是在   在consumer实例化后 注册该监听器的时候
-	public RocketMQConsumerListener(RocketMQClusterEventListener clusterEventListener) {
+	public RocketMQConcurrentlyConsumerListener(RocketMQClusterEventListener clusterEventListener) {
 		this.clusterConsumerEventHandler = new ClusterConsumerEventHandler(clusterEventListener);
 	}
 
@@ -32,8 +32,6 @@ public class RocketMQConsumerListener implements MessageListenerConcurrently {
 		if (CollectionUtil.isEmpty(messages)) {
 			return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
 		}
-
-		//todo 幂等性校验&重试处理
 
 		//2. 进行消息处理
 		for (MessageExt message : messages) {

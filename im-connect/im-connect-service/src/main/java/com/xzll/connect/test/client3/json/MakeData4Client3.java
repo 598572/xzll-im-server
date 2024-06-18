@@ -2,10 +2,11 @@ package com.xzll.connect.test.client3.json;
 
 
 import cn.hutool.json.JSONUtil;
+import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.MsgBaseRequest;
-import com.xzll.connect.pojo.enums.MsgStatusEnum;
-import com.xzll.connect.pojo.enums.MsgTypeEnum;
-import com.xzll.connect.pojo.response.dto.ClientReceivedMsgAckDTO;
+import com.xzll.common.constant.MsgStatusEnum;
+
+import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,10 +32,10 @@ public class MakeData4Client3 {
         List<String> msgIds = new ArrayList<>();
         msgIds.add("c31f0183-1ec5-4cc0-8872-ba60af889ad2");
         ack.setMsgIds(msgIds);
-        ack.setReadStatus(MsgStatusEnum.MsgReadStatus.READED.getCode());
+        ack.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
 
         ack.setFromUserId("1003");
-        ack.setSessionId("9999");
+        ack.setChatId("9999");
         ack.setToUserId("1002");
 
         msgBaseRequest.setBody(ack);

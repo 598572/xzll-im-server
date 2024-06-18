@@ -13,8 +13,8 @@
 //import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 //import com.xzll.connect.pojo.dto.ServerInfoDTO;
 //import com.xzll.connect.pojo.dto.WithdrawMsgRequestDTO;
-//import com.xzll.connect.pojo.enums.MsgStatusEnum;
-//import com.xzll.connect.pojo.enums.MsgTypeEnum;
+//import com.xzll.common.constant.MsgStatusEnum;
+//import com.xzll.common.constant.MsgTypeEnum;
 //import com.xzll.connect.pojo.response.dto.ServerReceivedMsgAckDTO;
 //import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 //import com.xzll.connect.strategy.MsgHandlerStrategy;

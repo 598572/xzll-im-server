@@ -1,4 +1,4 @@
-package com.xzll.connect.pojo.enums;
+package com.xzll.common.constant;
 
 import lombok.Getter;
 
