@@ -160,8 +160,8 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         } else {
             ChannelFuture handshake = handShaker.handshake(ctx.channel(), req);
             if (handshake.isSuccess()) {
-                //TODO 用户登录的信息 <uid,机器ip端口> 存入redis
-                //下边两步需要保证原子性 todo
+                //用户登录的信息 <uid,机器ip端口> 存入redis
+                //下边两步需要保证原子性 todo 使用lua
                 //设置当前用户登录的机器ip+端口  (设置用户登录的服务器信息 此处不设置过多信息 只设置用户登录的机器信息 方便快捷 存取无需转json )
                 redisTemplate.opsForHash().put(UserRedisConstant.ROUTE_PREFIX, uidStr, NettyAttrUtil.getIpPortStr());
                 //设置用户状态为在线
@@ -169,6 +169,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
                 log.info("握手成功");
                 //TODO 用户上线 此时需要处理离线消息
+
             } else {
                 log.warn("握手失败: {}", JSONUtil.toJsonStr(handshake));
             }

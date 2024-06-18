@@ -6,6 +6,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 
 /**
@@ -36,6 +37,25 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
     // 在通道连接成功后发送握手连接
     handshaker.handshake(ctx.channel());
     super.channelActive(ctx);
+  }
+
+  @Override
+  public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+    if (evt instanceof IdleStateEvent) {
+      IdleStateEvent event = (IdleStateEvent) evt;
+//      if (event.state() == IdleState.WRITER_IDLE) {
+        // 发送心跳消息
+        sendHeartbeat(ctx);
+//      }
+    } else {
+      super.userEventTriggered(ctx, evt);
+    }
+  }
+
+  private void sendHeartbeat(ChannelHandlerContext ctx) {
+    // 构建心跳消息并发送
+    PingWebSocketFrame pingWebSocketFrame = new PingWebSocketFrame();
+    ctx.writeAndFlush(pingWebSocketFrame);
   }
 
   @Override
