@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/11 09:49:20
+ * @Date: 2024/6/10 09:49:20
  * @Description: 白名单配置
  */
 @Data

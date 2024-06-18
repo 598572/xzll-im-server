@@ -14,8 +14,7 @@ public class NettyAttrUtil {
 
     private static final AttributeKey<String> ATTR_KEY_READER_TIME = AttributeKey.valueOf("readerTime");
     public static final String LINK = ":";
-    private static final ConcurrentHashMap<String, Integer> ipport = new ConcurrentHashMap<>(1);
-    ;
+    private static final ConcurrentHashMap<String, Integer> IP_PORT_MAP = new ConcurrentHashMap<>(1);
 
     public static void updateReaderTime(Channel channel, Long time) {
         channel.attr(ATTR_KEY_READER_TIME).set(time.toString());
@@ -37,17 +36,17 @@ public class NettyAttrUtil {
     }
 
     public static void setIpPort(String ip, Integer port) {
-        ipport.put(ip, port);
+        IP_PORT_MAP.put(ip, port);
     }
 
 
     public static Map.Entry<String, Integer> getIpPortMap() {
-        return ipport.entrySet().stream().findFirst().orElseThrow();
+        return IP_PORT_MAP.entrySet().stream().findFirst().orElseThrow();
 
     }
 
     public static String getIpPortStr() {
-        return ipport.entrySet().stream().map(x -> x.getKey() + LINK + x.getValue()).findFirst().orElse(null);
+        return IP_PORT_MAP.entrySet().stream().map(x -> x.getKey() + LINK + x.getValue()).findFirst().orElse(null);
     }
 
     public static String getIpStr(String ipPortStr) {

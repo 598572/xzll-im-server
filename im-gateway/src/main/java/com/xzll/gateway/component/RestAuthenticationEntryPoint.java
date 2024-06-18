@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/11 09:50:47
+ * @Date: 2024/6/10 09:50:47
  * @Description: token无效处理，即未认证。在这里自定义处理JWT请求头过期或签名错误的结果
  */
 @Component

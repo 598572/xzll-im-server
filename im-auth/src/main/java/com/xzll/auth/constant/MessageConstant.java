@@ -2,7 +2,7 @@ package com.xzll.auth.constant;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/11 11:06:10
+ * @Date: 2024/6/10 11:06:10
  * @Description: 提示语
  */
 public class MessageConstant {

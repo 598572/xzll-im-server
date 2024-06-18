@@ -6,7 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/14 14:20:35
+ * @Date: 2024/6/16 14:20:35
  * @Description:
  */
 @Data

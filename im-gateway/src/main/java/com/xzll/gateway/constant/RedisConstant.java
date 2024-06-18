@@ -2,7 +2,7 @@ package com.xzll.gateway.constant;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/11 09:45:04
+ * @Date: 2024/6/10 09:45:04
  * @Description:
  */
 public class RedisConstant {

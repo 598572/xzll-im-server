@@ -38,7 +38,7 @@ import static com.xzll.common.constant.ImConstant.RedisKeyConstant.NETTY_IP_PORT
 
 /**
  * @Author: hzz
- * @Date: 2024/6/12 15:57:21
+ * @Date: 2024/6/16 15:57:21
  * @Description: 拦截并修改响应体 不得不说这个拦截我真的废了很大的劲 其实主要原因就是在于Order的设置，另外由于WebFilter比GlobalFilter的范围更广，所以这里的场景使用WebFilter，来实现修改响应的目的
  *  从controller出来就给他填充 所以优先级搞低  保证从controller出来后第一个到这个过滤器
  */

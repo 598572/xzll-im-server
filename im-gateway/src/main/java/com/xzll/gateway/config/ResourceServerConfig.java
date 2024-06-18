@@ -24,7 +24,7 @@ import reactor.core.publisher.Mono;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/11 09:45:38
+ * @Date: 2024/6/10 09:45:38
  * @Description: 资源服务配置（jwt 白名单 认证 或者权限相关的配置）
  */
 @AllArgsConstructor

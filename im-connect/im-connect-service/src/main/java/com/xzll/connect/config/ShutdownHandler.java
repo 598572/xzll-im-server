@@ -1,14 +1,20 @@
 package com.xzll.connect.config;
 
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.UserRedisConstant;
+import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+
 import javax.annotation.Resource;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -42,6 +48,10 @@ public class ShutdownHandler implements ApplicationListener<ContextClosedEvent> 
         Set<String> allOnLineUserId = LocalChannelManager.getAllOnLineUserId();
         if (CollectionUtils.isEmpty(allOnLineUserId)) {
             return;
+        }
+        Map.Entry<String, Integer> ipPortMap = NettyAttrUtil.getIpPortMap();
+        if (Objects.nonNull(ipPortMap) && StringUtils.isNotBlank(ipPortMap.getKey())) {
+            redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.NETTY_IP_PORT, ipPortMap.getKey());
         }
         allOnLineUserId.forEach(uid -> {
             //清除用户登录信息

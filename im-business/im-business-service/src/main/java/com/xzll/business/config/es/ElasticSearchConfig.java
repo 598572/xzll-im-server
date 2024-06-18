@@ -14,7 +14,7 @@ import javax.annotation.Resource;
 
 /**
  * @Author: hzz
- * @Date: 2024/6/14 14:08:54
+ * @Date: 2024/6/16 14:08:54
  * @Description: es配置 本项目使用 es版本 7.17.5
  */
 @Configuration
