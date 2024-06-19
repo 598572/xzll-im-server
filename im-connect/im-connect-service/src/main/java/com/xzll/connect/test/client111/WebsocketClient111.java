@@ -88,61 +88,6 @@ public class WebsocketClient111 {
                 pipeline.addLast(new HttpObjectAggregator(65536));
                 pipeline.addLast("heart-notice", new IdleStateHandler(11, 0, 0, TimeUnit.SECONDS));
                 pipeline.addLast(handler);
-
-
-//                pipeline.addLast(new MsgEncoder());
-                // 解码器
-//                pipeline.addLast(new MsgDecoder());
-                //解码器，通过Google Protocol Buffers序列化框架动态的切割接收到的ByteBuf
-//                pipeline.addLast(new ProtobufVarint32FrameDecoder());
-                //Google Protocol Buffers 长度属性编码器
-//                pipeline.addLast(new ProtobufVarint32LengthFieldPrepender());
-                // 自定义数据接收处理器
-
-                // Protobuf消息解码器
-//                pipeline.addLast(new ProtobufDecoder(IMResponseProto.IMResProtocol.getDefaultInstance()));
-//
-//                pipeline.addLast(new MessageToMessageDecoder<WebSocketFrame>() {
-//                    @Override
-//                    protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame,
-//                                          List<Object> objs) throws Exception {
-//                        log.info("MessageToMessageDecoder msg ------------------------");
-//                        if (frame instanceof TextWebSocketFrame) {
-//                            TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
-//                            log.info("TextWebSocketFrame");
-//                        } else if (frame instanceof BinaryWebSocketFrame) {
-//                            ByteBuf buf = ((BinaryWebSocketFrame) frame).content();
-//                            objs.add(buf);
-//                            buf.retain();
-//                            log.info("BinaryWebSocketFrame received------------------------");
-//                        } else if (frame instanceof PongWebSocketFrame) {
-//                            log.info("WebSocket Client received pong");
-//                        } else if (frame instanceof CloseWebSocketFrame) {
-//                            log.info("receive close frame");
-//                        }
-//
-//                    }
-//                });
-
-//                pipeline.addLast(new MessageToMessageEncoder<MessageLiteOrBuilder>() {
-//                    @Override
-//                    protected void encode(ChannelHandlerContext ctx, MessageLiteOrBuilder msg, List<Object> out) throws Exception {
-//                        ByteBuf result = null;
-//                        if (msg instanceof MessageLite) {
-//                            // 没有build的Protobuf消息
-//                            result = wrappedBuffer(((MessageLite) msg).toByteArray());
-//                        }
-//                        if (msg instanceof MessageLite.Builder) {
-//                            // 经过build的Protobuf消息
-//                            result = wrappedBuffer(((MessageLite.Builder) msg).build().toByteArray());
-//                        }
-//                        // 将Protbuf消息包装成Binary Frame 消息
-//                        WebSocketFrame frame = new BinaryWebSocketFrame(result);
-//                        out.add(frame);
-//                    }
-//                });
-
-
             }
         });
 
@@ -172,32 +117,8 @@ public class WebsocketClient111 {
                 }
 
                 String s = sc.nextLine();
+
                 if (StringUtils.isNotBlank(s)) {
-//                    if (CollectionUtils.isEmpty(WebsocketClientHandler.msgIds)) {
-//                        getMsgIds(channelFuture);
-//                    }
-//                    if (CollectionUtils.isEmpty(WebsocketClientHandler.msgIds)) {
-//                        continue;
-//                    }
-
-//                    IMRequestProtobuf.IMReqProtocol protocol = IMRequestProtobuf.IMReqProtocol.newBuilder()
-//                            .setVersion(1)
-//                            .setMsgId(RandomUtil.getRandom())
-//                            .setMsgType(2)
-//                            .setMsgContent(s)
-//                            .setFromId(123455)
-//                            .setToId(100)
-//                            .setMsgCreateTime(System.currentTimeMillis())
-//                            .build();
-
-//                    String s1 = JsonUtil.toJson(protocol);
-//                    System.out.println(s1);
-//                    int length = s1.getBytes(StandardCharsets.UTF_8).length;
-//                    System.out.println("json的长度："+length);
-//
-//                    System.out.println("protobuf的长度："+protocol.toByteArray().length);
-//                    ByteBuf byteBuf1 = wrappedBuffer(protocol.toByteArray());//Unpooled.copiedBuffer(protocol.toByteArray())
-
                     String msgId = WebsocketClientHandler111.msgIds.remove(0);
                     Assert.isTrue(StringUtils.isNotBlank(msgId), "无msgId可用");
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<C2CSendMsgAO>();

@@ -111,19 +111,8 @@ public class WebsocketClient222 {
                 }
 
                 String s = sc.nextLine();
-                //test 1 : 发送json字符串方式
-//                if (!StringUtils.isEmpty(s)) {
-//                    MsgBaseRequest msgBaseRequest = JSON.parseObject(s, MsgBaseRequest.class);
-//                    //文本消息
-//                    TextWebSocketFrame byteFrame = new TextWebSocketFrame(JsonUtil.toJson(msgBaseRequest));
-//                    channelFuture.channel().writeAndFlush(byteFrame);
-////                    channelFuture.addListener((ChannelFutureListener) lis ->
-////                            log.info("客户端手动发消息成功={}", byteFrame.text()));
-//                }
 
-                //test 2 : 直接输入内容方式
                 if (!StringUtils.isEmpty(s)) {
-
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<>();
                     String msgId = WebsocketClientHandler222.msgIds.remove(0);
                     Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(msgId), "无msgId可用");
@@ -139,10 +128,6 @@ public class WebsocketClient222 {
                     c2CMsgRequestDTO.setChatId("999");
                     c2CMsgRequestDTO.setToUserId(WebsocketClient111.VALUE);
                     c2CMsgRequestDTO.setFromUserId(VALUE);
-//                    c2CMsgRequestDTO.setFirstUserName("我是客户222");
-//                    c2CMsgRequestDTO.setFirstUserType(1);
-//                    c2CMsgRequestDTO.setSecondUserName("我是客户222");
-//                    c2CMsgRequestDTO.setSecondUserType(2);
                     c2CMsgRequestDTO.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());
 
