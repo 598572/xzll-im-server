@@ -2,8 +2,8 @@ package com.xzll.connect.api;
 
 
 
-import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.pojo.response.base.CommonMsgVO;
 
 
 /**
@@ -13,7 +13,7 @@ import com.xzll.common.pojo.base.BaseMsgRequestDTO;
  */
 public interface ResponseAck2ClientApi {
 
-    public BaseResponse responseServerAck2Client(BaseMsgRequestDTO packet);
+    public WebBaseResponse responseServerAck2Client(CommonMsgVO packet);
 
-    public BaseResponse responseClientAck2Client(BaseMsgRequestDTO packet);
+    public WebBaseResponse responseClientAck2Client(CommonMsgVO packet);
 }

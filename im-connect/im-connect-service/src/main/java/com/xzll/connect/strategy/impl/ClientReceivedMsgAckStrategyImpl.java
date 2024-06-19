@@ -3,9 +3,9 @@ package com.xzll.connect.strategy.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
@@ -24,8 +24,6 @@ import java.util.Objects;
 @Service
 public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract implements MsgHandlerStrategy {
 
-    private static final String TAG = "[客户端ack消息]_";
-
     @Resource
     private ObjectMapper objectMapper;
     @Resource
@@ -38,7 +36,7 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
      * @return
      */
     @Override
-    public boolean support(MsgBaseRequest.MsgType msgType) {
+    public boolean support(ImBaseRequest.MsgType msgType) {
         return Objects.nonNull(msgType) &&
                 msgType.getFirstLevelMsgType() == MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode()
                 && (MsgTypeEnum.SecondLevelMsgType.UN_READ.getCode() == msgType.getSecondLevelMsgType()
@@ -48,23 +46,23 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
     /**
      * 根据不同类型适配不同的消息格式
      *
-     * @param msgBaseRequest
+     * @param imBaseRequest
      * @return
      */
-    private ClientReceivedMsgAckDTO supportPojo(MsgBaseRequest msgBaseRequest) {
-        ClientReceivedMsgAckDTO packet = objectMapper.convertValue(msgBaseRequest.getBody(), ClientReceivedMsgAckDTO.class);
-        packet.setMsgType(msgBaseRequest.getMsgType());
+    private ClientReceivedMsgAckAO supportPojo(ImBaseRequest imBaseRequest) {
+        ClientReceivedMsgAckAO packet = objectMapper.convertValue(imBaseRequest.getBody(), ClientReceivedMsgAckAO.class);
+        packet.setMsgType(imBaseRequest.getMsgType());
         return packet;
     }
 
 
     @Override
-    public void exchange(ChannelHandlerContext ctx, MsgBaseRequest msgBaseRequest) {
-        log.info((TAG + "exchange_method_start"));
-        ClientReceivedMsgAckDTO packet = this.supportPojo(msgBaseRequest);
+    public void exchange(ChannelHandlerContext ctx, ImBaseRequest imBaseRequest) {
+        log.debug("客户端ack消息_开始");
+        ClientReceivedMsgAckAO packet = this.supportPojo(imBaseRequest);
         //1. 修改数据库中消息的状态，并push消息至sender
         c2CMsgProvider.clientResponseAck(packet);
-        log.info((TAG + "exchange_method_end"));
+        log.debug("客户端ack消息_结束");
     }
 
 }

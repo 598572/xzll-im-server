@@ -1,22 +1,27 @@
-package com.xzll.common.pojo;
+package com.xzll.common.pojo.base;
 
 
 
 
 
+
+import com.xzll.common.constant.answercode.AnswerCode;
+import com.xzll.common.constant.answercode.ImAnswerCode;
 
 import java.io.Serializable;
 
-public class BaseResponse<T> implements Serializable{
+public class WebBaseResponse<T> implements Serializable{
+	private static final long serialVersionUID = -1L;
+
 	private int code;
 	
 	private String msg;
 
 	private T data;
 
-	public BaseResponse() {}
+	public WebBaseResponse() {}
 
-	public BaseResponse(int code, String msg, T data) {
+	public WebBaseResponse(int code, String msg, T data) {
 		this.code = code;
 		this.msg = msg;
 		this.data = data;
@@ -25,7 +30,7 @@ public class BaseResponse<T> implements Serializable{
 	/**
 	 * 返回成功，沒有data值
 	 */
-	public static <T> BaseResponse<T> returnResultSuccess() {
+	public static <T> WebBaseResponse<T> returnResultSuccess() {
 		return setResult(AnswerCode.SUCCESS.getCode(), AnswerCode.SUCCESS.getMessage(), null);
 	}
 
@@ -35,7 +40,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @param data
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultSuccess(T data) {
+	public static <T> WebBaseResponse<T> returnResultSuccess(T data) {
 		return setResult(AnswerCode.SUCCESS.getCode(), AnswerCode.SUCCESS.getMessage(), data);
 	}
 
@@ -45,14 +50,14 @@ public class BaseResponse<T> implements Serializable{
 	 * @param msg
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultSuccess(String msg) {
+	public static <T> WebBaseResponse<T> returnResultSuccess(String msg) {
 		return returnResultSuccess(msg, null);
 	}
 
 	/**
 	 * 返回成功
 	 */
-	public static <T> BaseResponse<T> returnResultSuccess(String msg, T data) {
+	public static <T> WebBaseResponse<T> returnResultSuccess(String msg, T data) {
 		return setResult(AnswerCode.SUCCESS.getCode(), msg, data);
 	}
 
@@ -63,7 +68,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @param msg
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultError(int code, String msg) {
+	public static <T> WebBaseResponse<T> returnResultError(int code, String msg) {
 		return setResult(code, msg, null);
 	}
 
@@ -73,7 +78,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @param msg
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultError(String msg) {
+	public static <T> WebBaseResponse<T> returnResultError(String msg) {
 		return returnResultError(-200, msg);
 	}
 
@@ -83,7 +88,7 @@ public class BaseResponse<T> implements Serializable{
 	 * @param <T>
 	 * @return
 	 */
-	public static <T> BaseResponse<T> returnResultError(ImAnswerCode anwserCode) {
+	public static <T> WebBaseResponse<T> returnResultError(ImAnswerCode anwserCode) {
 		if(anwserCode == null) {
 			return returnResultError("操作失败");
 		}
@@ -99,15 +104,15 @@ public class BaseResponse<T> implements Serializable{
 	 * @param data 返回数据
 	 * @return
 	 */
-	public static <T> BaseResponse<T> setResult(int code, String msg, T data) {
-		return new BaseResponse(code, msg, data);
+	public static <T> WebBaseResponse<T> setResult(int code, String msg, T data) {
+		return new WebBaseResponse(code, msg, data);
 	}
 
-	public static <T> BaseResponse<T> setResult(AnswerCode answerCode, T data) {
-		return new BaseResponse(answerCode.getCode(), answerCode.getMessage(), data);
+	public static <T> WebBaseResponse<T> setResult(AnswerCode answerCode, T data) {
+		return new WebBaseResponse(answerCode.getCode(), answerCode.getMessage(), data);
 	}
-	public static <T> BaseResponse<T> setResult(AnswerCode answerCode) {
-		return new BaseResponse(answerCode.getCode(), answerCode.getMessage(), null);
+	public static <T> WebBaseResponse<T> setResult(AnswerCode answerCode) {
+		return new WebBaseResponse(answerCode.getCode(), answerCode.getMessage(), null);
 	}
 
 	public int getCode() {

@@ -1,4 +1,4 @@
-package com.xzll.connect.test.client1.json;
+package com.xzll.connect.test.client111;
 
 
 import cn.hutool.core.lang.Assert;
@@ -8,10 +8,10 @@ import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
+import com.xzll.connect.test.client222.WebsocketClient222;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit;
  */
 
 @Slf4j
-public class WebsocketClient {
+public class WebsocketClient111 {
 
 
     public static final String VALUE = "111";
@@ -48,11 +48,11 @@ public class WebsocketClient {
     private String ip;
     private int port;
     private String uriStr;
-    private static WebsocketClientHandler handler;
+    private static WebsocketClientHandler111 handler;
 
     public static volatile boolean getMsgFlag = false;
 
-    public WebsocketClient(String ip, int port) {
+    public WebsocketClient111(String ip, int port) {
         this.ip = ip;
         this.port = port;
         uriStr = "ws://" + ip + ":" + port + "/websocket";
@@ -73,7 +73,7 @@ public class WebsocketClient {
 
         WebSocketClientHandshaker webSocketClientHandshaker = WebSocketClientHandshakerFactory
                 .newHandshaker(wsUri, WebSocketVersion.V13, null, true, entries, 100 * 1024 * 1024);
-        handler = new WebsocketClientHandler(webSocketClientHandshaker);
+        handler = new WebsocketClientHandler111(webSocketClientHandshaker);
 
         bootstrap.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -164,7 +164,7 @@ public class WebsocketClient {
                     continue;
                 }
                 //如果没有获取 并且集合也为空 则获取（一般首次或者消息id用完了）
-                if (!getMsgFlag && CollectionUtils.isEmpty(WebsocketClientHandler.msgIds)) {
+                if (!getMsgFlag && CollectionUtils.isEmpty(WebsocketClientHandler111.msgIds)) {
                     getMsgIds(channelFuture);
                     //标识正在获取消息id
                     getMsgFlag = true;
@@ -198,8 +198,8 @@ public class WebsocketClient {
 //                    System.out.println("protobuf的长度："+protocol.toByteArray().length);
 //                    ByteBuf byteBuf1 = wrappedBuffer(protocol.toByteArray());//Unpooled.copiedBuffer(protocol.toByteArray())
 
-                    String msgId = WebsocketClientHandler.msgIds.remove(0);
-                    Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(msgId), "无msgId可用");
+                    String msgId = WebsocketClientHandler111.msgIds.remove(0);
+                    Assert.isTrue(StringUtils.isNotBlank(msgId), "无msgId可用");
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<C2CSendMsgAO>();
                     ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
                     msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode());
@@ -208,9 +208,9 @@ public class WebsocketClient {
                     C2CSendMsgAO c2CMsgRequestDTO = new C2CSendMsgAO();
                     c2CMsgRequestDTO.setMsgId(msgId);
                     c2CMsgRequestDTO.setMsgContent(s);
-                    c2CMsgRequestDTO.setChatId("23434344");
-                    c2CMsgRequestDTO.setToUserId("222");
-                    c2CMsgRequestDTO.setFromUserId("111");
+                    c2CMsgRequestDTO.setChatId("999");
+                    c2CMsgRequestDTO.setToUserId(WebsocketClient222.VALUE);
+                    c2CMsgRequestDTO.setFromUserId(VALUE);
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());
                     imBaseRequest.setBody(c2CMsgRequestDTO);
 

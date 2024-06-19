@@ -3,8 +3,8 @@ package com.xzll.connect.test.client2.withdraw;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.MsgBaseRequest;
-import com.xzll.connect.pojo.dto.WithdrawMsgRequestDTO;
+import com.xzll.common.pojo.base.ImBaseRequest;
+import com.xzll.connect.pojo.dto.WithdrawMsgAO;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -97,24 +97,24 @@ public class WebsocketClient {
                 //test 2 : 直接输入内容方式
                 if (!StringUtils.isEmpty(s)) {
 
-                    MsgBaseRequest<WithdrawMsgRequestDTO> msgBaseRequest = new MsgBaseRequest<>();
+                    ImBaseRequest<WithdrawMsgAO> imBaseRequest = new ImBaseRequest<>();
 
-                    MsgBaseRequest.MsgType msgType = new MsgBaseRequest.MsgType();
+                    ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
                     msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode());
                     msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
-                    msgBaseRequest.setMsgType(msgType);
+                    imBaseRequest.setMsgType(msgType);
 
-                    WithdrawMsgRequestDTO withdrawMsgRequestDTO = new WithdrawMsgRequestDTO();
+                    WithdrawMsgAO withdrawMsgRequestDTO = new WithdrawMsgAO();
                     withdrawMsgRequestDTO.setMsgId(s);
                     withdrawMsgRequestDTO.setChatId("网约车业务线_会话001");
                     withdrawMsgRequestDTO.setToUserId("1003");
                     withdrawMsgRequestDTO.setFromUserId("1002");
 
 
-                    msgBaseRequest.setBody(withdrawMsgRequestDTO);
+                    imBaseRequest.setBody(withdrawMsgRequestDTO);
 
                     //文本消息
-                    TextWebSocketFrame byteFrame = new TextWebSocketFrame(JSONUtil.toJsonStr(msgBaseRequest));
+                    TextWebSocketFrame byteFrame = new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest));
                     channelFuture.channel().writeAndFlush(byteFrame);
                 }
             }

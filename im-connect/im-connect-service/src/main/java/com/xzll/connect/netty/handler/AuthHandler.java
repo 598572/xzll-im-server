@@ -3,7 +3,7 @@ package com.xzll.connect.netty.handler;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.extra.spring.SpringUtil;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.AnswerCode;
+import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;

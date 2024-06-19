@@ -1,6 +1,6 @@
-package com.xzll.common.pojo;
+package com.xzll.common.pojo.request;
 
-import com.xzll.common.pojo.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.request.base.CommonMsgAO;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,7 +11,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
-public class C2CMsgRequestDTO extends BaseMsgRequestDTO {
+public class C2CSendMsgAO extends CommonMsgAO {
 
     /**
      * 发送人id

@@ -1,8 +1,8 @@
 package com.xzll.gateway.component;
 
 import cn.hutool.json.JSONUtil;
-import com.xzll.common.pojo.AnswerCode;
-import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.constant.answercode.AnswerCode;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,7 +28,7 @@ public class RestfulAccessDeniedHandler implements ServerAccessDeniedHandler {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.OK);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-        String body = JSONUtil.toJsonStr(BaseResponse.returnResultError(AnswerCode.FORBIDDEN.getCode(), denied.getMessage()));
+        String body = JSONUtil.toJsonStr(WebBaseResponse.returnResultError(AnswerCode.FORBIDDEN.getCode(), denied.getMessage()));
         DataBuffer buffer = response.bufferFactory().wrap(body.getBytes(StandardCharsets.UTF_8));
         return response.writeWith(Mono.just(buffer));
     }

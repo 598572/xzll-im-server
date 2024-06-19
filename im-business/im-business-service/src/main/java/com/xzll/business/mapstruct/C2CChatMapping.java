@@ -1,7 +1,7 @@
 package com.xzll.business.mapstruct;
 
 import com.xzll.business.entity.mysql.ImChat;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -25,7 +25,7 @@ public interface C2CChatMapping {
     @Mapping(target = "lastMsgId", source = "msgId")
     @Mapping(target = "lastMsgTime", source = "msgCreateTime")
     @Mapping(target = "chatId", expression = "java(ChatIdUtils.buildC2CChatId(null,Long.valueOf(dto.getFromUserId()),Long.valueOf(dto.getToUserId())))")
-    ImChat convertAddC2CImChat(C2CMsgRequestDTO dto);
+    ImChat convertAddC2CImChat(C2CSendMsgAO dto);
 
 
 }

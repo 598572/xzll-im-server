@@ -7,7 +7,7 @@
 //import com.xzll.connect.pojo.MsgBaseResponse;
 //import com.xzll.connect.pojo.ao.MsgBaseRequest;
 //import com.xzll.connect.pojo.base.BaseResponse;
-//import com.xzll.common.constant.UserRedisConstant;
+//
 //import com.xzll.connect.pojo.dto.MessageInfoDTO;
 //import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 //import com.xzll.connect.pojo.dto.ServerInfoDTO;
@@ -93,13 +93,13 @@
 //
 //            log.info((TAG + "接收者id:{},在线状态:{},channelId:{},serverInfo:{}"), packet.getToId(), userStatus, channelIdByUserId, serverInfoDTO);
 //            //2.2 根据接收人状态做对应的处理
-//            if (null != targetChannel && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)) {
+//            if (null != targetChannel && Objects.equals(ImConstant.RedisKeyConstant.UserStatus.ON_LINE.toString(), userStatus)) {
 //                log.info((TAG + "用户{}在线且在本台机器上,将直接发送"), packet.getToId());
 //                super.msgSendTemplate(TAG, targetChannel, JsonUtil.toJson(msgBaseRequest));
 //            } else if (null == userStatus && null == targetChannel) {
 //                log.info((TAG + "用户{}不在线，将消息保存至离线表中"), packet.getToId());
 //                this.systemMsgOfflineStatusUpdate(packet);
-//            } else if (null == targetChannel && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus) && !StringUtil.isNullOrBlank(serverJson)) {
+//            } else if (null == targetChannel && Objects.equals(ImConstant.RedisKeyConstant.UserStatus.ON_LINE.toString(), userStatus) && !StringUtil.isNullOrBlank(serverJson)) {
 //                log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToId(), serverJson);
 //                String requestUrl = MessageFormat.format(RECEIVE_URL, serverInfoDTO.getAddr(), String.valueOf(serverInfoDTO.getPort()));
 //                super.msgTransferTemplate(requestUrl, TAG, JsonUtil.toJson(msgBaseRequest));

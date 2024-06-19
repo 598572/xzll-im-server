@@ -3,11 +3,11 @@ package com.xzll.connect.cluster.provider;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
-import com.xzll.common.pojo.OffLineMsgDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.OffLineMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.connect.cluster.mq.RocketMqProducerWrap;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -34,7 +34,7 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean sendC2CMsg(C2CMsgRequestDTO dto) {
+    public boolean sendC2CMsg(C2CSendMsgAO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();
@@ -54,7 +54,7 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean offLineMsg(OffLineMsgDTO dto) {
+    public boolean offLineMsg(OffLineMsgAO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();
@@ -74,7 +74,7 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean clientResponseAck(ClientReceivedMsgAckDTO dto) {
+    public boolean clientResponseAck(ClientReceivedMsgAckAO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();

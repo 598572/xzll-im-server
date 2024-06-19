@@ -3,8 +3,8 @@ package com.xzll.auth.controller;
 import com.xzll.auth.config.nacos.Oauth2Config;
 import com.xzll.auth.domain.Oauth2TokenDto;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.AnswerCode;
-import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.constant.answercode.AnswerCode;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -44,7 +44,7 @@ public class AuthController {
      * Oauth2登录认证
      */
     @RequestMapping(value = "/token", method = RequestMethod.POST)
-    public BaseResponse<Oauth2TokenDto> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
+    public WebBaseResponse<Oauth2TokenDto> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) throws HttpRequestMethodNotSupportedException {
         OAuth2AccessToken oAuth2AccessToken = tokenEndpoint.postAccessToken(principal, parameters).getBody();
         Oauth2TokenDto oauth2TokenDto = Oauth2TokenDto.builder()
                 .token(oAuth2AccessToken.getValue())
@@ -58,7 +58,7 @@ public class AuthController {
             Assert.isTrue(StringUtils.isNotBlank(uid), "缺少用户id信息！");
             redisTemplate.opsForValue().set(ImConstant.RedisKeyConstant.USER_TOKEN_KEY + oauth2TokenDto.getToken(), uid, oauth2Config.getTokenTimeOut());
         }
-        return BaseResponse.returnResultSuccess(oauth2TokenDto);
+        return WebBaseResponse.returnResultSuccess(oauth2TokenDto);
     }
 
     //token 刷新接口 todo
@@ -67,17 +67,17 @@ public class AuthController {
      * 验证 jwt Token ，供 不走网关的服务验证token，走网关的话不走这个接口验证token
      */
     @GetMapping("/validate")
-    public BaseResponse<String> validateToken(@RequestParam String token) {
+    public WebBaseResponse<String> validateToken(@RequestParam String token) {
         try {
             OAuth2AccessToken accessToken = tokenStore.readAccessToken(token);
             //空或者过期 返回token无效
             if (accessToken == null || accessToken.isExpired()) {
-                return BaseResponse.returnResultError(AnswerCode.TOKEN_INVALID.getMessage());
+                return WebBaseResponse.returnResultError(AnswerCode.TOKEN_INVALID.getMessage());
             }
-            return BaseResponse.returnResultSuccess(AnswerCode.SUCCESS.getMessage());
+            return WebBaseResponse.returnResultSuccess(AnswerCode.SUCCESS.getMessage());
         } catch (Exception e) {
             log.error("验证token接口异常e:", e);
-            return BaseResponse.returnResultError("验证token接口异常: " + e.getMessage());
+            return WebBaseResponse.returnResultError("验证token接口异常: " + e.getMessage());
         }
     }
 

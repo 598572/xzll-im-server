@@ -1,8 +1,8 @@
 package com.xzll.connect.api;
 
 
-import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.pojo.base.ImBaseRequest;
 
 /**
  * @Author: hzz
@@ -11,5 +11,5 @@ import com.xzll.common.pojo.MsgBaseRequest;
  */
 public interface TransferC2CMsgApi {
 
-    public BaseResponse transferC2CMsg(MsgBaseRequest msgBaseRequest);
+    public WebBaseResponse transferC2CMsg(ImBaseRequest imBaseRequest);
 }

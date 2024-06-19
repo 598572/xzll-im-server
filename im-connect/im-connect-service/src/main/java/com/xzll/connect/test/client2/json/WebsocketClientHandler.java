@@ -7,10 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
-import com.xzll.common.pojo.MsgBaseRequest;
-import com.xzll.common.pojo.MsgBaseResponse;
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
+import com.xzll.common.pojo.base.ImBaseRequest;
+import com.xzll.common.pojo.base.ImBaseResponse;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -75,41 +75,41 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
     if (frame instanceof TextWebSocketFrame) {
       TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
       String text = textFrame.text();
-      MsgBaseRequest msgBaseRequest = JSON.parseObject(text, MsgBaseRequest.class);
-      System.out.println("客户端：接收到TextWebSocketFrame消息，消息内容是: " + JSONUtil.toJsonStr(msgBaseRequest));
+      ImBaseRequest imBaseRequest = JSON.parseObject(text, ImBaseRequest.class);
+      System.out.println("客户端：接收到TextWebSocketFrame消息，消息内容是: " + JSONUtil.toJsonStr(imBaseRequest));
 
-      MsgBaseRequest.MsgType msgType = msgBaseRequest.getMsgType();
+      ImBaseRequest.MsgType msgType = imBaseRequest.getMsgType();
 
       //模拟接收到单聊消息后 receive client 返回已读 or 未读
       if (msgType.getFirstLevelMsgType() == MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode()
               && msgType.getSecondLevelMsgType() == MsgTypeEnum.SecondLevelMsgType.C2C.getCode()) {
 
         ObjectMapper objectMapper = new ObjectMapper();
-        C2CMsgRequestDTO packet = objectMapper.convertValue(msgBaseRequest.getBody(), C2CMsgRequestDTO.class);
+        C2CSendMsgAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CSendMsgAO.class);
 
-        ClientReceivedMsgAckDTO clientReceivedMsgAckDTO = new ClientReceivedMsgAckDTO();
+        ClientReceivedMsgAckAO clientReceivedMsgAckAO = new ClientReceivedMsgAckAO();
 
-        clientReceivedMsgAckDTO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
-        clientReceivedMsgAckDTO.setMsgId(packet.getMsgId());
+        clientReceivedMsgAckAO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
+        clientReceivedMsgAckAO.setMsgId(packet.getMsgId());
 
-        clientReceivedMsgAckDTO.setFromUserId("222");
-        clientReceivedMsgAckDTO.setToUserId("111");
-        clientReceivedMsgAckDTO.setChatId(packet.getChatId());
+        clientReceivedMsgAckAO.setFromUserId("222");
+        clientReceivedMsgAckAO.setToUserId("111");
+        clientReceivedMsgAckAO.setChatId(packet.getChatId());
         //模拟接收方已读 发送成功ack
         //clientReceivedMsgAckDTO.setSendStatus(MsgStatusEnum.MsgSendStatus.SUCCESS.getCode());
-        clientReceivedMsgAckDTO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
+        clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
 
-        MsgBaseResponse.MsgType responseType = new MsgBaseResponse.MsgType();
+        ImBaseResponse.MsgType responseType = new ImBaseResponse.MsgType();
         responseType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
         responseType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());//模拟已读
 
-        MsgBaseResponse msgBaseResponse = new MsgBaseResponse();
+        ImBaseResponse imBaseResponse = new ImBaseResponse();
 
-        msgBaseResponse.setMsgType(responseType);
-        msgBaseResponse.setBody(clientReceivedMsgAckDTO);
+        imBaseResponse.setMsgType(responseType);
+        imBaseResponse.setBody(clientReceivedMsgAckAO);
 
-        ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(msgBaseResponse)));
-        System.out.println("发送已读or未读完成! data: " + JSONUtil.toJsonStr(msgBaseResponse));
+        ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseResponse)));
+        System.out.println("发送已读or未读完成! data: " + JSONUtil.toJsonStr(imBaseResponse));
       }
     } else if (frame instanceof BinaryWebSocketFrame) {
       System.out.println("客户端：接收到BinaryWebSocketFrame消息，消息内容是-- ");

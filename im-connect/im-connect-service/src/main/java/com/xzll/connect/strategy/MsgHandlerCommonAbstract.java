@@ -5,11 +5,12 @@ import cn.hutool.extra.spring.SpringUtil;
 import cn.hutool.json.JSONUtil;
 
 
-import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.MsgBaseResponse;
+import com.xzll.common.constant.ImConstant;
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.pojo.base.ImBaseResponse;
 
 import com.xzll.connect.netty.channel.LocalChannelManager;
-import com.xzll.common.constant.UserRedisConstant;
+
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -50,8 +51,8 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
         ReceiveUserDataDTO build = null;
         try {
             Channel targetChannel = LocalChannelManager.getChannelByUserId(toUserId);
-            String ipPort = (String) redisTemplate.opsForHash().get(UserRedisConstant.ROUTE_PREFIX, toUserId);
-            String userStatus = (String) redisTemplate.opsForHash().get(UserRedisConstant.LOGIN_STATUS_PREFIX, toUserId);
+            String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, toUserId);
+            String userStatus = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, toUserId);
             build = ReceiveUserDataDTO.builder()
                     .channelIdByUserId(targetChannel != null ? targetChannel.id().asLongText() : null)
                     .targetChannel(targetChannel)
@@ -98,7 +99,7 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * @param ctx
      * @param packet
      */
-    public void responseServerReceiveAckToSender(ChannelHandlerContext ctx, MsgBaseResponse packet) {
+    public void responseServerReceiveAckToSender(ChannelHandlerContext ctx, ImBaseResponse packet) {
         try {
             if (Objects.nonNull(ctx) && Objects.nonNull(ctx.channel())) {
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));
@@ -116,7 +117,7 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * @param channel
      * @param packet
      */
-    public void forgeClientReceiveAckToSender(Channel channel, MsgBaseResponse packet) {
+    public void forgeClientReceiveAckToSender(Channel channel, ImBaseResponse packet) {
         try {
             if (Objects.nonNull(channel)) {
                 channel.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));
@@ -134,8 +135,8 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * @param packet
      * @return
      */
-    protected BaseResponse<MsgBaseResponse> responseServerReceiveAckToSystem(MsgBaseResponse packet, boolean receiveStatus) {
-        return BaseResponse.returnResultSuccess("接收系统消息成功", packet);
+    protected WebBaseResponse<ImBaseResponse> responseServerReceiveAckToSystem(ImBaseResponse packet, boolean receiveStatus) {
+        return WebBaseResponse.returnResultSuccess("接收系统消息成功", packet);
     }
 
 }

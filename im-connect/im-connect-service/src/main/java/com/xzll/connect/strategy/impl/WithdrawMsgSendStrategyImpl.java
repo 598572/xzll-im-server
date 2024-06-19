@@ -8,7 +8,7 @@
 //import com.xzll.connect.pojo.MsgBaseResponse;
 //import com.xzll.connect.pojo.ao.MsgBaseRequest;
 //import com.xzll.connect.pojo.base.BaseResponse;
-//import com.xzll.common.constant.UserRedisConstant;
+//
 //import com.xzll.connect.pojo.dto.MessageInfoDTO;
 //import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 //import com.xzll.connect.pojo.dto.ServerInfoDTO;
@@ -96,7 +96,7 @@
 //        log.info((TAG + "接收者id:{},在线状态:{},channelId:{},serverInfo:{}"), packet.getToUserId(), userStatus, channelIdByUserId, serverInfoDTO);
 //
 //        //3. 根据接收人状态做对应的处理
-//        if (null != targetChannel && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)) {
+//        if (null != targetChannel && Objects.equals(ImConstant.RedisKeyConstant.UserStatus.ON_LINE.toString(), userStatus)) {
 //            // 直接发送
 //            log.info((TAG + "用户{}在线且在本台机器上,将直接发送"), packet.getToUserId());
 //            super.msgSendTemplate(TAG, targetChannel, JsonUtil.toJson(msgBaseRequest));
@@ -104,7 +104,7 @@
 //            log.info((TAG + "用户{}不在线，将db中消息数据更新为撤回消息"), packet.getToUserId());
 //            // 更新消息状态为撤回
 //            this.withdrawMsgStatusUpdate(packet);
-//        } else if (Objects.isNull(targetChannel) && Objects.equals(UserRedisConstant.UserStatus.ON_LINE.toString(), userStatus)
+//        } else if (Objects.isNull(targetChannel) && Objects.equals(ImConstant.RedisKeyConstant.UserStatus.ON_LINE.toString(), userStatus)
 //                && !StringUtil.isNullOrBlank(serverJson)) {
 //            log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToUserId(), serverJson);
 //            String requestUrl = MessageFormat.format(RECEIVE_URL, serverInfoDTO.getAddr(), String.valueOf(serverInfoDTO.getPort()));
@@ -128,7 +128,7 @@
 //        String channelIdByUserId = ChannelManager.getChannelIdByUserId(String.valueOf(packet.getToUserId()));
 //        Channel targetChannel = ChannelManager.findChannel(channelIdByUserId);
 //
-//        String userStatus = redisCache.get(UserRedisConstant.LOGIN_STATUS_PREFIX + channelIdByUserId);
+//        String userStatus = redisCache.get(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX + channelIdByUserId);
 //        //二次校验接收人在线状态
 //        if (!StringUtil.isNullOrBlank(userStatus) && null != targetChannel) {
 //            log.info((TAG + "跳转后用户{}在线,将直接发送消息"), packet.getToUserId());

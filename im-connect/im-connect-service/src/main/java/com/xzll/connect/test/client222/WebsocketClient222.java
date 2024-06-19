@@ -1,12 +1,15 @@
-package com.xzll.connect.test.client2.json;
+package com.xzll.connect.test.client222;
 
 
+import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.base.ImBaseRequest;
-import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.constant.MsgFormatEnum;
 import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
+import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
+import com.xzll.common.pojo.base.ImBaseRequest;
+import com.xzll.connect.test.client111.WebsocketClient111;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -21,12 +24,12 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Scanner;
-import java.util.UUID;
 
 /**
  * @Author: hzz
@@ -35,7 +38,7 @@ import java.util.UUID;
  */
 
 @Slf4j
-public class WebsocketClient {
+public class WebsocketClient222 {
 
 
     private static EventLoopGroup group = new NioEventLoopGroup();
@@ -43,13 +46,15 @@ public class WebsocketClient {
     private String ip;
     private int port;
     private String uriStr;
-    private static WebsocketClientHandler handler;
+    private static WebsocketClientHandler222 handler;
 
-    public WebsocketClient(String ip, int port) {
+    public WebsocketClient222(String ip, int port) {
         this.ip = ip;
         this.port = port;
         uriStr = "ws://" + ip + ":" + port + "/websocket";
     }
+
+    public static volatile boolean getMsgFlag = false;
 
     public void run() throws InterruptedException, URISyntaxException {
         // 主要是为handler(自己写的类)服务，用于初始化EasyWsHandle
@@ -66,7 +71,7 @@ public class WebsocketClient {
 
         WebSocketClientHandshaker webSocketClientHandshaker = WebSocketClientHandshakerFactory
                 .newHandshaker(wsUri, WebSocketVersion.V13, null, true, entries, 100 * 1024 * 1024);
-        handler = new WebsocketClientHandler(webSocketClientHandshaker);
+        handler = new WebsocketClientHandler222(webSocketClientHandshaker);
 
 
 
@@ -91,7 +96,20 @@ public class WebsocketClient {
 
 
         new Thread(() -> {
+
             while (true) {
+                //正在获取中 则等待
+                if (getMsgFlag){
+                    continue;
+                }
+                //如果没有获取 并且集合也为空 则获取（一般首次或者消息id用完了）
+                if (!getMsgFlag && CollectionUtils.isEmpty(WebsocketClientHandler222.msgIds)) {
+                    getMsgIds(channelFuture);
+                    //标识正在获取消息id
+                    getMsgFlag = true;
+                    continue;
+                }
+
                 String s = sc.nextLine();
                 //test 1 : 发送json字符串方式
 //                if (!StringUtils.isEmpty(s)) {
@@ -107,6 +125,8 @@ public class WebsocketClient {
                 if (!StringUtils.isEmpty(s)) {
 
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<>();
+                    String msgId = WebsocketClientHandler222.msgIds.remove(0);
+                    Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(msgId), "无msgId可用");
 
                     ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
                     msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode());
@@ -114,15 +134,15 @@ public class WebsocketClient {
                     imBaseRequest.setMsgType(msgType);
 
                     C2CSendMsgAO c2CMsgRequestDTO = new C2CSendMsgAO();
-                    c2CMsgRequestDTO.setMsgId(UUID.randomUUID().toString());
+                    c2CMsgRequestDTO.setMsgId(msgId);
                     c2CMsgRequestDTO.setMsgContent(s);
-                    c2CMsgRequestDTO.setChatId("网约车业务线_会话001");
-                    c2CMsgRequestDTO.setToUserId("111");
-                    c2CMsgRequestDTO.setFromUserId("222");
-                    c2CMsgRequestDTO.setFirstUserName("我是乘客-小李");
-                    c2CMsgRequestDTO.setFirstUserType(1);
-                    c2CMsgRequestDTO.setSecondUserName("司机-张师傅");
-                    c2CMsgRequestDTO.setSecondUserType(2);
+                    c2CMsgRequestDTO.setChatId("999");
+                    c2CMsgRequestDTO.setToUserId(WebsocketClient111.VALUE);
+                    c2CMsgRequestDTO.setFromUserId(VALUE);
+//                    c2CMsgRequestDTO.setFirstUserName("我是客户222");
+//                    c2CMsgRequestDTO.setFirstUserType(1);
+//                    c2CMsgRequestDTO.setSecondUserName("我是客户222");
+//                    c2CMsgRequestDTO.setSecondUserType(2);
                     c2CMsgRequestDTO.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());
 
@@ -136,6 +156,21 @@ public class WebsocketClient {
         }).start();
         // 堵塞线程，保持长连接
         channelFuture.channel().closeFuture().sync();
+    }
+
+
+    private void getMsgIds(ChannelFuture channelFuture) {
+        ImBaseRequest<ClientGetMsgIdsAO> getMsgIds = new ImBaseRequest<ClientGetMsgIdsAO>();
+        ImBaseRequest.MsgType msgTypeGetMsgIds = new ImBaseRequest.MsgType();
+        msgTypeGetMsgIds.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.GET_DATA_MSG.getCode());
+        msgTypeGetMsgIds.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.GET_MSG_IDS.getCode());
+        getMsgIds.setMsgType(msgTypeGetMsgIds);
+        ClientGetMsgIdsAO msgIdsDTO = new ClientGetMsgIdsAO();
+        msgIdsDTO.setFromUserId(VALUE);
+        getMsgIds.setBody(msgIdsDTO);
+        TextWebSocketFrame textFrameResult = new TextWebSocketFrame(JSONUtil.toJsonStr(getMsgIds));
+        //文本消息
+        channelFuture.channel().writeAndFlush(textFrameResult);
     }
 
 }

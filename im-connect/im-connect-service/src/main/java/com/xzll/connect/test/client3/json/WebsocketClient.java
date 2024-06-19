@@ -4,7 +4,7 @@ package com.xzll.connect.test.client3.json;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
 
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -86,7 +86,7 @@ public class WebsocketClient {
             while (true) {
                 String s = sc.nextLine();
                 if (!StringUtils.isEmpty(s)) {
-                    MsgBaseRequest msgBaseResponse = JSON.parseObject(s, MsgBaseRequest.class);
+                    ImBaseRequest msgBaseResponse = JSON.parseObject(s, ImBaseRequest.class);
 
                     //文本消息
                     TextWebSocketFrame byteFrame = new TextWebSocketFrame(JSONUtil.toJsonStr(msgBaseResponse));

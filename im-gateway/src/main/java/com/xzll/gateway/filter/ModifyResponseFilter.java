@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
-import com.xzll.common.pojo.ImServerAddressDTO;
+import com.xzll.common.pojo.dto.ImServerAddressDTO;
 import com.xzll.common.util.TraceIdUtil;
 import com.xzll.gateway.config.nacos.NeedAddImServerUrlsConfig;
 import lombok.extern.slf4j.Slf4j;

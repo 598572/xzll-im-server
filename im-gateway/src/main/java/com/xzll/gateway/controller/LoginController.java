@@ -1,6 +1,6 @@
 package com.xzll.gateway.controller;
 
-import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,11 +22,11 @@ import java.util.Map;
 public class LoginController {
 
     @PostMapping(value = "/login")
-    public BaseResponse<Map<String, Object>> test(@RequestBody Map<String,Object> param) {
+    public WebBaseResponse<Map<String, Object>> test(@RequestBody Map<String,Object> param) {
         log.info("我是网关服务,入参:{}", JsonUtils.toJsonStr(param));
         Map<String, Object> map = new HashMap<>();
         map.put("id",123);
         map.put("name","张三");
-        return BaseResponse.returnResultSuccess(map);
+        return WebBaseResponse.returnResultSuccess(map);
     }
 }

@@ -1,7 +1,7 @@
 package com.xzll.connect.config;
 
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.constant.UserRedisConstant;
+
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import lombok.extern.slf4j.Slf4j;
@@ -55,9 +55,9 @@ public class ShutdownHandler implements ApplicationListener<ContextClosedEvent> 
         }
         allOnLineUserId.forEach(uid -> {
             //清除用户登录信息
-            redisTemplate.opsForHash().delete(UserRedisConstant.ROUTE_PREFIX, uid);
+            redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.ROUTE_PREFIX, uid);
             //清除用户登录状态
-            redisTemplate.opsForHash().delete(UserRedisConstant.LOGIN_STATUS_PREFIX, uid);
+            redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, uid);
         });
         log.info("共计{}个用户登录信息清除完毕", allOnLineUserId.size());
     }

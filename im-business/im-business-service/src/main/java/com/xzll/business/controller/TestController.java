@@ -1,7 +1,7 @@
 package com.xzll.business.controller;
 
 import com.xzll.business.service.ImC2CMsgRecordService;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +37,7 @@ public class TestController {
 	 * @return
 	 */
 	@PostMapping("/testes")
-	public Long testes(@RequestBody C2CMsgRequestDTO dto) {
+	public Long testes(@RequestBody C2CSendMsgAO dto) {
 		imC2CMsgRecordService.testEs(dto);
 		return timeOutConfig;
 	}

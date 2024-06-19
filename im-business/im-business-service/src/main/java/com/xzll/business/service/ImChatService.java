@@ -1,6 +1,6 @@
 package com.xzll.business.service;
 
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 
 /**
  * @Author: hzz
@@ -8,5 +8,5 @@ import com.xzll.common.pojo.C2CMsgRequestDTO;
  * @Description:
  */
 public interface ImChatService {
-    public boolean saveOrUpdateC2CChat(C2CMsgRequestDTO dto);
+    public boolean saveOrUpdateC2CChat(C2CSendMsgAO dto);
 }

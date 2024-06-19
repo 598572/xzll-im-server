@@ -2,8 +2,8 @@ package com.xzll.connect.strategy;
 
 
 
-import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.pojo.base.ImBaseRequest;
 
 import io.netty.channel.ChannelHandlerContext;
 
@@ -20,14 +20,14 @@ public interface MsgHandlerStrategy {
     /**
      * 适配
      */
-    boolean support(MsgBaseRequest.MsgType type);
+    boolean support(ImBaseRequest.MsgType type);
 
     //---------------------------------------------长连接-----------------------------------------------------
 
     /**
      * 处理通过长连接发送过来的消息
      */
-    default void exchange(ChannelHandlerContext ctx, MsgBaseRequest packet) {
+    default void exchange(ChannelHandlerContext ctx, ImBaseRequest packet) {
     }
 
     /**
@@ -35,7 +35,7 @@ public interface MsgHandlerStrategy {
      * <p>
      * 处理接收到的跳转请求
      */
-    default BaseResponse<String> receiveAndSendMsg(MsgBaseRequest msg) {
+    default WebBaseResponse<String> receiveAndSendMsg(ImBaseRequest msg) {
         return null;
     }
 
@@ -47,8 +47,8 @@ public interface MsgHandlerStrategy {
      *
      * @param packet
      */
-    default BaseResponse exchange(MsgBaseRequest packet) {
-        return BaseResponse.returnResultSuccess();
+    default WebBaseResponse exchange(ImBaseRequest packet) {
+        return WebBaseResponse.returnResultSuccess();
     }
 
 }

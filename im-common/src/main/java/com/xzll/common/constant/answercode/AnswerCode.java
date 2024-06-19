@@ -1,4 +1,4 @@
-package com.xzll.common.pojo;
+package com.xzll.common.constant.answercode;
 
 import java.io.Serializable;
 

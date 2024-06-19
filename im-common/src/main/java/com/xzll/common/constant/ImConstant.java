@@ -1,9 +1,9 @@
 package com.xzll.common.constant;
 
 import io.netty.util.AttributeKey;
-import org.checkerframework.checker.units.qual.C;
-
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public interface ImConstant {
@@ -12,6 +12,11 @@ public interface ImConstant {
     public static final String TOKEN = "token";
 
     public static final String START_TIME = "startTime";
+
+    public static String WEBSOCKET_PATH = "/websocket";
+
+
+
 
 
     /**
@@ -47,16 +52,48 @@ public interface ImConstant {
         }
     }
 
+    /**
+     * rocketMq topic
+     */
     public static class TopicConstant {
         public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
     }
 
     public static class RedisKeyConstant {
-        public static final String NETTY_IP_PORT = "NETTY_IP_PORT";
 
-        public static final String IM_SERVER_ROUND_COUNTER_KEY = "IM_SERVER_ROUND_COUNTER_KEY";
+        //=======================im服务器信息相关 key=======================
+        /**
+         * 服务器信息，每一个imConnect服务启动 都会往redis（后期可能改成zookeeper）注册 ip和端口 key就是NETTY_IP_PORT
+         */
+        public static final String NETTY_IP_PORT = "imServer:nettyIpPort:";
+        /**
+         * 给登录用户分配im服务时，的负载均衡算法的：轮询key
+         */
+        public static final String IM_SERVER_ROUND_COUNTER_KEY = "imServer:roundCounter:";
 
-        public static final String USER_TOKEN_KEY = "USER_TOKEN_KEY:";
+
+        //=======================用户登录相关消息相关 key =======================
+        /**
+         * 用户登录的token key
+         */
+        public static final String USER_TOKEN_KEY = "userLogin:token:";
+        /**
+         * 路由信息前缀
+         */
+        public final static String ROUTE_PREFIX = "userLogin:server:";
+
+        /**
+         * 用户登录状态前缀
+         */
+        public final static String LOGIN_STATUS_PREFIX = "userLogin:status:";
+
+
+        //=======================离线消息相关 key =======================
+        /**
+         * 离线消息缓存key
+         */
+        public static final String OFF_LINE_MSG_KEY = "offLine:msgKey:";
+
 
     }
 
@@ -68,6 +105,57 @@ public interface ImConstant {
         //客户端响应的 ack消息
         public static final int C2C_CLIENT_RECEIVED_ACK_MSG = 30;
     }
+
+
+    public enum UserStatus {
+        /**
+         * 离线
+         */
+        OFF_LINE(0),
+
+        //将来可能置忙
+
+        /**
+         * 在线
+         */
+        ON_LINE(5);
+
+        private final Integer value;
+
+        UserStatus(Integer value) {
+            this.value = value;
+        }
+
+        public Integer getValue() {
+            return value;
+        }
+    }
+
+    /**
+     * 消息状态更新条件，防止状态回退
+     */
+    public static class MsgStatusUpdateCondition {
+
+        /**
+         * 可以更新为未读的条件
+         */
+        public static Set<Integer> CAN_UPDATE_UN_READ = new HashSet<Integer>();
+
+        /**
+         * 可以更新为已读的条件
+         */
+        public static Set<Integer> CAN_UPDATE_READED = new HashSet<Integer>();
+
+        static {
+            CAN_UPDATE_UN_READ.add(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
+            CAN_UPDATE_UN_READ.add(MsgStatusEnum.MsgStatus.OFF_LINE.getCode());
+
+            CAN_UPDATE_READED.add(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
+            CAN_UPDATE_READED.add(MsgStatusEnum.MsgStatus.OFF_LINE.getCode());
+            CAN_UPDATE_READED.add(MsgStatusEnum.MsgStatus.UN_READ.getCode());
+        }
+    }
+
 
 
 }

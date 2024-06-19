@@ -1,6 +1,6 @@
-package com.xzll.common.pojo;
+package com.xzll.common.pojo.response;
 
-import com.xzll.common.pojo.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.response.base.CommonMsgVO;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,7 +11,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
-public class C2CServerResponseAckDTO extends BaseMsgRequestDTO {
+public class C2CServerResponseVO extends CommonMsgVO {
 
     /**
      * server ack 目标userId

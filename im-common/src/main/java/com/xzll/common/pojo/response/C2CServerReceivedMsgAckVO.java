@@ -1,6 +1,6 @@
-package com.xzll.connect.pojo.response.dto;
+package com.xzll.common.pojo.response;
 
-import com.xzll.common.pojo.base.BaseMsgResponseDTO;
+import com.xzll.common.pojo.response.base.CommonMsgVO;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -11,8 +11,9 @@ import lombok.experimental.Accessors;
  */
 @Data
 @Accessors(chain = true)
-public class C2CClientReceivedMsgAckDTO extends BaseMsgResponseDTO {
+public class C2CServerReceivedMsgAckVO extends CommonMsgVO {
 
+    private String toUserId;
     private String chatId;
     private Integer msgReceivedStatus;
     private String ackTextDesc;

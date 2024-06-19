@@ -9,7 +9,7 @@ import com.xzll.business.mapper.ImChatMapper;
 import com.xzll.business.mapstruct.C2CChatMapping;
 import com.xzll.business.service.ImChatService;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,7 +43,7 @@ public class ImChatServiceImpl implements ImChatService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public boolean saveOrUpdateC2CChat(C2CMsgRequestDTO dto) {
+    public boolean saveOrUpdateC2CChat(C2CSendMsgAO dto) {
         log.info("写入或更新会话信息入参:{}", JSONUtil.toJsonStr(dto));
         String chatId = ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(dto.getFromUserId()), Long.valueOf(dto.getToUserId()));
         LambdaQueryWrapper<ImChat> eq = Wrappers.lambdaQuery(ImChat.class).eq(ImChat::getChatId, chatId);

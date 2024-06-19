@@ -3,10 +3,10 @@ package com.xzll.connect.test.client3.json;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.constant.MsgStatusEnum;
 
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,15 +19,15 @@ import java.util.List;
 public class MakeData4Client3 {
 
     public static void main(String[] args) {
-        MsgBaseRequest msgBaseRequest = new MsgBaseRequest();
+        ImBaseRequest imBaseRequest = new ImBaseRequest();
 
-        MsgBaseRequest.MsgType msgType = new MsgBaseRequest.MsgType();
+        ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
         msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
         msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());
 
-        msgBaseRequest.setMsgType(msgType);
+        imBaseRequest.setMsgType(msgType);
 
-        ClientReceivedMsgAckDTO ack = new ClientReceivedMsgAckDTO();
+        ClientReceivedMsgAckAO ack = new ClientReceivedMsgAckAO();
 
         List<String> msgIds = new ArrayList<>();
         msgIds.add("c31f0183-1ec5-4cc0-8872-ba60af889ad2");
@@ -38,9 +38,9 @@ public class MakeData4Client3 {
         ack.setChatId("9999");
         ack.setToUserId("1002");
 
-        msgBaseRequest.setBody(ack);
+        imBaseRequest.setBody(ack);
 
-        String s = JSONUtil.toJsonStr(msgBaseRequest);
+        String s = JSONUtil.toJsonStr(imBaseRequest);
         System.out.println(s);
 
     }

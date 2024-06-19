@@ -1,6 +1,6 @@
 package com.xzll.connect.pojo.dto;
 
-import com.xzll.common.pojo.base.BaseMsgRequestDTO;
+import com.xzll.common.pojo.request.base.CommonMsgAO;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,7 +11,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
-public class WithdrawMsgRequestDTO extends BaseMsgRequestDTO {
+public class WithdrawMsgAO extends CommonMsgAO {
 
     private String fromUserId;
     private String toUserId;

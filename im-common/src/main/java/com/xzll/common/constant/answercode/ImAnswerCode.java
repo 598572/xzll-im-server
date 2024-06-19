@@ -1,9 +1,6 @@
-package com.xzll.common.pojo;
+package com.xzll.common.constant.answercode;
 
 
-/**
- * @author hzz
- */
 
 public class ImAnswerCode extends AnswerCode {
     /**

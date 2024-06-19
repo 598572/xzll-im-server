@@ -10,16 +10,17 @@ import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.mapper.ImC2CMsgRecordMapper;
 import com.xzll.business.mapstruct.C2CMsgMapping;
 import com.xzll.business.entity.es.MsgEntity;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
-import com.xzll.common.pojo.OffLineMsgDTO;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.OffLineMsgAO;
 import org.elasticsearch.index.query.MatchAllQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
 
 import com.xzll.business.service.ImC2CMsgRecordService;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -53,7 +54,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public boolean saveC2CMsg(C2CMsgRequestDTO dto) {
+    public boolean saveC2CMsg(C2CSendMsgAO dto) {
         log.info("保存单聊消息入参:{}", JSONUtil.toJsonStr(dto));
         ImC2CMsgRecord imC2CMsgRecord = c2CMsgMapping.convertC2CMsgRecord(dto);
         imC2CMsgRecord.setMsgStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
@@ -82,7 +83,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public boolean updateC2CMsgOffLineStatus(OffLineMsgDTO dto) {
+    public boolean updateC2CMsgOffLineStatus(OffLineMsgAO dto) {
         log.info("更新消息为离线入参:{}", JSONUtil.toJsonStr(dto));
         //如果是重试消息 需要特殊处理
         LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
@@ -103,7 +104,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
      * @return
      */
     @Override
-    public boolean updateC2CMsgReceivedStatus(ClientReceivedMsgAckDTO dto) {
+    public boolean updateC2CMsgReceivedStatus(ClientReceivedMsgAckAO dto) {
         String currentName = MsgStatusEnum.MsgStatus.getNameByCode(dto.getMsgStatus());
         log.info("更新消息状态为:{}，入参:{}", currentName, JSONUtil.toJsonStr(dto));
         //如果是重试消息 需要特殊处理
@@ -111,13 +112,23 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
         ImC2CMsgRecord dbResult = imC2CMsgRecordMapper.selectOne(msgRecord);
         Assert.isTrue(Objects.nonNull(dbResult), "数据为空抛出异常待mq重试消费,一般顺序消费情况下，不会出现此异常");
         //如果db中已经是已读且当前要更新为未读，则将此未读忽略掉
-        if (Objects.equals(dbResult.getMsgStatus(), MsgStatusEnum.MsgStatus.READED.getCode()) && dto.getMsgStatus().equals(MsgStatusEnum.MsgStatus.UN_READ.getCode())) {
+        if (Objects.equals(dbResult.getMsgStatus(), MsgStatusEnum.MsgStatus.READED.getCode()) && Objects.equals(dto.getMsgStatus(), MsgStatusEnum.MsgStatus.UN_READ.getCode())) {
             log.info("db中已经是已读状态不再更新为未读");
             return true;
         }
-        if (!(dbResult.getMsgStatus().equals(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode()) || dbResult.getMsgStatus().equals(MsgStatusEnum.MsgStatus.OFF_LINE.getCode()))) {
-            log.info("当前消息状态不支持更新为:{}，当前状态:{}", currentName, MsgStatusEnum.MsgStatus.getNameByCode(dbResult.getMsgStatus()));
-            return true;
+        //如果是未读 则更新前状态一定是（离线/到达服务器）
+        if (Objects.equals(dto.getMsgStatus(), MsgStatusEnum.MsgStatus.UN_READ.getCode())) {
+            if (!ImConstant.MsgStatusUpdateCondition.CAN_UPDATE_UN_READ.contains(dbResult.getMsgStatus())) {
+                log.info("当前消息状态不支持更新为:{}，当前状态:{}", currentName, MsgStatusEnum.MsgStatus.getNameByCode(dbResult.getMsgStatus()));
+                return true;
+            }
+        }
+        //如果是已读 则更新前状态一定是（离线/到达服务器/未读）
+        if (Objects.equals(dto.getMsgStatus(), MsgStatusEnum.MsgStatus.READED.getCode())) {
+            if (!ImConstant.MsgStatusUpdateCondition.CAN_UPDATE_READED.contains(dbResult.getMsgStatus())) {
+                log.info("当前消息状态不支持更新为:{}，当前状态:{}", currentName, MsgStatusEnum.MsgStatus.getNameByCode(dbResult.getMsgStatus()));
+                return true;
+            }
         }
         ImC2CMsgRecord updateValue = new ImC2CMsgRecord();
         updateValue.setMsgStatus(dto.getMsgStatus());
@@ -129,7 +140,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
 
 
     @Override
-    public void testEs(C2CMsgRequestDTO dto) {
+    public void testEs(C2CSendMsgAO dto) {
         MsgEntity msgEntity = new MsgEntity();
         BeanUtil.copyProperties(dto, msgEntity);
         //测试es

@@ -1,9 +1,9 @@
 package com.xzll.connect.service.impl;
 
 
-import com.xzll.common.pojo.BaseResponse;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.connect.api.TransferC2CMsgApi;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
@@ -25,7 +25,7 @@ public class TransferC2CMsgServiceImpl implements TransferC2CMsgApi {
     private HandlerDispatcher handlerDispatcher;
 
     @Override
-    public BaseResponse transferC2CMsg(MsgBaseRequest msgBaseRequest) {
-        return handlerDispatcher.receiveAndSendMsg(msgBaseRequest);
+    public WebBaseResponse transferC2CMsg(ImBaseRequest imBaseRequest) {
+        return handlerDispatcher.receiveAndSendMsg(imBaseRequest);
     }
 }

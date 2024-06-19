@@ -2,8 +2,8 @@ package com.xzll.connect.dispatcher;
 
 
 
-import com.xzll.common.pojo.BaseResponse;
-import com.xzll.common.pojo.MsgBaseRequest;
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.pojo.base.ImBaseRequest;
 
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
@@ -34,7 +34,7 @@ public class HandlerDispatcher implements ApplicationContextAware {
      * @param ctx
      * @param packet
      */
-    public void dispatcher(ChannelHandlerContext ctx, MsgBaseRequest packet) {
+    public void dispatcher(ChannelHandlerContext ctx, ImBaseRequest packet) {
         if (CollectionUtils.isEmpty(exchangers)) {
             return;
         }
@@ -51,16 +51,16 @@ public class HandlerDispatcher implements ApplicationContextAware {
      * @param packet
      * @return
      */
-    public BaseResponse dispatcher(MsgBaseRequest packet) {
+    public WebBaseResponse dispatcher(ImBaseRequest packet) {
         if (CollectionUtils.isEmpty(exchangers)) {
-            return BaseResponse.returnResultError("无处理器");
+            return WebBaseResponse.returnResultError("无处理器");
         }
         for (MsgHandlerStrategy item : exchangers) {
             if (item.support(packet.getMsgType())) {
                 return item.exchange(packet);
             }
         }
-        return BaseResponse.returnResultError("无处理器");
+        return WebBaseResponse.returnResultError("无处理器");
     }
 
     /**
@@ -68,16 +68,16 @@ public class HandlerDispatcher implements ApplicationContextAware {
      *
      * @param msg
      */
-    public BaseResponse receiveAndSendMsg(MsgBaseRequest msg) {
+    public WebBaseResponse receiveAndSendMsg(ImBaseRequest msg) {
         if (CollectionUtils.isEmpty(exchangers)) {
-            return BaseResponse.returnResultError("无处理器");
+            return WebBaseResponse.returnResultError("无处理器");
         }
         for (MsgHandlerStrategy item : exchangers) {
             if (item.support(msg.getMsgType())) {
                 return item.receiveAndSendMsg(msg);
             }
         }
-        return BaseResponse.returnResultError("无处理器");
+        return WebBaseResponse.returnResultError("无处理器");
     }
 
     /**

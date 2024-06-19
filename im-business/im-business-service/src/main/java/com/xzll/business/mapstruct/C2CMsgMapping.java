@@ -1,7 +1,7 @@
 package com.xzll.business.mapstruct;
 
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -22,7 +22,7 @@ public interface C2CMsgMapping {
      */
     @Mapping(target = "msgFormat", defaultValue = "1")
     @Mapping(target = "msgType", expression = "java(dto.getMsgType().getFirstLevelMsgType())")
-    ImC2CMsgRecord convertC2CMsgRecord(C2CMsgRequestDTO dto);
+    ImC2CMsgRecord convertC2CMsgRecord(C2CSendMsgAO dto);
 
 
 }

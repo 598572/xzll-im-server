@@ -6,9 +6,9 @@ import com.xzll.business.handler.c2c.C2CSendMsgHandler;
 import com.xzll.business.handler.c2c.C2CClientReceivedAckMsgHandler;
 import com.xzll.business.handler.c2c.C2COffLineMsgHandler;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.C2CMsgRequestDTO;
-import com.xzll.common.pojo.ClientReceivedMsgAckDTO;
-import com.xzll.common.pojo.OffLineMsgDTO;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
+import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.OffLineMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.common.rocketmq.RocketMQClusterEventListener;
 import lombok.extern.slf4j.Slf4j;
@@ -65,16 +65,16 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
         }
         switch (clusterEventType) {
             case ImConstant.ClusterEventTypeConstant.C2C_SEND_MSG:
-                C2CMsgRequestDTO c2CMsgRequestDTO = JSONUtil.toBean(clusterEvent.getData(), C2CMsgRequestDTO.class);
+                C2CSendMsgAO c2CMsgRequestDTO = JSONUtil.toBean(clusterEvent.getData(), C2CSendMsgAO.class);
                 c2CSendMsgHandler.sendC2CMsgDeal(c2CMsgRequestDTO);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_OFF_LINE_MSG:
-                OffLineMsgDTO offLineMsgDTO = JSONUtil.toBean(clusterEvent.getData(), OffLineMsgDTO.class);
-                c2COffLineMsgHandler.offLineMsgDeal(offLineMsgDTO);
+                OffLineMsgAO offLineMsgAO = JSONUtil.toBean(clusterEvent.getData(), OffLineMsgAO.class);
+                c2COffLineMsgHandler.offLineMsgDeal(offLineMsgAO);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_CLIENT_RECEIVED_ACK_MSG:
-                ClientReceivedMsgAckDTO clientReceivedMsgAckDTO = JSONUtil.toBean(clusterEvent.getData(), ClientReceivedMsgAckDTO.class);
-                c2CClientReceivedAckMsgHandler.clientReceivedAckMsgDeal(clientReceivedMsgAckDTO);
+                ClientReceivedMsgAckAO clientReceivedMsgAckAO = JSONUtil.toBean(clusterEvent.getData(), ClientReceivedMsgAckAO.class);
+                c2CClientReceivedAckMsgHandler.clientReceivedAckMsgDeal(clientReceivedMsgAckAO);
                 return;
             default:
                 log.warn("不适配的事件类型:{},请检查", clusterEvent);
