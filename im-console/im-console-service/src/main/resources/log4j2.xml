@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xml>
+<Configuration status="off" monitorInterval="10">
+
+	<properties>
+		<property name="FILE_NAME">xzll_admin</property>
+	</properties>
+
+	<Appenders>
+		<Console name="Console" target="SYSTEM_OUT">
+			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{im_trace_id}] - %msg%n" />
+			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+		</Console>
+	</Appenders>
+
+	<Loggers>
+		<Root level="info">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</Root>
+		<logger level="info" name="jdbc.sqlonly" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="jdbc.sqltiming" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="jdbc.companyAudit" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="jdbc.resultset" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="jdbc.connection" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="jdbc.audit" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+
+		<logger level="OFF" name="serviceStatsLog" additivity="false">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="File" />
+		</logger>
+	</Loggers>
+</Configuration>

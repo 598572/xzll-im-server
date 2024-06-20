@@ -81,9 +81,9 @@ public class C2CMsgProvider {
             clusterEvent.setData(JSONUtil.toJsonStr(dto));
             clusterEvent.setClusterEventType(ImConstant.ClusterEventTypeConstant.C2C_CLIENT_RECEIVED_ACK_MSG);
             result = rocketMqProducerWrap.sendClusterEvent(C2CMsgProvider.C2C_TOPIC, clusterEvent, dto.getMsgId());
-            log.info("往mq发送离线消息结果:{}", result);
+            log.info("往mq发送客户端ack消息结果:{}", result);
         } catch (Exception e) {
-            log.error("往mq发送离线消息失败:", e);
+            log.error("往mq发送客户端ack消息失败:", e);
         }
         return result;
     }
