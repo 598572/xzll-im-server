@@ -4,8 +4,9 @@ package com.xzll.connect.cluster.provider;
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
-import com.xzll.common.pojo.request.OffLineMsgAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2COffLineMsgAO;
+import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.connect.cluster.mq.RocketMqProducerWrap;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +55,7 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean offLineMsg(OffLineMsgAO dto) {
+    public boolean offLineMsg(C2COffLineMsgAO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();
@@ -74,7 +75,7 @@ public class C2CMsgProvider {
      * @param dto
      * @return
      */
-    public boolean clientResponseAck(ClientReceivedMsgAckAO dto) {
+    public boolean clientResponseAck(C2CReceivedMsgAckAO dto) {
         boolean result = false;
         try {
             ClusterEvent clusterEvent = new ClusterEvent();
@@ -84,6 +85,26 @@ public class C2CMsgProvider {
             log.info("往mq发送客户端ack消息结果:{}", result);
         } catch (Exception e) {
             log.error("往mq发送客户端ack消息失败:", e);
+        }
+        return result;
+    }
+
+    /**
+     * 往mq 发送撤回消息，用于更新消息状态为撤回以及发撤回消息
+     *
+     * @param ao
+     * @return
+     */
+    public boolean sendWithdrawMsg(C2CWithdrawMsgAO ao) {
+        boolean result = false;
+        try {
+            ClusterEvent clusterEvent = new ClusterEvent();
+            clusterEvent.setData(JSONUtil.toJsonStr(ao));
+            clusterEvent.setClusterEventType(ImConstant.ClusterEventTypeConstant.C2C_CLIENT_WITHDRAW_MSG);
+            result = rocketMqProducerWrap.sendClusterEvent(C2CMsgProvider.C2C_TOPIC, clusterEvent, ao.getMsgId());
+            log.info("往mq发送客户端撤回消息结果:{}", result);
+        } catch (Exception e) {
+            log.error("往mq发送客户端撤回消息失败:", e);
         }
         return result;
     }

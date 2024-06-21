@@ -1,4 +1,4 @@
-package com.xzll.connect.service.impl;
+package com.xzll.connect.rpcimpl;
 
 
 import cn.hutool.core.lang.Assert;
@@ -6,8 +6,9 @@ import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.base.ImBaseResponse;
+import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
 import com.xzll.common.pojo.response.base.CommonMsgVO;
-import com.xzll.connect.api.ResponseAck2ClientApi;
+import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
@@ -28,7 +29,7 @@ import java.util.Objects;
 @DubboService
 @Service
 @Slf4j
-public class ResponseAck2ClientImpl implements ResponseAck2ClientApi {
+public class RpcSendMsg2ClientImpl implements RpcSendMsg2ClientApi {
 
 
     @Override
@@ -37,9 +38,9 @@ public class ResponseAck2ClientImpl implements ResponseAck2ClientApi {
         C2CServerReceivedMsgAckVO ackVo = (C2CServerReceivedMsgAckVO) packet;
         Assert.isTrue(Objects.nonNull(ackVo) && StringUtils.isNotBlank(ackVo.getToUserId()), "发送服务端ack时缺少必填参数");
         // 构建&响应服务端是否接收成功消息
-        ImBaseResponse<C2CServerReceivedMsgAckVO> imBaseResponse = ImBaseResponse.buildPushToClientData(ackVo.getMsgType(), ackVo);
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackVo.getMsgType(), ackVo);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(ackVo.getToUserId());
-        boolean result = this.responseAckToSender(targetChannel, imBaseResponse);
+        boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
         return WebBaseResponse.setResult(resultAnswer);
     }
@@ -50,9 +51,21 @@ public class ResponseAck2ClientImpl implements ResponseAck2ClientApi {
         C2CClientReceivedMsgAckVO ackDTO = (C2CClientReceivedMsgAckVO) packet;
         Assert.isTrue(Objects.nonNull(ackDTO) && StringUtils.isNotBlank(ackDTO.getToUserId()), "发送客户端ack时缺少必填参数");
         //构建&响应 消息接收方客户端是否接收成功消息
-        ImBaseResponse<C2CClientReceivedMsgAckVO> imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getMsgType(), ackDTO);
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getMsgType(), ackDTO);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(ackDTO.getToUserId());
-        boolean result = this.responseAckToSender(targetChannel, imBaseResponse);
+        boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+        AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
+        return WebBaseResponse.setResult(resultAnswer);
+    }
+
+    @Override
+    public WebBaseResponse sendWithdrawMsg2Client(CommonMsgVO packet) {
+        Assert.isTrue(Objects.nonNull(packet), "参数错误");
+        C2CWithdrawMsgVO withdrawMsgVo = (C2CWithdrawMsgVO) packet;
+        //构建&响应 消息接收方客户端是否接收成功消息
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getMsgType(), withdrawMsgVo);
+        Channel targetChannel = LocalChannelManager.getChannelByUserId(withdrawMsgVo.getToUserId());
+        boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
         return WebBaseResponse.setResult(resultAnswer);
     }
@@ -64,7 +77,7 @@ public class ResponseAck2ClientImpl implements ResponseAck2ClientApi {
      * @param channel
      * @param packet
      */
-    public boolean responseAckToSender(Channel channel, ImBaseResponse packet) {
+    public boolean sendMsg2Client(Channel channel, ImBaseResponse packet) {
         try {
             if (Objects.nonNull(channel)) {
                 channel.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));

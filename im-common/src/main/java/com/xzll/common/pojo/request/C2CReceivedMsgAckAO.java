@@ -16,7 +16,7 @@ import java.util.List;
 @Setter
 @Getter
 @Accessors(chain = true)
-public class ClientReceivedMsgAckAO extends CommonMsgAO {
+public class C2CReceivedMsgAckAO extends CommonMsgAO {
 
     private String fromUserId;
 

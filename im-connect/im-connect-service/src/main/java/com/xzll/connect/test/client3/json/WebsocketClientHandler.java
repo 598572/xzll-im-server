@@ -10,7 +10,7 @@ import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -88,15 +88,15 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
                 ObjectMapper objectMapper = new ObjectMapper();
                 C2CSendMsgAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CSendMsgAO.class);
 
-                ClientReceivedMsgAckAO clientReceivedMsgAckAO = new ClientReceivedMsgAckAO();
+                C2CReceivedMsgAckAO c2CReceivedMsgAckAO = new C2CReceivedMsgAckAO();
 
-                clientReceivedMsgAckAO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
-                clientReceivedMsgAckAO.setFromUserId("1003");
-                clientReceivedMsgAckAO.setToUserId("1002");
-                clientReceivedMsgAckAO.setChatId(packet.getChatId());
+                c2CReceivedMsgAckAO.setMsgIds(Stream.of(packet.getMsgId()).collect(Collectors.toList()));
+                c2CReceivedMsgAckAO.setFromUserId("1003");
+                c2CReceivedMsgAckAO.setToUserId("1002");
+                c2CReceivedMsgAckAO.setChatId(packet.getChatId());
                 //模拟接收方已读 发送成功ack
                 //clientReceivedMsgAckDTO.setSendStatus(MsgStatusEnum.MsgSendStatus.SUCCESS.getCode());
-                clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
+                c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
 
                 ImBaseResponse.MsgType responseType = new ImBaseResponse.MsgType();
                 responseType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
@@ -105,7 +105,7 @@ public class WebsocketClientHandler extends SimpleChannelInboundHandler<Object> 
                 ImBaseResponse imBaseResponse = new ImBaseResponse();
 
                 imBaseResponse.setMsgType(responseType);
-                imBaseResponse.setBody(clientReceivedMsgAckAO);
+                imBaseResponse.setBody(c2CReceivedMsgAckAO);
 
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseResponse)));
                 System.out.println("发送已读or未读完成! data: " + JSONUtil.toJsonStr(imBaseResponse));

@@ -2,7 +2,7 @@ package com.xzll.connect.service.impl;
 
 
 import com.xzll.business.api.RpcTestApi;
-import com.xzll.connect.api.XxxApi;
+import com.xzll.connect.rpcapi.XxxApi;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.stereotype.Service;

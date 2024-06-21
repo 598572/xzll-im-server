@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
@@ -49,8 +49,8 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
      * @param imBaseRequest
      * @return
      */
-    private ClientReceivedMsgAckAO supportPojo(ImBaseRequest imBaseRequest) {
-        ClientReceivedMsgAckAO packet = objectMapper.convertValue(imBaseRequest.getBody(), ClientReceivedMsgAckAO.class);
+    private C2CReceivedMsgAckAO supportPojo(ImBaseRequest imBaseRequest) {
+        C2CReceivedMsgAckAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CReceivedMsgAckAO.class);
         packet.setMsgType(imBaseRequest.getMsgType());
         return packet;
     }
@@ -59,8 +59,8 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
     @Override
     public void exchange(ChannelHandlerContext ctx, ImBaseRequest imBaseRequest) {
         log.debug("客户端ack消息_开始");
-        ClientReceivedMsgAckAO packet = this.supportPojo(imBaseRequest);
-        //1. 修改数据库中消息的状态，并push消息至sender
+        C2CReceivedMsgAckAO packet = this.supportPojo(imBaseRequest);
+        //1. 修改数据库中消息的状态，并push消息至sender，此处：修改db与发ack消息为同步。设计原则：要么第一步存消息就失败，要么：消息新增成功后，后边的状态流转一定要正确所以需要同步
         c2CMsgProvider.clientResponseAck(packet);
         log.debug("客户端ack消息_结束");
     }

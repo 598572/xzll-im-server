@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class OffLineMsgAO extends CommonMsgAO {
+public class C2COffLineMsgAO extends CommonMsgAO {
 
     /**
      * 消息内容

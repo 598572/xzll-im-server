@@ -78,6 +78,11 @@ public class ImC2CMsgRecord implements Serializable {
      */
     private Integer retryCount;
 
+    /**
+     * 撤回标志 0 未撤回 1 已撤回
+     */
+    private Integer withdrawFlag;
+
     
 
 }
