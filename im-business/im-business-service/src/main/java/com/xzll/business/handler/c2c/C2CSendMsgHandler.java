@@ -12,7 +12,7 @@ import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.connect.api.ResponseAck2ClientApi;
+import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.Objects;
 
 /**
  * @Author: hzz
@@ -39,7 +38,7 @@ public class C2CSendMsgHandler {
     private ImC2CMsgRecordService imC2CMsgRecordService;
     //配置check = false 后生产者不启动也无所谓，不会报错影响本服务启动，当然也可全局配(这里全局配置了)
     @DubboReference
-    private ResponseAck2ClientApi responseAck2ClientApi;
+    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
     @Resource
     private RedisTemplate<String, String> redisTemplate;
 
@@ -60,7 +59,7 @@ public class C2CSendMsgHandler {
             //指定ip调用 与消息转发一样
             String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getFromUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
-            WebBaseResponse webBaseResponse = responseAck2ClientApi.responseServerAck2Client(ackVo);
+            WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseServerAck2Client(ackVo);
             log.info("服务端ack发送至发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));
         }
     }

@@ -2,7 +2,7 @@ package com.xzll.connect.service.impl;
 
 
 import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.connect.api.TransferC2CMsgApi;
+import com.xzll.connect.rpcapi.TransferC2CMsgApi;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
 import lombok.extern.slf4j.Slf4j;

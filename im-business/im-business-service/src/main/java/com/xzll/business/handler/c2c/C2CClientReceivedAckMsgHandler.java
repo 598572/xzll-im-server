@@ -8,11 +8,11 @@ import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.util.msgId.MsgIdUtilsService;
-import com.xzll.connect.api.ResponseAck2ClientApi;
+import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
@@ -39,7 +39,7 @@ public class C2CClientReceivedAckMsgHandler {
     @Resource
     private RedisTemplate<String, String> redisTemplate;
     @DubboReference
-    private ResponseAck2ClientApi responseAck2ClientApi;
+    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
 
 
     /**
@@ -48,7 +48,7 @@ public class C2CClientReceivedAckMsgHandler {
      * @param dto
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void clientReceivedAckMsgDeal(ClientReceivedMsgAckAO dto) {
+    public void clientReceivedAckMsgDeal(C2CReceivedMsgAckAO dto) {
         //1. 更新消息状态为：未读/已读
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
         //2. （收到未读/已读ack后）删除离线消息缓存
@@ -61,13 +61,13 @@ public class C2CClientReceivedAckMsgHandler {
             //指定ip调用 与消息转发一样
             String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
-            WebBaseResponse webBaseResponse = responseAck2ClientApi.responseClientAck2Client(ackVo);
+            WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseClientAck2Client(ackVo);
             log.info("接收方客户端ack发送至发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));
         }
     }
 
 
-    public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(ClientReceivedMsgAckAO packet) {
+    public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(C2CReceivedMsgAckAO packet) {
         C2CClientReceivedMsgAckVO clientReceivedMsgAckDTO = new C2CClientReceivedMsgAckVO();
         ImBaseResponse.MsgType msgType = new ImBaseResponse.MsgType();
         msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());

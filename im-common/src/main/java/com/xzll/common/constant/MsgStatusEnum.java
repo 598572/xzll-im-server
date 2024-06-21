@@ -59,8 +59,8 @@ public interface MsgStatusEnum {
     @Getter
     public enum MsgWithdrawStatus {
 
-        NO(0, "非撤回"),
-        YES(1, "撤回");
+        NO(0, "未撤回"),
+        YES(1, "已撤回");
         private int code;
         private String desc;
 

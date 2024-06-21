@@ -8,7 +8,7 @@ import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseResponse;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
@@ -116,12 +116,12 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
                 String toUserId = jsonObject.getObject("toUserId", String.class);
                 String fromUserId = jsonObject.getObject("fromUserId", String.class);
 
-                ClientReceivedMsgAckAO clientReceivedMsgAckAO = new ClientReceivedMsgAckAO();
-                clientReceivedMsgAckAO.setMsgId(msgId);
-                clientReceivedMsgAckAO.setFromUserId(toUserId);
-                clientReceivedMsgAckAO.setToUserId(fromUserId);
+                C2CReceivedMsgAckAO c2CReceivedMsgAckAO = new C2CReceivedMsgAckAO();
+                c2CReceivedMsgAckAO.setMsgId(msgId);
+                c2CReceivedMsgAckAO.setFromUserId(toUserId);
+                c2CReceivedMsgAckAO.setToUserId(fromUserId);
                 //模拟接收方已读 发送成功ack
-                clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
+                c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
 
 
                 ImBaseRequest.MsgType request = new ImBaseRequest.MsgType();
@@ -131,7 +131,7 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
                 ImBaseRequest imBaseRequest = new ImBaseRequest<>();
 
                 imBaseRequest.setMsgType(request);
-                imBaseRequest.setBody(clientReceivedMsgAckAO);
+                imBaseRequest.setBody(c2CReceivedMsgAckAO);
 
                 //模拟未读
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
@@ -139,9 +139,9 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
 
                 //模拟已读
                 request.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());
-                clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
+                c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
                 imBaseRequest.setMsgType(request);
-                imBaseRequest.setBody(clientReceivedMsgAckAO);
+                imBaseRequest.setBody(c2CReceivedMsgAckAO);
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
                 System.out.println("发送已读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
             }
@@ -168,6 +168,12 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
                         WebsocketClientHandler111.msgIds.addAll(msgIds);
                         WebsocketClient111.getMsgFlag = false;
                     }
+                }
+            }
+
+            if (MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode() == firstLevelMsgType) {
+                if (MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode() == secondLevelMsgType) {
+                    System.out.println("接收到撤回消息的指令，内容：" + textFrame.text());
                 }
             }
         } else if (frame instanceof BinaryWebSocketFrame) {

@@ -2,13 +2,15 @@ package com.xzll.business.cluster.consumer;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.config.mq.RocketMqConsumerWrap;
+import com.xzll.business.handler.c2c.C2CClientWithdrawMsgHandler;
 import com.xzll.business.handler.c2c.C2CSendMsgHandler;
 import com.xzll.business.handler.c2c.C2CClientReceivedAckMsgHandler;
 import com.xzll.business.handler.c2c.C2COffLineMsgHandler;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
-import com.xzll.common.pojo.request.OffLineMsgAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2COffLineMsgAO;
+import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.common.rocketmq.RocketMQClusterEventListener;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +45,8 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
     private C2COffLineMsgHandler c2COffLineMsgHandler;
     @Resource
     private C2CClientReceivedAckMsgHandler c2CClientReceivedAckMsgHandler;
+    @Resource
+    private C2CClientWithdrawMsgHandler c2CClientWithdrawMsgHandler;
 
     /**
      * 初始化该类要监听的topic 并且调用RocketMqCustomConsumer的subscribe方法，进行订阅和启动consumer
@@ -65,16 +69,20 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
         }
         switch (clusterEventType) {
             case ImConstant.ClusterEventTypeConstant.C2C_SEND_MSG:
-                C2CSendMsgAO c2CMsgRequestDTO = JSONUtil.toBean(clusterEvent.getData(), C2CSendMsgAO.class);
-                c2CSendMsgHandler.sendC2CMsgDeal(c2CMsgRequestDTO);
+                C2CSendMsgAO c2CMsgRequestDto = JSONUtil.toBean(clusterEvent.getData(), C2CSendMsgAO.class);
+                c2CSendMsgHandler.sendC2CMsgDeal(c2CMsgRequestDto);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_OFF_LINE_MSG:
-                OffLineMsgAO offLineMsgAO = JSONUtil.toBean(clusterEvent.getData(), OffLineMsgAO.class);
-                c2COffLineMsgHandler.offLineMsgDeal(offLineMsgAO);
+                C2COffLineMsgAO c2COffLineMsgAo = JSONUtil.toBean(clusterEvent.getData(), C2COffLineMsgAO.class);
+                c2COffLineMsgHandler.offLineMsgDeal(c2COffLineMsgAo);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_CLIENT_RECEIVED_ACK_MSG:
-                ClientReceivedMsgAckAO clientReceivedMsgAckAO = JSONUtil.toBean(clusterEvent.getData(), ClientReceivedMsgAckAO.class);
-                c2CClientReceivedAckMsgHandler.clientReceivedAckMsgDeal(clientReceivedMsgAckAO);
+                C2CReceivedMsgAckAO c2CReceivedMsgAckAo = JSONUtil.toBean(clusterEvent.getData(), C2CReceivedMsgAckAO.class);
+                c2CClientReceivedAckMsgHandler.clientReceivedAckMsgDeal(c2CReceivedMsgAckAo);
+                return;
+            case ImConstant.ClusterEventTypeConstant.C2C_CLIENT_WITHDRAW_MSG:
+                C2CWithdrawMsgAO c2CWithdrawMsgAo = JSONUtil.toBean(clusterEvent.getData(), C2CWithdrawMsgAO.class);
+                c2CClientWithdrawMsgHandler.clientWithdrawMsgDeal(c2CWithdrawMsgAo);
                 return;
             default:
                 log.warn("不适配的事件类型:{},请检查", clusterEvent);

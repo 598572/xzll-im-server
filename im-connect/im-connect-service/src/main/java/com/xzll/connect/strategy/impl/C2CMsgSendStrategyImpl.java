@@ -11,14 +11,14 @@ import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CSendMsgVO;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.util.msgId.MsgIdUtilsService;
-import com.xzll.connect.api.TransferC2CMsgApi;
+import com.xzll.connect.rpcapi.TransferC2CMsgApi;
 import com.xzll.common.pojo.base.ImBaseRequest;
 
 
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 
-import com.xzll.common.pojo.request.OffLineMsgAO;
+import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -157,8 +157,8 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
      *
      * @param packet
      */
-    private OffLineMsgAO buildOffLineMsgDTO(C2CSendMsgAO packet) {
-        OffLineMsgAO build = OffLineMsgAO.builder()
+    private C2COffLineMsgAO buildOffLineMsgDTO(C2CSendMsgAO packet) {
+        C2COffLineMsgAO build = C2COffLineMsgAO.builder()
                 .fromUserId(packet.getFromUserId())
                 .toUserId(packet.getToUserId())
                 .msgStatus(MsgStatusEnum.MsgStatus.OFF_LINE.getCode())

@@ -6,7 +6,7 @@ import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.constant.MsgStatusEnum;
 
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +27,7 @@ public class MakeData4Client3 {
 
         imBaseRequest.setMsgType(msgType);
 
-        ClientReceivedMsgAckAO ack = new ClientReceivedMsgAckAO();
+        C2CReceivedMsgAckAO ack = new C2CReceivedMsgAckAO();
 
         List<String> msgIds = new ArrayList<>();
         msgIds.add("c31f0183-1ec5-4cc0-8872-ba60af889ad2");

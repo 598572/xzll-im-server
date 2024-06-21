@@ -7,9 +7,10 @@ import com.alibaba.fastjson.JSONObject;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.request.ClientReceivedMsgAckAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.base.ImBaseResponse;
+import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -96,12 +97,12 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                 String toUserId = jsonObject.getObject("toUserId", String.class);
                 String fromUserId = jsonObject.getObject("fromUserId", String.class);
 
-                ClientReceivedMsgAckAO clientReceivedMsgAckAO = new ClientReceivedMsgAckAO();
-                clientReceivedMsgAckAO.setMsgId(msgId);
-                clientReceivedMsgAckAO.setFromUserId(toUserId);
-                clientReceivedMsgAckAO.setToUserId(fromUserId);
+                C2CReceivedMsgAckAO c2CReceivedMsgAckAO = new C2CReceivedMsgAckAO();
+                c2CReceivedMsgAckAO.setMsgId(msgId);
+                c2CReceivedMsgAckAO.setFromUserId(toUserId);
+                c2CReceivedMsgAckAO.setToUserId(fromUserId);
                 //模拟接收方未读
-                clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
+                c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
 
                 ImBaseRequest.MsgType request = new ImBaseRequest.MsgType();
                 request.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
@@ -110,7 +111,7 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                 ImBaseRequest imBaseRequest = new ImBaseRequest<>();
 
                 imBaseRequest.setMsgType(request);
-                imBaseRequest.setBody(clientReceivedMsgAckAO);
+                imBaseRequest.setBody(c2CReceivedMsgAckAO);
 
                 //模拟已读
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
@@ -119,13 +120,28 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                 //模拟已读
                 request.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());
                 imBaseRequest.setMsgType(request);
-                clientReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
-                imBaseRequest.setBody(clientReceivedMsgAckAO);
+                c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
+                imBaseRequest.setBody(c2CReceivedMsgAckAO);
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
                 System.out.println("发送已读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
+
+                //模拟撤回消息
+                ImBaseRequest imBaseRequestWithdraw = new ImBaseRequest<>();
+                ImBaseRequest.MsgType withdrawRequest = new ImBaseRequest.MsgType();
+                withdrawRequest.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode());
+                withdrawRequest.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
+                imBaseRequestWithdraw.setMsgType(withdrawRequest);
+                C2CWithdrawMsgAO withdrawMsgAO = new C2CWithdrawMsgAO();
+                withdrawMsgAO.setFromUserId(toUserId);
+                withdrawMsgAO.setToUserId(fromUserId);
+                withdrawMsgAO.setMsgId(msgId);
+                withdrawMsgAO.setWithdrawFlag(MsgStatusEnum.MsgWithdrawStatus.YES.getCode());
+                imBaseRequestWithdraw.setBody(withdrawMsgAO);
+                ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequestWithdraw)));
+                System.out.println("发送撤回消息完成，data: " + JSONUtil.toJsonStr(imBaseRequestWithdraw));
             }
             /**
-             * 处理单聊消息
+             * 处理打印单聊消息
              */
             if (MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode() == firstLevelMsgType) {
                 if (MsgTypeEnum.SecondLevelMsgType.C2C.getCode() == secondLevelMsgType) {

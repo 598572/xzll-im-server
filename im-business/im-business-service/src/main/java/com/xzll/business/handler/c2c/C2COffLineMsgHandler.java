@@ -7,11 +7,11 @@ import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.common.pojo.request.OffLineMsgAO;
+import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.util.msgId.MsgIdUtilsService;
-import com.xzll.connect.api.ResponseAck2ClientApi;
+import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
@@ -39,7 +39,7 @@ public class C2COffLineMsgHandler {
     @Resource
     private RedisTemplate<String, String> redisTemplate;
     @DubboReference
-    private ResponseAck2ClientApi responseAck2ClientApi;
+    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
 
 
     /**
@@ -48,7 +48,7 @@ public class C2COffLineMsgHandler {
      * @param dto
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void offLineMsgDeal(OffLineMsgAO dto) {
+    public void offLineMsgDeal(C2COffLineMsgAO dto) {
         //1. 更新消息状态为离线
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgOffLineStatus(dto);
 
@@ -63,7 +63,7 @@ public class C2COffLineMsgHandler {
             //指定ip调用 与消息转发一样
             String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
-            WebBaseResponse webBaseResponse = responseAck2ClientApi.responseClientAck2Client(ackDTO);
+            WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseClientAck2Client(ackDTO);
             log.info("接收方离线时，服务器伪造未读ack给发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));
         }
     }
@@ -73,7 +73,7 @@ public class C2COffLineMsgHandler {
      * @param packet
      * @return
      */
-    public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(OffLineMsgAO packet) {
+    public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(C2COffLineMsgAO packet) {
         //目标用户离线，响应给发送者的ack固定为未读
         packet.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
 

@@ -4,8 +4,8 @@ package com.xzll.connect.test.client2.withdraw;
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseRequest;
-import com.xzll.connect.pojo.dto.WithdrawMsgAO;
 
+import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -97,14 +97,14 @@ public class WebsocketClient {
                 //test 2 : 直接输入内容方式
                 if (!StringUtils.isEmpty(s)) {
 
-                    ImBaseRequest<WithdrawMsgAO> imBaseRequest = new ImBaseRequest<>();
+                    ImBaseRequest<C2CWithdrawMsgAO> imBaseRequest = new ImBaseRequest<>();
 
                     ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
                     msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode());
                     msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
                     imBaseRequest.setMsgType(msgType);
 
-                    WithdrawMsgAO withdrawMsgRequestDTO = new WithdrawMsgAO();
+                    C2CWithdrawMsgAO withdrawMsgRequestDTO = new C2CWithdrawMsgAO();
                     withdrawMsgRequestDTO.setMsgId(s);
                     withdrawMsgRequestDTO.setChatId("网约车业务线_会话001");
                     withdrawMsgRequestDTO.setToUserId("1003");
