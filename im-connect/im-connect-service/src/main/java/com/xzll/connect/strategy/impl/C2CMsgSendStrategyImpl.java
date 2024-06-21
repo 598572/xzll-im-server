@@ -10,8 +10,6 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CSendMsgVO;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.util.msgId.MsgIdUtilsService;
-import com.xzll.connect.rpcapi.TransferC2CMsgApi;
 import com.xzll.common.pojo.base.ImBaseRequest;
 
 
@@ -23,14 +21,13 @@ import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.connect.service.TransferC2CMsgService;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.dubbo.config.annotation.DubboReference;
-
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -55,12 +52,10 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private RedisTemplate<String, String> redisTemplate;
     @Resource
     private ObjectMapper objectMapper;
-    @DubboReference(parameters = {"router", "address"})
-    private TransferC2CMsgApi transferC2CMsgApi;
+    @Resource
+    private TransferC2CMsgService transferC2CMsgService;
     @Resource
     private C2CMsgProvider c2CMsgProvider;
-    @Resource
-    private MsgIdUtilsService msgIdUtilsService;
 
     /**
      * 策略适配
@@ -126,7 +121,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
             //RpcContext.getContext().setObjectAttachment("address", address);
             //dubbo 3.x 使用此方式指定 ip:port 调用 官方建议：[必须每次都设置，而且设置后必须马上发起调用]， 这里无需指定端口，指定ip就足够
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPortStr), 0, false));
-            transferC2CMsgApi.transferC2CMsg(imBaseRequest);
+            transferC2CMsgService.transferC2CMsg(imBaseRequest);
         }
         log.debug("客户端发送单聊消息_结束");
     }

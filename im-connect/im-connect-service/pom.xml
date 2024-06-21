@@ -160,6 +160,7 @@
                     <include>**/*.json</include>
                     <include>**/*.pem</include>
                     <include>**/*.jks</include>
+                    <include>**/*.lua</include>
                 </includes>
                 <excludes>
                     <exclude>*.jks</exclude>

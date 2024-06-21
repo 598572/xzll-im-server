@@ -4,12 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
-import org.springframework.stereotype.Component;
-
 
 @Setter
 @Getter
-@Component
 @RefreshScope
 @ConfigurationProperties(prefix = "im.netty")
 public class IMConnectServerConfig {

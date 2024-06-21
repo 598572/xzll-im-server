@@ -7,10 +7,13 @@ import com.alibaba.fastjson.JSON;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.util.NettyAttrUtil;
+import com.xzll.connect.config.ImMsgConfig;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.netty.heart.HeartBeatHandler;
 import com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl;
+import com.xzll.connect.service.UserStatusManagerService;
+import com.xzll.connect.service.impl.UserStatusManagerServiceImpl;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -25,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.CollectionUtils;
-
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +48,8 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     private static final HandlerDispatcher handlerDispatcher = SpringUtil.getBean(HandlerDispatcher.class);
     private static final RedisTemplate<String, String> redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
     private static final ThreadPoolTaskExecutor threadPoolTaskExecutor = SpringUtil.getBean(ThreadPoolTaskExecutor.class);
+    private static final ImMsgConfig imMsgConfig = SpringUtil.getBean(ImMsgConfig.class);
+    private static final UserStatusManagerService userStatusManagerService = SpringUtil.getBean(UserStatusManagerServiceImpl.class);
 
     //这里用来对连接数进行记数,每两秒输出到控制台
     private static final AtomicInteger nConnection = new AtomicInteger();
@@ -88,10 +92,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         String uid = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
         //清除用户登录的服务器信息
         LocalChannelManager.removeUserChannel(uid);
-        //清楚用户登录信息
-        redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.ROUTE_PREFIX, uid);
-        //清除用户登录状态
-        redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, uid);
+        userStatusManagerService.userDisconnectAfter(uid);
         nConnection.decrementAndGet();
     }
 
@@ -159,16 +160,10 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         } else {
             ChannelFuture handshake = handShaker.handshake(ctx.channel(), req);
             if (handshake.isSuccess()) {
-                //用户登录的信息 <uid,机器ip端口> 存入redis
-                //下边两步需要保证原子性 todo 使用lua
-                //设置当前用户登录的机器ip+端口  (设置用户登录的服务器信息 此处不设置过多信息 只设置用户登录的机器信息 方便快捷 存取无需转json )
-                redisTemplate.opsForHash().put(ImConstant.RedisKeyConstant.ROUTE_PREFIX, uidStr, NettyAttrUtil.getIpPortStr());
-                //设置用户状态为在线
-                redisTemplate.opsForHash().put(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, uidStr, ImConstant.UserStatus.ON_LINE.getValue().toString());
-
                 log.info("握手成功");
+                userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
                 //用户上线 此时需要处理离线消息【此时机主动push 10条最近的离线消息，后续依赖客户下拉获取也即pull 】
-                Set<String> lastOffLineMsgs = redisTemplate.opsForZSet().reverseRange(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 0, 9);
+                Set<String> lastOffLineMsgs = redisTemplate.opsForZSet().reverseRange(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 0, imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount());
                 if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
                     lastOffLineMsgs.forEach(msg -> {
                         try {
