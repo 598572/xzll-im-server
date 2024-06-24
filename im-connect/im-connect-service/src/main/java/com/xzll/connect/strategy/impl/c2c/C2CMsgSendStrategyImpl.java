@@ -1,4 +1,4 @@
-package com.xzll.connect.strategy.impl;
+package com.xzll.connect.strategy.impl.c2c;
 
 
 import cn.hutool.core.bean.BeanUtil;
@@ -30,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -52,6 +53,8 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private RedisTemplate<String, String> redisTemplate;
     @Resource
     private ObjectMapper objectMapper;
+    //需要此注解 否则 C2CMsgSendStrategyImpl 和 TransferC2CMsgService将循环依赖
+    @Lazy
     @Resource
     private TransferC2CMsgService transferC2CMsgService;
     @Resource

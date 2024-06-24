@@ -115,28 +115,18 @@
     </dependencies>
 
     <build>
-<!--        <plugins>-->
-<!--            <plugin>-->
-<!--                <artifactId>maven-resources-plugin</artifactId>-->
-<!--                <configuration>-->
-<!--                    <encoding>utf-8</encoding>-->
-<!--                    &lt;!&ndash; 需要指定这玩意 否则springboot将使用 @占位符  &ndash;&gt;-->
-<!--                    <useDefaultDelimiters>true</useDefaultDelimiters>-->
-<!--                    &lt;!&ndash;用于打胖jar 即直接可以执行的jar包 一般会比较大，如果只想打瘦包只包含class文件的话 则指定为false(该应用场景一般是非springboot项目)&ndash;&gt;-->
-<!--                    <skip>false</skip>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-compiler-plugin</artifactId>-->
-<!--                <version>3.8.1</version>-->
-<!--                <inherited>true</inherited>-->
-<!--                <configuration>-->
-<!--                    <source>1.8</source>-->
-<!--                    <target>1.8</target>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
-<!--        </plugins>-->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 指定该Main Class为全局的唯一入口 -->
+                    <mainClass>com.xzll.business.IMBusinessServiceApplication</mainClass>
+                    <layout>ZIP</layout>
+                </configuration>
+            </plugin>
+        </plugins>
 
         <resources>
             <resource>

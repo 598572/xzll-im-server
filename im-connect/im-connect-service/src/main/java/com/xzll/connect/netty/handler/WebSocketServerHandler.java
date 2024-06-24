@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.CollectionUtils;
+
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -56,7 +57,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     static {
         Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-            System.out.println("连接数: " + nConnection.get());
+            System.out.println("当前连接数: " + nConnection.get());
         }, 0, 10, TimeUnit.SECONDS);
     }
 
@@ -105,7 +106,6 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-//        ThreadContext.put(TraceContexHolder.TRACE_ID, TraceContexHolder.buildTraceId(StringUtils.EMPTY));
         // 传统的HTTP接入
         if (msg instanceof FullHttpRequest) {
             log.info("=========处理Http请求接入=========");

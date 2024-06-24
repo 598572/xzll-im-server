@@ -1,4 +1,4 @@
-package com.xzll.connect.strategy.impl;
+package com.xzll.connect.strategy.impl.c2c;
 
 
 import cn.hutool.core.lang.Assert;

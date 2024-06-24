@@ -16,6 +16,7 @@ import java.util.zip.CRC32;
  */
 public class MsgIdUtilsService {
 
+    public static final int ONCE_BATCH_COUNT = 1000;
     // 定义 Snowflake 算法的参数
     private final long twepoch = 1288834974657L; // 自定义的时间戳起点
     private final long workerIdBits = 5L;       // 机器 ID 所占的位数
@@ -118,8 +119,8 @@ public class MsgIdUtilsService {
     }
 
     public List<String> generateBatchMessageId(long userId, boolean isGroupChat) {
-        List<String> ids = new ArrayList<>(1000);
-        for (int i = 0; i < 1000; i++) {
+        List<String> ids = new ArrayList<>(ONCE_BATCH_COUNT);
+        for (int i = 0; i < ONCE_BATCH_COUNT; i++) {
             ids.add(generateMessageId(userId, isGroupChat));
         }
         return ids;
@@ -137,7 +138,7 @@ public class MsgIdUtilsService {
     private void refillIdPool() {
         idPool.clear();
         poolIndex.set(0);
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < ONCE_BATCH_COUNT; i++) {
             idPool.add(nextId());
         }
     }
@@ -152,28 +153,12 @@ public class MsgIdUtilsService {
      * @return
      */
     public String generateMessageId(long userId, boolean isGroupChat) {
-        //long id = nextId();
         long id = getNextIdFromPool();
         // 获取本地递增序列 雪花算法已经实现序列号 无需多此一举了
         //long localSeq = localSequence.incrementAndGet();
         Integer type = isGroupChat ? 2 : 1;
         return String.format("%d-%d-%d", type, userId, id);
     }
-
-    /**
-     * 获取一批消息id
-     *
-     * @param userId
-     * @param isGroupChat
-     * @return
-     */
-//    public Set<String> generateBatchMessageId(long userId, boolean isGroupChat) {
-//        Set<String> sets = new HashSet<>();
-//        for (int i = 0; i < 1000; i++) {
-//            sets.add(generateMessageId(userId, isGroupChat));
-//        }
-//        return sets;
-//    }
 
     /**
      * 提供给外部，从消息id 获取雪花id

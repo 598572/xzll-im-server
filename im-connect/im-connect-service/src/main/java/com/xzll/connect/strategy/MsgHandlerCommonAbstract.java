@@ -2,26 +2,16 @@ package com.xzll.connect.strategy;
 
 
 import cn.hutool.extra.spring.SpringUtil;
-import cn.hutool.json.JSONUtil;
-
-
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.common.pojo.base.ImBaseResponse;
-
 import com.xzll.connect.netty.channel.LocalChannelManager;
-
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -78,65 +68,6 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
         ChannelFuture future = targetChannel.writeAndFlush(new TextWebSocketFrame(packet));
         future.addListener((ChannelFutureListener) channelFuture ->
                 log.info((tag + "接收者在线直接发送,消息结果:{}"), channelFuture.isDone()));
-    }
-
-
-    /**
-     * 消息转发common
-     *
-     * @param requestUrl
-     * @param tag
-     * @param packet
-     */
-//    protected void msgTransferTemplate(String requestUrl, String tag, String packet) {
-//        String response = HttpComponet.doPost(requestUrl, packet);
-//        log.info((tag + "transfer_response:{}"), response);
-//    }
-
-    /**
-     * 服务端接收消息后ack common 4 client
-     *
-     * @param ctx
-     * @param packet
-     */
-    public void responseServerReceiveAckToSender(ChannelHandlerContext ctx, ImBaseResponse packet) {
-        try {
-            if (Objects.nonNull(ctx) && Objects.nonNull(ctx.channel())) {
-                ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));
-            } else {
-                log.info("responseServerReceiveAckToSender_传入的channel为空，不发送!");
-            }
-        } catch (Exception e) {
-            log.error("responseServerReceiveAckToSender_异常!:", e);
-        }
-    }
-
-    /**
-     * 伪造ack给sender
-     *
-     * @param channel
-     * @param packet
-     */
-    public void forgeClientReceiveAckToSender(Channel channel, ImBaseResponse packet) {
-        try {
-            if (Objects.nonNull(channel)) {
-                channel.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));
-            } else {
-                log.info("forgeClientReceiveAckToSender_传入的channel为空，不发送!");
-            }
-        } catch (Exception e) {
-            log.error("forgeClientReceiveAckToSender_异常!:", e);
-        }
-    }
-
-    /**
-     * 返回消息接收ack给调用系统 4 system
-     *
-     * @param packet
-     * @return
-     */
-    protected WebBaseResponse<ImBaseResponse> responseServerReceiveAckToSystem(ImBaseResponse packet, boolean receiveStatus) {
-        return WebBaseResponse.returnResultSuccess("接收系统消息成功", packet);
     }
 
 }
