@@ -12,6 +12,7 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+
 import java.util.Optional;
 
 /**
@@ -31,9 +32,9 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * @param redisTemplate
      * @return
      */
-    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedisTemplate<String, String> redisTemplate) {
+    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedisTemplate<String, Object> redisTemplate) {
         if (redisTemplate == null) {
-            redisTemplate = SpringUtil.getBean(RedisTemplate.class);
+            redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
         }
         if (null == redisTemplate) {
             return ReceiveUserDataDTO.builder().build();

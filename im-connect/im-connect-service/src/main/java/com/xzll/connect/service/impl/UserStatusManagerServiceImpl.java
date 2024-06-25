@@ -10,8 +10,8 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.stereotype.Service;
-
 import javax.annotation.Resource;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +46,6 @@ public class UserStatusManagerServiceImpl implements UserStatusManagerService, I
         // 加载 Lua 脚本
         String clearUserStatusLuaScript = loadLuaScript(LUA_CLEAR_USER_STATUS_DISCONNECT_AFTER_LUA);
         String setUserStatusLuaScript = loadLuaScript(LUA_SET_USER_STATUS_CONNECT_AFTER_LUA);
-
         // 初始化 DefaultRedisScript
         clearUserStatusScript = new DefaultRedisScript<>(clearUserStatusLuaScript, Long.class);
         setUserStatusScript = new DefaultRedisScript<>(setUserStatusLuaScript, Long.class);
@@ -67,8 +66,9 @@ public class UserStatusManagerServiceImpl implements UserStatusManagerService, I
     @Override
     public void userConnectSuccessAfter(Integer status, String uidStr) {
         try {
-            Long execute = redisTemplate.execute(setUserStatusScript,
-                    Arrays.asList(ImConstant.RedisKeyConstant.ROUTE_PREFIX, ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX),
+            //注： 这里在写数据时，需要指定args 的序列化类型和反参的序列化类型，不指定的话（尤其是args序列化）传入的string类型的参数（不管是key 还是value）
+            //都将会被 多加一个 "" 号 ，这不是我想要的结果，所以指定args序列化必须要有
+            Long execute = redisTemplate.execute(setUserStatusScript, redisTemplate.getKeySerializer(), new Jackson2JsonRedisSerializer<Long>(Long.class), Arrays.asList(ImConstant.RedisKeyConstant.ROUTE_PREFIX, ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX),
                     uidStr, NettyAttrUtil.getIpPortStr(), status.toString());
             log.info("客户端握手成功后设置用户状态结果:{}", execute);
         } catch (Exception e) {

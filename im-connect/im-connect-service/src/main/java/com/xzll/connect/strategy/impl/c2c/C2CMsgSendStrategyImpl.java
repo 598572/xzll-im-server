@@ -50,7 +50,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private static final String TAG = "[客户端发送单聊消息]_";
 
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedisTemplate<String, Object> redisTemplate;
     @Resource
     private ObjectMapper objectMapper;
     //需要此注解 否则 C2CMsgSendStrategyImpl 和 TransferC2CMsgService将循环依赖
