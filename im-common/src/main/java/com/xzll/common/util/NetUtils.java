@@ -1,16 +1,14 @@
 package com.xzll.common.util;
 
 
+import cn.hutool.core.net.NetUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ServerWebExchange;
 
 import javax.servlet.http.HttpServletRequest;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -182,5 +180,52 @@ public class NetUtils {
 	public static String getOutIpAddr() {
 		String outAddr = null;
 		return (String)outAddr;
+	}
+
+
+
+	public static String getRealIp() {
+		try {
+			Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+			while (networkInterfaces.hasMoreElements()) {
+				NetworkInterface networkInterface = networkInterfaces.nextElement();
+				Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+				while (inetAddresses.hasMoreElements()) {
+					InetAddress inetAddress = inetAddresses.nextElement();
+					// Check if it's not a loopback address and is not a virtual interface
+					if (!inetAddress.isLoopbackAddress() && !inetAddress.isAnyLocalAddress() && !inetAddress.isLinkLocalAddress()) {
+						return inetAddress.getHostAddress();
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return NetUtil.getLocalhost().getHostAddress(); // Fallback to Hutool method
+	}
+
+	public static String getSpecificInterfaceIp(String interfaceName) {
+		try {
+			NetworkInterface networkInterface = NetworkInterface.getByName(interfaceName);
+			if (networkInterface != null) {
+				Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+				while (inetAddresses.hasMoreElements()) {
+					InetAddress inetAddress = inetAddresses.nextElement();
+					if (!inetAddress.isLoopbackAddress() && !inetAddress.isAnyLocalAddress() && !inetAddress.isLinkLocalAddress()) {
+						return inetAddress.getHostAddress();
+					}
+				}
+			}
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+		return null; // 或者返回一个默认值
+	}
+
+	public static void main(String[] args) {
+		String machineIpAddr = getRealIp();
+		String en0 = getSpecificInterfaceIp("en0");
+		System.out.println(en0);
+		System.out.println(machineIpAddr);
 	}
 }

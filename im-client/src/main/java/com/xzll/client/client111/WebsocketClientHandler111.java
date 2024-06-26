@@ -1,5 +1,5 @@
 
-package com.xzll.connect.test.client222;
+package com.xzll.client.client111;
 
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
@@ -7,14 +7,14 @@ import com.alibaba.fastjson.JSONObject;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.base.ImBaseResponse;
-import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
+import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import org.springframework.util.CollectionUtils;
 
@@ -26,13 +26,13 @@ import java.util.List;
  * @Date: 2022/1/14 10:39:23
  * @Description:
  */
-public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Object> {
+public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Object> {
     private final WebSocketClientHandshaker handshaker;
     private ChannelPromise handshakeFuture;
 
     public static List<String> msgIds = new ArrayList<>();
 
-    public WebsocketClientHandler222(WebSocketClientHandshaker handshaker) {
+    public WebsocketClientHandler111(WebSocketClientHandshaker handshaker) {
         this.handshaker = handshaker;
     }
 
@@ -51,6 +51,25 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
         // 在通道连接成功后发送握手连接
         handshaker.handshake(ctx.channel());
         super.channelActive(ctx);
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            IdleStateEvent event = (IdleStateEvent) evt;
+//      if (event.state() == IdleState.WRITER_IDLE) {
+            // 发送心跳消息
+            sendHeartbeat(ctx);
+//      }
+        } else {
+            super.userEventTriggered(ctx, evt);
+        }
+    }
+
+    private void sendHeartbeat(ChannelHandlerContext ctx) {
+        // 构建心跳消息并发送
+        PingWebSocketFrame pingWebSocketFrame = new PingWebSocketFrame();
+        ctx.writeAndFlush(pingWebSocketFrame);
     }
 
     @Override
@@ -78,7 +97,7 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
         if (frame instanceof TextWebSocketFrame) {
             TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
 
-            System.out.println("用户：（ " + WebsocketClient222.VALUE + " ），接收到TextWebSocketFrame消息，消息内容是: " + textFrame.text());
+            System.out.println("用户：（ " + WebsocketClient111.VALUE + " ），接收到TextWebSocketFrame消息，消息内容是: " + textFrame.text());
             ImBaseResponse imBaseResponse = JSON.parseObject(textFrame.text(), ImBaseResponse.class);
             ImBaseResponse.MsgType msgType = imBaseResponse.getMsgType();
 
@@ -101,8 +120,9 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                 c2CReceivedMsgAckAO.setMsgId(msgId);
                 c2CReceivedMsgAckAO.setFromUserId(toUserId);
                 c2CReceivedMsgAckAO.setToUserId(fromUserId);
-                //模拟接收方未读
+                //模拟接收方已读 发送成功ack
                 c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
+
 
                 ImBaseRequest.MsgType request = new ImBaseRequest.MsgType();
                 request.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
@@ -113,35 +133,20 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                 imBaseRequest.setMsgType(request);
                 imBaseRequest.setBody(c2CReceivedMsgAckAO);
 
-                //模拟已读
+                //模拟未读
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
                 System.out.println("发送未读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
 
                 //模拟已读
                 request.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());
-                imBaseRequest.setMsgType(request);
                 c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
+                imBaseRequest.setMsgType(request);
                 imBaseRequest.setBody(c2CReceivedMsgAckAO);
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
                 System.out.println("发送已读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
-
-                //模拟撤回消息
-                ImBaseRequest imBaseRequestWithdraw = new ImBaseRequest<>();
-                ImBaseRequest.MsgType withdrawRequest = new ImBaseRequest.MsgType();
-                withdrawRequest.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode());
-                withdrawRequest.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
-                imBaseRequestWithdraw.setMsgType(withdrawRequest);
-                C2CWithdrawMsgAO withdrawMsgAO = new C2CWithdrawMsgAO();
-                withdrawMsgAO.setFromUserId(toUserId);
-                withdrawMsgAO.setToUserId(fromUserId);
-                withdrawMsgAO.setMsgId(msgId);
-                withdrawMsgAO.setWithdrawFlag(MsgStatusEnum.MsgWithdrawStatus.YES.getCode());
-                imBaseRequestWithdraw.setBody(withdrawMsgAO);
-                ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequestWithdraw)));
-                System.out.println("发送撤回消息完成，data: " + JSONUtil.toJsonStr(imBaseRequestWithdraw));
             }
             /**
-             * 处理打印单聊消息
+             * 处理单聊消息
              */
             if (MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode() == firstLevelMsgType) {
                 if (MsgTypeEnum.SecondLevelMsgType.C2C.getCode() == secondLevelMsgType) {
@@ -160,9 +165,15 @@ public class WebsocketClientHandler222 extends SimpleChannelInboundHandler<Objec
                     List<String> msgIds = jsonObject.getObject("msgIds", List.class);
                     System.out.println("获取到一批消息id,长度:" + msgIds.size());
                     if (!CollectionUtils.isEmpty(msgIds)) {
-                        WebsocketClientHandler222.msgIds.addAll(msgIds);
-                        WebsocketClient222.getMsgFlag = false;
+                        WebsocketClientHandler111.msgIds.addAll(msgIds);
+                        WebsocketClient111.getMsgFlag = false;
                     }
+                }
+            }
+
+            if (MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode() == firstLevelMsgType) {
+                if (MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode() == secondLevelMsgType) {
+                    System.out.println("接收到撤回消息的指令，内容：" + textFrame.text());
                 }
             }
         } else if (frame instanceof BinaryWebSocketFrame) {

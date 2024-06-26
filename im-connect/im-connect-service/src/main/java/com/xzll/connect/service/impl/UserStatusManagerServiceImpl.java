@@ -27,6 +27,8 @@ import java.util.Arrays;
 public class UserStatusManagerServiceImpl implements UserStatusManagerService, InitializingBean {
 
 
+
+
     private static final String LUA_CLEAR_USER_STATUS_DISCONNECT_AFTER_LUA = "lua/clear_user_status_disconnect_after.lua";
     private static final String LUA_SET_USER_STATUS_CONNECT_AFTER_LUA = "lua/set_user_status_connect_after.lua";
 

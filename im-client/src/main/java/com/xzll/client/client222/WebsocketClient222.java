@@ -1,15 +1,15 @@
-package com.xzll.connect.test.client222;
+package com.xzll.client.client222;
 
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
+import com.xzll.client.client111.WebsocketClient111;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgFormatEnum;
 import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
-import com.xzll.common.pojo.base.ImBaseRequest;
-import com.xzll.connect.test.client111.WebsocketClient111;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;

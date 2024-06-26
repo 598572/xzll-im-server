@@ -1,14 +1,14 @@
-package com.xzll.connect.test.client111;
+package com.xzll.client.client111;
 
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
+import com.xzll.client.client222.WebsocketClient222;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
-import com.xzll.common.pojo.base.ImBaseRequest;
-import com.xzll.connect.test.client222.WebsocketClient222;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -102,7 +102,7 @@ public class WebsocketClient111 {
 
 
         new Thread(() -> {
-
+            int i=0;
             while (true) {
                 //正在获取中 则等待
                 if (getMsgFlag){
@@ -117,6 +117,8 @@ public class WebsocketClient111 {
                 }
 
                 String s = sc.nextLine();
+                //String s="你好啊 我发消息压死你，第"+i+"条消息";
+                i++;
 
                 if (StringUtils.isNotBlank(s)) {
                     String msgId = WebsocketClientHandler111.msgIds.remove(0);

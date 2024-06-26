@@ -1,5 +1,6 @@
 package com.xzll.connect;
 
+import com.xzll.common.config.DubboNetworkInitializer;
 import org.apache.dubbo.config.spring.context.annotation.EnableDubbo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,7 +15,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class IMConnectServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(IMConnectServiceApplication.class, args);
+        SpringApplication application = new SpringApplication(IMConnectServiceApplication.class);
+        application.addInitializers(new DubboNetworkInitializer());
+        application.run(args);
     }
 
 }
