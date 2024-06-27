@@ -45,7 +45,7 @@
         <netty.version>4.1.75.Final</netty.version>
 
         <!--暂时不用新版本es客户端-->
-<!--        <elasticsearch.java.client.version>7.17.5</elasticsearch.java.client.version>-->
+        <!--        <elasticsearch.java.client.version>7.17.5</elasticsearch.java.client.version>-->
 
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
         <fastjson.version>1.2.46</fastjson.version>
@@ -256,11 +256,11 @@
             </dependency>
 
             <!--此客户端较新，暂时不使用 先试用elasticsearch-rest-high-level-client  因为 elasticsearch-rest-high-level-client 更稳定 虽然他标识为 ：已过时的 -->
-<!--            <dependency>-->
-<!--                <groupId>co.elastic.clients</groupId>-->
-<!--                <artifactId>elasticsearch-java</artifactId>-->
-<!--                <version>${elasticsearch.java.client.version}</version>-->
-<!--            </dependency>-->
+            <!--            <dependency>-->
+            <!--                <groupId>co.elastic.clients</groupId>-->
+            <!--                <artifactId>elasticsearch-java</artifactId>-->
+            <!--                <version>${elasticsearch.java.client.version}</version>-->
+            <!--            </dependency>-->
 
             <!--如果单纯使用springboot集成nacos 则使用此方式 但是此方式有问题读不到bootstrap.yml文件 原因可能是boot不支持对bootstarp.yml的文件读取，但是我又不想像官网那样把命名空间dataid配到注解中，所以不用这种方式了：https://nacos.io/zh-cn/docs/quick-start-spring-boot.html-->
             <!--            <dependency>-->
@@ -281,7 +281,9 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <optional>true</optional>
-                <version>1.18.0</version>
+                <!--之前是1.18.0 编译时将报错： java.lang.ExceptionInInitializerError: Unable to make field private com.sun.tools.javac.processing.JavacProcessingEnvironment$DiscoveredProcessors com.sun.tools.javac.processing.JavacProcessingEnvironment.discoveredProcs accessible: module jdk.compiler does not "opens com.sun.tools.javac.processing" -->
+                <!--解决此报错的方法就是 升级lombook版本为 1.18.20-->
+                <version>1.18.20</version>
             </dependency>
 
             <dependency>
@@ -434,13 +436,52 @@
 
     <build>
 
-        <!--        <plugins>-->
-        <!--            <plugin>-->
-        <!--                <groupId>org.springframework.boot</groupId>-->
-        <!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
-        <!--                <version>2.1.13.RELEASE</version>-->
-        <!--            </plugin>-->
-        <!--        </plugins>-->
+        <plugins>
+
+            <!--
+            无需在父pom配置 此打包插件，此插件只配置在 有springboot main启动类的 需要打成胖jar的模块中。
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            -->
+
+            <!-- 在父pom配置好编译插件后 无需在子模块中再次配置了-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <!--指定注解处理器的路径和依赖项, 告诉  编译器插件应该使用哪些注解处理器来生成代码 或  执行其他编译时的任务-->
+                    <annotationProcessorPaths>
+                        <!--使用mapstruct的话 必须有这一步 因为其是在编译期间进行代码生成的的-->
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                        <!--mapstruct和spring集成的话 这一步也必须有 集成后 直接使用 spring的 ConversionService去掉就行了 更方便些-->
+                        <path>
+                            <groupId>org.mapstruct.extensions.spring</groupId>
+                            <artifactId>mapstruct-spring-extensions</artifactId>
+                            <version>${mapstruct.extensions.spring.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>${lombok-mapstruct-binding.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+
 
     </build>
 

@@ -5,6 +5,7 @@ import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.core.convert.converter.Converter;
 
 
 /**
@@ -13,7 +14,7 @@ import org.mapstruct.Mapping;
  * @Description:
  */
 @Mapper(componentModel = "spring",imports = ChatIdUtils.class)
-public interface C2CChatMapping {
+public interface C2CChatMapping extends Converter<C2CSendMsgAO, ImChat> {
 
     /**
      * 单聊消息转会话 do类
@@ -21,11 +22,12 @@ public interface C2CChatMapping {
      * @param dto
      * @return
      */
+    @Override
     @Mapping(target = "chatType",constant = "1")
     @Mapping(target = "lastMsgId", source = "msgId")
     @Mapping(target = "lastMsgTime", source = "msgCreateTime")
     @Mapping(target = "chatId", expression = "java(ChatIdUtils.buildC2CChatId(null,Long.valueOf(dto.getFromUserId()),Long.valueOf(dto.getToUserId())))")
-    ImChat convertAddC2CImChat(C2CSendMsgAO dto);
+    ImChat convert(C2CSendMsgAO dto);
 
 
 }

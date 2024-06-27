@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.mapper.ImC2CMsgRecordMapper;
-import com.xzll.business.mapstruct.C2CMsgMapping;
 import com.xzll.business.entity.es.MsgEntity;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -16,6 +15,7 @@ import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import org.elasticsearch.index.query.MatchAllQueryBuilder;
+import org.springframework.core.convert.ConversionService;
 import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQuery;
@@ -44,7 +44,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     @Resource
     private ImC2CMsgRecordMapper imC2CMsgRecordMapper;
     @Resource
-    private C2CMsgMapping c2CMsgMapping;
+    private ConversionService conversionService;
     @Resource
     private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
@@ -57,7 +57,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public boolean saveC2CMsg(C2CSendMsgAO dto) {
         log.info("保存单聊消息入参:{}", JSONUtil.toJsonStr(dto));
-        ImC2CMsgRecord imC2CMsgRecord = c2CMsgMapping.convertC2CMsgRecord(dto);
+        ImC2CMsgRecord imC2CMsgRecord = conversionService.convert(dto, ImC2CMsgRecord.class);
         imC2CMsgRecord.setMsgStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
         int row = 0;
         if (Objects.isNull(dto.getRetryMsgFlag())) {

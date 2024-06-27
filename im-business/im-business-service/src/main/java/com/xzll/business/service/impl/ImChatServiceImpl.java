@@ -6,13 +6,13 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
 import com.xzll.business.entity.mysql.ImChat;
 import com.xzll.business.mapper.ImChatMapper;
-import com.xzll.business.mapstruct.C2CChatMapping;
 import com.xzll.business.service.ImChatService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,7 @@ public class ImChatServiceImpl implements ImChatService {
     @Resource
     private ImChatMapper imChatMapper;
     @Resource
-    private C2CChatMapping c2CChatMapping;
+    private ConversionService conversionService;
 
     /**
      * 保存单聊会话信息
@@ -56,7 +56,7 @@ public class ImChatServiceImpl implements ImChatService {
             imChatUpdate.setLastMsgTime(dto.getMsgCreateTime());
             row = imChatMapper.updateById(imChatUpdate);
         } else {
-            ImChat imChatAdd = c2CChatMapping.convertAddC2CImChat(dto);
+            ImChat imChatAdd = conversionService.convert(dto, ImChat.class);
             row = imChatMapper.insert(imChatAdd);
         }
         log.info("写入或更新会话信息结果:{}", row);

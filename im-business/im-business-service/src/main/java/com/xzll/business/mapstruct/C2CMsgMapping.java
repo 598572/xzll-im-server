@@ -4,7 +4,7 @@ import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-
+import org.springframework.core.convert.converter.Converter;
 
 
 /**
@@ -13,16 +13,17 @@ import org.mapstruct.Mapping;
  * @Description:
  */
 @Mapper(componentModel = "spring")
-public interface C2CMsgMapping {
+public interface C2CMsgMapping  extends Converter<C2CSendMsgAO, ImC2CMsgRecord> {
 
     /**
      *
      * @param dto
      * @return
      */
+    @Override
     @Mapping(target = "msgFormat", defaultValue = "1")
     @Mapping(target = "msgType", expression = "java(dto.getMsgType().getFirstLevelMsgType())")
-    ImC2CMsgRecord convertC2CMsgRecord(C2CSendMsgAO dto);
+    ImC2CMsgRecord convert(C2CSendMsgAO dto);
 
 
 }
