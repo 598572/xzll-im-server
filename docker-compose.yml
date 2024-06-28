@@ -1,0 +1,71 @@
+version: '3'
+services:
+  im-gateway:
+    build: ./im-gateway
+    hostname: im-gateway
+    container_name: im-gateway
+    restart: always
+    ports:
+      - "8081:8081"
+    networks:
+      - default_network
+    volumes:
+      - "/tmp/data/logs:/logs"
+  im-auth:
+    build: ./im-auth
+    hostname: im-auth
+    container_name: im-auth
+    restart: always
+    ports:
+      - "8082:8082"
+    networks:
+      - default_network
+    volumes:
+      - "/tmp/data/logs:/logs"
+  im-business:
+    # 可以根据Dockerfile构建镜像（但是，Docker Compose 会在检测到上下文变化时重新构建镜像。也就是说如果你不修改Dockerfile docker-compose应该不是每次都构建镜像 实测确实如此）
+    build: ./im-business
+    # 也可以指定镜像名
+    # image: im-business:0.0.2
+
+    # 设置容器的主机名 即修改 ： /etc/hosts 中的内容
+    hostname: im-business
+    # 容器名称
+    container_name: im-business
+    # 重启策略， always 表示无论哪种状态退出，都会重启容器
+    restart: always
+    ports:
+      # 设置主机与容器的端口映射
+      - "8083:8083"
+    networks:
+      # 使用默认网络即：docker0 桥接
+      - default_network
+    volumes:
+      # 将主机的 /tmp/data/logs 目录挂载到容器的 /logs 目录。这样可以实现数据的持久化，当容器重启时，数据不会丢失
+      - "/tmp/data/logs:/logs"
+  im-connect:
+    build: ./im-connect
+    hostname: im-connect
+    container_name: im-connect
+    restart: always
+    ports:
+      - "10001:10001"
+    networks:
+      - default_network
+    volumes:
+      - "/tmp/data/logs:/logs"
+  im-console:
+    build: ./im-console
+    hostname: im-console
+    container_name: im-console
+    restart: always
+    ports:
+      - "8084:8084"
+    networks:
+      - default_network
+    volumes:
+      - "/tmp/data/logs:/logs"
+networks:
+  default_network:
+    # 桥接
+    driver: bridge

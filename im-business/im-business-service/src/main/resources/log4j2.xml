@@ -3,7 +3,8 @@
 <Configuration status="off" monitorInterval="10">
 
 	<properties>
-		<property name="FILE_NAME">xzll_admin</property>
+		<property name="FILE_NAME">im-business</property>
+		<property name="LOG_HOME">/logs</property> <!-- 设置日志输出目录为 /logs -->
 	</properties>
 
 	<Appenders>
@@ -12,19 +13,20 @@
 			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
 		</Console>
 
-<!--		<RollingRandomAccessFile name="File"-->
-<!--			fileName="${LOG_HOME}/${FILE_NAME}.log"-->
-<!--			filePattern="${LOG_HOME}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd}-%i.log">-->
-<!--			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{trace_id}] - %msg%n" />-->
-<!--			-->
-<!--			<Policies>-->
-<!--				<TimeBasedTriggeringPolicy />-->
-<!--				<SizeBasedTriggeringPolicy size="2000MB" />-->
-<!--			</Policies>-->
-<!--			-->
-<!--			<DefaultRolloverStrategy max="40" />-->
-<!--			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />-->
-<!--		</RollingRandomAccessFile>-->
+
+		<RollingRandomAccessFile name="File"
+								 fileName="${LOG_HOME}/${FILE_NAME}.log"
+								 filePattern="${LOG_HOME}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd}-%i.log">
+			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{trace_id}] - %msg%n" />
+			<Policies>
+				<TimeBasedTriggeringPolicy />
+				<SizeBasedTriggeringPolicy size="2000MB" />
+			</Policies>
+
+			<DefaultRolloverStrategy max="40" />
+			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+		</RollingRandomAccessFile>
+
 	</Appenders>
 
 	<Loggers>
