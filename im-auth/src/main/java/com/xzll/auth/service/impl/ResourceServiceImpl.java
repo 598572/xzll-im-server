@@ -2,11 +2,12 @@ package com.xzll.auth.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import com.xzll.auth.constant.RedisConstant;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -21,8 +22,10 @@ import java.util.TreeMap;
 public class ResourceServiceImpl {
 
     private Map<String, List<String>> resourceRolesMap;
-    @Resource
-    private RedisTemplate<String,Object> redisTemplate;
+
+    @Autowired
+    @Qualifier(value = "secondaryRedisTemplate")
+    private RedisTemplate<String, Object> redisTemplate;
 
     @PostConstruct
     public void initData() {

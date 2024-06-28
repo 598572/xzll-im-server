@@ -3,6 +3,9 @@ package com.xzll.gateway.authorization;
 import cn.hutool.core.convert.Convert;
 import com.xzll.gateway.constant.AuthConstant;
 import com.xzll.gateway.constant.RedisConstant;
+import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.ReactiveAuthorizationManager;
@@ -12,9 +15,9 @@ import org.springframework.security.web.server.authorization.AuthorizationContex
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.Resource;
 import java.net.URI;
 import java.util.List;
+
 import java.util.stream.Collectors;
 
 /**
@@ -24,9 +27,12 @@ import java.util.stream.Collectors;
  */
 @Component
 public class AuthorizationManager implements ReactiveAuthorizationManager<AuthorizationContext> {
-    @Resource
-    private RedisTemplate<String,Object> redisTemplate;
 
+    @Autowired
+    @Qualifier(value = "secondaryRedisTemplate")
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @SneakyThrows
     @Override
     public Mono<AuthorizationDecision> check(Mono<Authentication> mono, AuthorizationContext authorizationContext) {
         //从Redis中获取当前路径可访问角色列表

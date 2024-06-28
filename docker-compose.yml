@@ -1,7 +1,11 @@
-version: '3'
+version: '3.9'
 services:
   im-gateway:
-    build: ./im-gateway
+    build:
+      context: ./im-gateway
+      dockerfile: Dockerfile
+    image: im-gateway:latest
+
     hostname: im-gateway
     container_name: im-gateway
     restart: always
@@ -11,8 +15,18 @@ services:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    depends_on:
+      - nacos
+      - zookeeper
+      - redis
+      - rmq_broker
+      - rmq_namesrv
   im-auth:
-    build: ./im-auth
+    build:
+      context: ./im-auth
+      dockerfile: Dockerfile
+    image: im-auth:latest
+
     hostname: im-auth
     container_name: im-auth
     restart: always
@@ -22,10 +36,20 @@ services:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    depends_on:
+      - nacos
+      - zookeeper
+      - redis
+      - rmq_broker
+      - rmq_namesrv
   im-business:
     # 可以根据Dockerfile构建镜像（但是，Docker Compose 会在检测到上下文变化时重新构建镜像。也就是说如果你不修改Dockerfile docker-compose应该不是每次都构建镜像 实测确实如此）
-    build: ./im-business
-    # 也可以指定镜像名
+    build:
+      context: ./im-business # 指定Dockerfile文件位置
+      dockerfile: Dockerfile # 指定名称
+    image: im-business:latest # 指定生成镜像的 名称
+
+    # 也可以直接指定镜像名 但是要确保镜像存在 （如果在docker仓库, 则不需要再本地存在镜像 会自动pull）
     # image: im-business:0.0.2
 
     # 设置容器的主机名 即修改 ： /etc/hosts 中的内容
@@ -43,8 +67,18 @@ services:
     volumes:
       # 将主机的 /tmp/data/logs 目录挂载到容器的 /logs 目录。这样可以实现数据的持久化，当容器重启时，数据不会丢失
       - "/tmp/data/logs:/logs"
+    depends_on:
+      - nacos
+      - zookeeper
+      - redis
+      - rmq_broker
+      - rmq_namesrv
   im-connect:
-    build: ./im-connect
+    build:
+      context: ./im-connect
+      dockerfile: Dockerfile
+    image: im-connect:latest
+
     hostname: im-connect
     container_name: im-connect
     restart: always
@@ -54,8 +88,18 @@ services:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    depends_on:
+      - nacos
+      - zookeeper
+      - redis
+      - rmq_broker
+      - rmq_namesrv
   im-console:
-    build: ./im-console
+    build:
+      context: ./im-console
+      dockerfile: Dockerfile
+    image: im-console:latest
+
     hostname: im-console
     container_name: im-console
     restart: always
@@ -65,6 +109,88 @@ services:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    depends_on:
+      - nacos
+      - zookeeper
+      - redis
+      - rmq_broker
+      - rmq_namesrv
+
+  # ######################################### 以下是此im项目 依赖的中间件 #########################################
+
+  # rocketMq nameServer
+  rmq_namesrv:
+    image: apache/rocketmq:4.8.0
+    container_name: rmq_namesrv
+    restart: always
+    ports:
+      - "9876:9876"
+    volumes:
+      - /usr/local/soft_hzz/docker/rocketmq_namesrv/store:/root/store
+      - /usr/local/soft_hzz/docker/rocketmq_namesrv/logs:/root/logs
+    command: sh mqnamesrv
+  # rocketMq broker
+  rmq_broker:
+    image: apache/rocketmq:4.8.0
+    container_name: rmq_broker
+    restart: always
+    ports:
+      - "10911:10911"
+      - "10909:10909"
+    volumes:
+      - /usr/local/soft_hzz/docker/rocketmq_broker/store:/root/store
+      - /usr/local/soft_hzz/docker/rocketmq_broker/logs:/root/logs
+      - /usr/local/soft_hzz/docker/rocketmq_broker/conf/broker.conf:/opt/rocketmq-4.8.0/conf/broker.conf
+#    environment:
+#      - LOCAL_IP=${LOCAL_IP}
+    command: sh mqbroker -c /opt/rocketmq-4.8.0/conf/broker.conf
+
+  rocketmq-console:
+    image: styletang/rocketmq-console-ng
+    container_name: rocketmq-console
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=172.30.128.65:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"
+    depends_on:
+      - rmq_namesrv
+      - rmq_broker
+  # nacos
+  nacos:
+    image: nacos/nacos-server:2.0.3
+    container_name: nacos
+    restart: always
+    ports:
+      - "8848:8848"
+    volumes:
+      - /usr/local/soft_hzz/docker/nacos/data:/home/nacos/data
+      - /usr/local/soft_hzz/docker/nacos/logs:/home/nacos/logs
+    environment:
+      MODE: standalone
+  #redis
+  redis:
+    image: redis
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - /usr/local/soft_hzz/docker/redis/data:/data
+      - /usr/local/soft_hzz/docker/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+  # zk
+  zookeeper:
+    image: zookeeper
+    container_name: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    volumes:
+      - /usr/local/soft_hzz/docker/zk/data:/data
+      - /usr/local/soft_hzz/docker/zk/datalog:/datalog
+      - /usr/local/soft_hzz/docker/zk/conf/zoo.cfg:/conf/zoo.cfg
+
 networks:
   default_network:
     # 桥接
