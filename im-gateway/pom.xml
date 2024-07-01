@@ -124,6 +124,12 @@
             <version>5.7.0</version>
         </dependency>
 
+        <!--添加 Micrometer Prometheus 依赖，以便将指标导出到 Prometheus-->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
 
     </dependencies>
 

@@ -1,0 +1,43 @@
+# 普罗米修斯 的配置文件，定义部分抓取规则以及 监控的目标实例
+
+# 配置全局抓取间隔：每 15 秒抓取一次所有配置的监控目标。
+global:
+  scrape_interval: 15s
+
+# scrape_configs：定义 Prometheus 要抓取的监控目标，以及抓取这些目标的相关配置
+scrape_configs:
+
+  - job_name: 'im-gateway'
+    # static_configs：静态配置，定义了要抓取的目标地址和端口
+    static_configs:
+      - targets: [ 'im-gateway:8081' ]
+    # 需要指定 否则的话  prometheus 默认找的路径是：ip:端口/metrics  而springboot2.7中是没有 /metrics  这个端点路径的
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'im-auth'
+    static_configs:
+      - targets: [ 'im-auth:8082' ]
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'im-business'
+    static_configs:
+      - targets: [ 'im-business:8083' ]
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'im-console'
+    static_configs:
+      - targets: [ 'im-console:8084' ]
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'im-connect'
+    static_configs:
+      - targets: [ 'im-connect:10001' ]
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: [ 'node_exporter:9100' ]
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: [ 'cadvisor:8080' ] # 注意此处需要是docker容器 cadvisor 的端口 而不是映射到宿主机的910端口

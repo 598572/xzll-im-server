@@ -186,6 +186,13 @@
             <version>1.0.6</version>
         </dependency>
 
+
+        <!--添加 Spring Boot Actuator 依赖，以启用 Actuator 端点-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
     </dependencies>
 
 

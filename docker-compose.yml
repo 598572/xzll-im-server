@@ -65,7 +65,7 @@ services:
       # 使用默认网络即：docker0 桥接
       - default_network
     volumes:
-      # 将主机的 /tmp/data/logs 目录挂载到容器的 /logs 目录。这样可以实现数据的持久化，当容器重启时，数据不会丢失
+      # 将主机的 /tmp/data/logs 目录挂载到容器的 /logs 目录。这样可以实现数据的持久化，当容器重启时，数据不会丢失，注意 挂载文件需要给宿主机文件 添加最权限，chmod -R 777 目标文件夹
       - "/tmp/data/logs:/logs"
     depends_on:
       - nacos
@@ -190,6 +190,70 @@ services:
       - /usr/local/soft_hzz/docker/zk/data:/data
       - /usr/local/soft_hzz/docker/zk/datalog:/datalog
       - /usr/local/soft_hzz/docker/zk/conf/zoo.cfg:/conf/zoo.cfg
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      # 数据挂载 防止容器重启/停止后  数据消失
+      - /usr/local/soft_hzz/docker/prometheus/conf/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /usr/local/soft_hzz/docker/prometheus/data/prometheus_data:/prometheus  # 挂载数据到宿主机目录
+
+    ports:
+      - "9090:9090"
+    networks:
+      - default_network
+    depends_on:
+      - im-connect
+      - im-console
+      - im-business
+      - im-gateway
+      - im-auth
+      - node_exporter
+      - cadvisor
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=grafana123 # grafana 密码
+    # 挂载数据到宿主机目录
+    volumes:
+    - /usr/local/soft_hzz/docker/grafana/grafana_data:/var/lib/grafana
+
+    # 必须指定 网络，否则无法通过服务名 如：im-business 找到对应的ip
+    networks:
+      - default_network
+    depends_on:
+      - im-connect
+      - im-console
+      - im-business
+      - im-gateway
+      - im-auth
+      - prometheus
+
+  # 用于监控linux系统的信息
+  node_exporter:
+    image: prom/node-exportercadvisor
+    container_name: node_exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - default_network
+  # 用于监控docker容器的信息
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "9101:8080" # 8080已经被rocketMQ控制台占用 所以这里选择映射到主机的 9101端口
+    privileged: true
+#    volumes:
+      #- /usr/local/soft_hzz/docker/cadvisor/run/docker.sock:/var/run/docker.sock
+      #- /usr/local/soft_hzz/docker/cadvisor/sys:/sys
+      # - /usr/local/soft_hzz/docker/cadvisor/lib/docker/:/var/lib/docker/
+    networks:
+      - default_network
 
 networks:
   default_network:

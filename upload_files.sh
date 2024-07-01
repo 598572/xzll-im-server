@@ -9,17 +9,26 @@ remote_base_dir="/usr/local/soft_hzz/xzll-im/jar-file/docker-compose-way"
 
 # 定义要上传的文件和目标目录
 files=(
+  # 上传jar
+
   "$local_base_dir/im-gateway/target/im-gateway.jar:$remote_base_dir/im-gateway/"
   "$local_base_dir/im-auth/target/im-auth.jar:$remote_base_dir/im-auth/"
   "$local_base_dir/im-business/im-business-service/target/im-business-service.jar:$remote_base_dir/im-business/"
   "$local_base_dir/im-connect/im-connect-service/target/im-connect-service.jar:$remote_base_dir/im-connect/"
   "$local_base_dir/im-console/im-console-service/target/im-console-service.jar:$remote_base_dir/im-console/"
+
+  # 上传Dockerfile
   "$local_base_dir/im-gateway/src/main/resources/Dockerfile:$remote_base_dir/im-gateway"
   "$local_base_dir/im-auth/src/main/resources/Dockerfile:$remote_base_dir/im-auth/"
   "$local_base_dir/im-business/im-business-service/src/main/resources/Dockerfile:$remote_base_dir/im-business/"
   "$local_base_dir/im-connect/im-connect-service/src/main/resources/Dockerfile:$remote_base_dir/im-connect/"
   "$local_base_dir/im-console/im-console-service/src/main/resources/Dockerfile:$remote_base_dir/im-console/"
+
+  # 上传docker-compose.yml 文件
   "$local_base_dir/docker-compose.yml:$remote_base_dir/"
+
+  # 上传 prometheus.yml 文件
+  "$local_base_dir/prometheus.yml:/usr/local/soft_hzz/docker/prometheus/conf/"
 )
 
 # 远程服务器的用户名和主机名
