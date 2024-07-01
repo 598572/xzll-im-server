@@ -27,12 +27,12 @@
 2. Spring Cloud GateWay 【网关】✅
 1. Oauth2 + Spring Security 【认证&鉴权】✅
 1. 在雪花算法基础上 生成含有业务信息的 msgId，长连接获取批量消息id ✅
+1. prometheus + grafana【服务监控✅】
 
 - **待集成**
 
 1. Sentinel 【限流】
 1. docker+k8s【项目部署】
-1. prometheus + grafana【服务监控】
 1. SkyWalking 【链路追踪】
 1. ElasticSearch【聊天记录等搜索】
 1. Jmeter+python脚本【压测】
