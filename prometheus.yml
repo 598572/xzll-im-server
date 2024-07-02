@@ -29,15 +29,23 @@ scrape_configs:
       - targets: [ 'im-console:8084' ]
     metrics_path: /actuator/prometheus
 
-  - job_name: 'im-connect'
-    static_configs:
-      - targets: [ 'im-connect:10001' ]
-    metrics_path: /actuator/prometheus
+# 不直接从长连接服务采集， 而是通过jmx采集im-connect，再上传给 prometheus
+#  - job_name: 'im-connect'
+#    static_configs:
+#      - targets: [ 'im-connect:10001' ]
+#    metrics_path: /actuator/prometheus
 
+  # 用于监控linux硬件系统和资源
   - job_name: 'node_exporter'
     static_configs:
       - targets: [ 'node_exporter:9100' ]
 
+  # 用于监控docker容器
   - job_name: 'cadvisor'
     static_configs:
       - targets: [ 'cadvisor:8080' ] # 注意此处需要是docker容器 cadvisor 的端口 而不是映射到宿主机的910端口
+
+  # jmx采集数据给 prometheus
+  - job_name: 'jmx-exporter'
+    static_configs:
+      - targets: [ 'jmx-exporter:5556' ]

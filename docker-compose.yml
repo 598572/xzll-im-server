@@ -78,22 +78,45 @@ services:
       context: ./im-connect
       dockerfile: Dockerfile
     image: im-connect:latest
-
     hostname: im-connect
     container_name: im-connect
     restart: always
     ports:
       - "10001:10001"
+      # - "5556:5556"   # JMX Exporter 端口
+      # - "5557:5557"   # JMX RMI 端口
     networks:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+#      - "/usr/local/soft_hzz/docker/jmx/jmx_exporter.yaml:/config/jmx_exporter.yaml"
+#      - "/usr/local/soft_hzz/docker/jmx:/usr/local/soft_hzz/docker/jmx"  # 映射整个目录 防止找不到  jmx_prometheus_javaagent-0.16.1.jar 文件
+    environment:
+#      - JAVA_TOOL_OPTIONS=-javaagent:/usr/local/soft_hzz/docker/jmx/jmx_prometheus_javaagent-0.16.1.jar=5556:/config/jmx_exporter.yaml
+      # - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5556 -Dcom.sun.management.jmxremote.rmi.port=5557 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=172.30.128.65
+      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5556 -Dcom.sun.management.jmxremote.rmi.port=5557 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=im-connect
     depends_on:
       - nacos
       - zookeeper
       - redis
       - rmq_broker
       - rmq_namesrv
+
+  # 使用进程方式 不使用javaagent(附着到im-connect) 否则有点问题总是报错: read timeout
+  jmx-exporter:
+    image: sscaling/jmx-prometheus-exporter
+    container_name: jmx-exporter
+    hostname: jmx-exporter
+    ports:
+      - "5556:5556"
+    networks:
+      - default_network
+    environment:
+      - JMX_URL=service:jmx:rmi:///jndi/rmi://im-connect:5556/jmxrmi
+    volumes:
+      - "/usr/local/soft_hzz/docker/jmx/jmx_exporter.yaml:/config/jmx_exporter.yaml"
+      - "/usr/local/soft_hzz/docker/jmx:/usr/local/soft_hzz/docker/jmx"  # 映射整个目录 防止找不到  jmx_prometheus_javaagent-0.16.1.jar 文件
+
   im-console:
     build:
       context: ./im-console
@@ -235,8 +258,8 @@ services:
 
   # 用于监控linux系统的信息
   node_exporter:
-    image: prom/node-exportercadvisor
-    container_name: node_exporter
+    image: prom/node-exporter
+    container_name: node-exporter
     ports:
       - "9100:9100"
     networks:

@@ -1,0 +1,10 @@
+startDelaySeconds: 0
+hostPort: im-connect:5556
+username:
+password:
+ssl: false
+lowercaseOutputName: false
+lowercaseOutputLabelNames: false
+rules:
+  - pattern: '.*'
+#jmxUrl: service:jmx:rmi:///jndi/rmi://im-connect:5556/jmxrmi

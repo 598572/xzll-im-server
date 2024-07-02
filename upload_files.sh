@@ -29,6 +29,9 @@ files=(
 
   # 上传 prometheus.yml 文件
   "$local_base_dir/prometheus.yml:/usr/local/soft_hzz/docker/prometheus/conf/"
+
+  # 上传 jmx_exporter.yaml 文件 (此文件用于定义jmx采集规则)
+  "$local_base_dir/jmx_exporter.yaml:/usr/local/soft_hzz/docker/jmx/"
 )
 
 # 远程服务器的用户名和主机名
