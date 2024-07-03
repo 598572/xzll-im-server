@@ -14,7 +14,12 @@ public class IMConnectServerConfig {
     /**
      * netty端口
      */
-    private int port;
+    private int nettyPort;
+
+    /**
+     * prometheus采集指标 端口
+     */
+    private int prometheusPort;
     /**
      * accept 队列的大小
      */
@@ -27,5 +32,7 @@ public class IMConnectServerConfig {
      * 心跳时间
      */
     private long heartBeatTime;
+
+
 
 }

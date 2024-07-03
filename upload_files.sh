@@ -30,13 +30,13 @@ files=(
   # 上传 prometheus.yml 文件
   "$local_base_dir/prometheus.yml:/usr/local/soft_hzz/docker/prometheus/conf/"
 
-  # 上传 jmx_exporter.yaml 文件 (此文件用于定义jmx采集规则)
-  "$local_base_dir/jmx_exporter.yaml:/usr/local/soft_hzz/docker/jmx/"
+  # 上传 jmx_exporter.yaml 文件 (此文件用于定义jmx采集规则) 使用prometheus后 jmx采集这种方式就弃用了。
+  # "$local_base_dir/jmx_exporter.yaml:/usr/local/soft_hzz/docker/jmx/"
 )
 
 # 远程服务器的用户名和主机名
 remote_user="root"
-remote_host="$XUNIJI_ADDRESS"
+remote_host="192.168.1.103" # $XUNIJI_ADDRESS
 remote_password="$REMOTE_PASSWORD"
 
 # 日志文件
@@ -58,3 +58,17 @@ for file_pair in "${files[@]}"; do
   fi
   echo "" | tee -a "$log_file"
 done
+
+# 执行docker-compose命令并列出所有容器
+read -p "是否执行Docker命令？ (y/n): " user_input
+
+if [[ "$user_input" == "y" ]]; then
+    sshpass -p "$remote_password" ssh ${remote_user}@${remote_host} <<EOF | tee -a "$log_file"
+cd /usr/local/soft_hzz/xzll-im/jar-file/docker-compose-way/
+docker-compose down
+docker-compose up -d --build
+docker ps -a
+EOF
+else
+    echo "操作已取消。"
+fi

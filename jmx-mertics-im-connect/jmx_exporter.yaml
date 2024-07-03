@@ -1,0 +1,11 @@
+startDelaySeconds: 0
+hostPort: im-connect:5556 # 使用单独jmx进程抓取使用此配置
+#hostPort: im-connect:9999 # 使用springboot jmx # 目前不使用此方式
+username:
+password:
+ssl: false
+lowercaseOutputName: false
+lowercaseOutputLabelNames: false
+rules:
+  - pattern: '.*'
+#jmxUrl: service:jmx:rmi:///jndi/rmi://im-connect:5556/jmxrmi 配了hostPort的话 就不要配这个了 要不会报冲突的错误

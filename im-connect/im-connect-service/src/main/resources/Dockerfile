@@ -6,5 +6,8 @@ VOLUME /tmp
 COPY im-connect-service.jar im-connect-service.jar
 # 启动命令
 ENTRYPOINT ["java", "-jar", "/im-connect-service.jar"]
-# 暴露端口 与服务端口保持一致
+
+# 暴露netty端口
 EXPOSE 10001
+# 暴露 promethues指标采集端口
+EXPOSE 10000

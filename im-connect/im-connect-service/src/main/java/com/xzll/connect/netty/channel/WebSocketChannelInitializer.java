@@ -3,6 +3,7 @@ package com.xzll.connect.netty.channel;
 import cn.hutool.extra.spring.SpringUtil;
 import com.xzll.connect.config.IMConnectServerConfig;
 import com.xzll.connect.netty.handler.AuthHandler;
+import com.xzll.connect.netty.handler.MetricsHandler;
 import com.xzll.connect.netty.handler.WebSocketServerHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -47,6 +48,7 @@ public class WebSocketChannelInitializer extends ChannelInitializer<SocketChanne
         pipeline.addLast("heart-notice", new IdleStateHandler(11, 0, 0, TimeUnit.SECONDS));
 
         //添加自定义handler
+        pipeline.addLast(new MetricsHandler());
         pipeline.addLast(new AuthHandler());
         pipeline.addLast(new WebSocketServerHandler());
 

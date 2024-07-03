@@ -116,10 +116,14 @@ public class WebsocketClient111 {
                     continue;
                 }
 
-                String s = sc.nextLine();
-                //String s="你好啊 我发消息压死你，第"+i+"条消息";
+                //String s = sc.nextLine();
+                String s="你好啊 我发消息压死你，第"+i+"条消息";
                 i++;
-
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 if (StringUtils.isNotBlank(s)) {
                     String msgId = WebsocketClientHandler111.msgIds.remove(0);
                     Assert.isTrue(StringUtils.isNotBlank(msgId), "无msgId可用");

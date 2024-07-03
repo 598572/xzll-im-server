@@ -47,10 +47,10 @@ public class NettyServer implements ApplicationRunner {
      * 此逻辑最好在springboot项目都启动之后再启动，防止影响启动流程。 此前，我曾 在@PostConstruct、CommandLineRunner阶段启动此逻辑，将会遇到一些莫名问题
      *
      * @param args
-     * @throws Exception
      */
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
+
         log.info("[NettyServer]_正在启动websocket服务器");
         NioEventLoopGroup boss = new NioEventLoopGroup();
         NioEventLoopGroup work = new NioEventLoopGroup();
@@ -74,7 +74,7 @@ public class NettyServer implements ApplicationRunner {
 
             log.info("获取到的ip信息 hostAddress:{},machineIpAddr:{},realIp:{},enp0s3:{}", hostAddress, machineIpAddr, realIp,dubboPreferredResult);
 //            int usableLocalPort = NetUtil.getUsableLocalPort();//测试时： 因为目前只有一台机器如果部署多个实例 需要放开此注释 即使用随机端口 保证端口不冲突
-            int usableLocalPort = imConnectServerConfig.getPort();
+            int usableLocalPort = imConnectServerConfig.getNettyPort();
 
             String realUseIp = StringUtils.isBlank(dubboPreferredResult) ? realIp : dubboPreferredResult;
             //将来 每一个服务的ip和端口 是要注册到zk中 以便客户请求连接时进行路由

@@ -74,6 +74,65 @@ services:
       - rmq_broker
       - rmq_namesrv
 
+
+  # 使用springBoot支持的 jmx采集指标， 也不可行 还是报错，错误信息与下边的javaagent一样：ERROR [prometheus-http-1-1][JmxCollector.java:collect:552] [] - JMX scrape failed: java.io.IOException: Failed to retrieve RMIServer stub: javax.naming.CommunicationException [Root exception is java.rmi.ConnectIOException: error during JRMP connection establishment; nested exception is:	java.net.SocketTimeoutException: Read timed out]
+#  im-connect:
+#    build:
+#      context: ./im-connect
+#      dockerfile: Dockerfile
+#    image: im-connect:latest
+#    hostname: im-connect
+#    container_name: im-connect
+#    restart: always
+#    ports:
+#      - "10001:10001"
+#      - "9999:9999"   # JMX Exporter 端口
+#    networks:
+#      - default_network
+#    volumes:
+#      - "/tmp/data/logs:/logs"
+#      - "/usr/local/soft_hzz/docker/jmx/jmx_exporter.yaml:/config/jmx_exporter.yaml"
+#      - "/usr/local/soft_hzz/docker/jmx:/usr/local/soft_hzz/docker/jmx"  # 映射整个目录 防止找不到  jmx_prometheus_javaagent-0.16.1.jar 文件
+#    environment:
+#      - JAVA_TOOL_OPTIONS=-javaagent:/usr/local/soft_hzz/docker/jmx/jmx_prometheus_javaagent-0.16.1.jar=9999:/config/jmx_exporter.yaml
+#      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=9999 -Dcom.sun.management.jmxremote.rmi.port=9999 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=im-connect
+#    depends_on:
+#      - nacos
+#      - zookeeper
+#      - redis
+#      - rmq_broker
+#      - rmq_namesrv
+
+   # 使用javaagent方式采集指标，此方式无需单独进程，目前报错，暂时弃用此方式，错误信息：ERROR [prometheus-http-1-1][JmxCollector.java:collect:552] [] - JMX scrape failed: java.io.IOException: Failed to retrieve RMIServer stub: javax.naming.CommunicationException [Root exception is java.rmi.ConnectIOException: error during JRMP connection establishment; nested exception is:	java.net.SocketTimeoutException: Read timed out]
+#  im-connect:
+#    build:
+#      context: ./im-connect
+#      dockerfile: Dockerfile
+#    image: im-connect:latest
+#    hostname: im-connect
+#    container_name: im-connect
+#    restart: always
+#    ports:
+#      - "10001:10001"
+#      - "5556:5556"   # JMX Exporter 端口
+#      - "5557:5557"   # JMX RMI 端口
+#    networks:
+#      - default_network
+#    volumes:
+#      - "/tmp/data/logs:/logs"
+#      - "/usr/local/soft_hzz/docker/jmx/jmx_exporter.yaml:/config/jmx_exporter.yaml"
+#      - "/usr/local/soft_hzz/docker/jmx:/usr/local/soft_hzz/docker/jmx"  # 映射整个目录 防止找不到  jmx_prometheus_javaagent-0.16.1.jar 文件
+#    environment:
+#      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5556 -Dcom.sun.management.jmxremote.rmi.port=5557 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=im-connect
+#      - JAVA_TOOL_OPTIONS=-javaagent:/usr/local/soft_hzz/docker/jmx/jmx_prometheus_javaagent-0.16.1.jar=5556:/config/jmx_exporter.yaml
+#    depends_on:
+#      - nacos
+#      - zookeeper
+#      - redis
+#      - rmq_broker
+#      - rmq_namesrv
+
+   # 使用单独的jmx进程进行指标采集，需要起一个容器即下边的：jmx-exporter，有jmx-exporter 采集im-connect 再由 jmx-exporter上报给 prometheus 。
   im-connect:
     build:
       context: ./im-connect
@@ -83,18 +142,34 @@ services:
     container_name: im-connect
     restart: always
     ports:
-      - "10000:10000" # prometheus指标采集端口 http (注：不采用jmx方式采集)
-      - "10001:10001" # netty端口
+      - "10001:10001"
     networks:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    environment:
+      - JAVA_OPTS=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5556 -Dcom.sun.management.jmxremote.rmi.port=5557 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=im-connect
     depends_on:
       - nacos
       - zookeeper
       - redis
       - rmq_broker
       - rmq_namesrv
+
+   # 使用jmx-exporter进程， 采集 im-connect 的指标
+  jmx-exporter:
+    image: sscaling/jmx-prometheus-exporter
+    container_name: jmx-exporter
+    hostname: jmx-exporter
+    ports:
+      - "5556:5556"
+    networks:
+      - default_network
+    environment:
+      - JMX_URL=service:jmx:rmi:///jndi/rmi://im-connect:5556/jmxrmi
+    volumes:
+      - "/usr/local/soft_hzz/docker/jmx/jmx_exporter.yaml:/config/jmx_exporter.yaml"
+      - "/usr/local/soft_hzz/docker/jmx:/usr/local/soft_hzz/docker/jmx"  # 映射整个目录 防止找不到  jmx_prometheus_javaagent-0.16.1.jar 文件
 
   im-console:
     build:
