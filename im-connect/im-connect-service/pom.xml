@@ -145,7 +145,7 @@
         <!--        </dependency>-->
 
 
-
+            <!--不使用此方式（此方式主要是和 SpringBoot actuator 来配合使用），而是使用下边的 prometheus client-->
 <!--        <dependency>-->
 <!--            <groupId>io.micrometer</groupId>-->
 <!--            <artifactId>micrometer-registry-prometheus</artifactId>-->
@@ -155,41 +155,34 @@
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient</artifactId>
-            <version>0.16.0</version>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient_hotspot</artifactId>
-            <version>0.16.0</version>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient_common</artifactId>
-            <version>0.16.0</version>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient_httpserver</artifactId>
-            <version>0.15.0</version>
         </dependency>
 
 
-        <!--使用 dropwizard 来【补充】采集 系统指标，如 cpu 内存 文件描述符等指标 -->
+        <!--使用 dropwizard 来【补充】采集 系统指标。，如 cpu 内存 文件描述符等指标 -->
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
-            <version>4.1.17</version>
         </dependency>
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-jvm</artifactId>
-            <version>4.1.17</version>
         </dependency>
 
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient_dropwizard</artifactId>
-            <version>0.16.0</version>
         </dependency>
 
     </dependencies>

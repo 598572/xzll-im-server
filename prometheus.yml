@@ -1,11 +1,13 @@
-# 普罗米修斯 的配置文件，定义部分抓取规则以及 监控的目标实例
+# prometheus 的配置文件，定义部分抓取规则以及 监控的目标实例
 
-# 配置全局抓取间隔：每 15 秒抓取一次所有配置的监控目标。
+# 全局配置
 global:
-  scrape_interval: 15s
+  scrape_interval: 15s    # 抓取间隔：每 15 秒抓取一次所有配置的监控目标。
 
-# scrape_configs：定义 Prometheus 要抓取的监控目标，以及抓取这些目标的相关配置
+# 抓取规则：定义 Prometheus 要抓取的监控目标，以及抓取这些目标的相关配置
 scrape_configs:
+
+  # # ----------------------------------------监控自己的几个服务----------------------------------------
 
   - job_name: 'im-gateway'
     # static_configs：静态配置，定义了要抓取的目标地址和端口
@@ -29,17 +31,41 @@ scrape_configs:
       - targets: [ 'im-console:8084' ]
     metrics_path: /actuator/prometheus
 
-  # 用于监控linux硬件系统和资源
-  - job_name: 'node_exporter'
-    static_configs:
-      - targets: [ 'node_exporter:9100' ]
-
-  # 用于监控docker容器
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: [ 'cadvisor:8080' ] # 注意此处需要是docker容器 cadvisor 的端口 而不是映射到宿主机的910端口
-
   # 使用 prometheus 客户端采集netty服务的指标数据给 prometheus
   - job_name: 'im-connect'
     static_configs:
       - targets: [ 'im-connect:10000' ]
+
+
+
+  # ----------------------------------------对硬件和中间件的监控----------------------------------------
+
+  # 监控linux硬件系统和资源 grafana模板id: 1860 模板名称： Node Exporter Full
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: [ 'node_exporter:9100' ]
+
+  # 用于监控docker容器 grafana模板id: 893，名称： Docker and system monitoring
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: [ 'cadvisor:8080' ] # 注意此处需要是docker容器 cadvisor 的端口 而不是映射到宿主机的910端口
+
+  # 监控 RocketMQ NameServer 和 RocketMQ Broker （此程序会有定时任务定时扫描rm指标 并归并上报给 prometheus，暂无docker镜像 需要手动下载并构建 详见）
+  # 此监控也有grafana模板id : 10477 ，模板名称：Rocketmq_dashboard
+  - job_name: 'rocketmq_exporter'
+    static_configs:
+      - targets: [ 'rocketmq-exporter:5557' ]
+        labels:
+          # 这俩是必须的 详见这个提示： https://github.com/apache/rocketmq-exporter?tab=readme-ov-file#quick-start
+          Env: 'develop'
+          Cluster: 'local'
+
+  # 监控虚拟机上的mysql(目前除了mysql 其余都是在docker部署) ，grfnada 模板id使用: 7362 模板名称： MySQL Overview
+  - job_name: 'mysqld-exporter'
+    static_configs:
+      - targets: [ 'mysqld-exporter:9104' ]
+
+  # 监控的reds ，grafana 模板id使用: 763，模板名称： Redis Dashboard for Prometheus Redis Exporter 1.x
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: [ 'redis-exporter:9121' ]

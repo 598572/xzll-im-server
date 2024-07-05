@@ -32,13 +32,12 @@ import javax.annotation.Resource;
 @Configuration
 @Slf4j
 public class MetricsConfig {
-
-
     @Resource
     private IMConnectServerConfig imConnectServerConfig;
 
     @Bean
     public MetricRegistry metricRegistry() {
+
         MetricRegistry metricRegistry = new MetricRegistry();
 
         // 注册 JVM 内存使用情况指标
@@ -53,17 +52,14 @@ public class MetricsConfig {
         metricRegistry.register("system.cpu.load", (Gauge<Double>) osBean::getSystemCpuLoad);
         metricRegistry.register("system.memory.total", (Gauge<Long>) osBean::getTotalPhysicalMemorySize);
         metricRegistry.register("system.memory.free", (Gauge<Long>) osBean::getFreePhysicalMemorySize);
-
         return metricRegistry;
     }
-
     @Bean
     public HTTPServer prometheusHttpServer(MetricRegistry metricRegistry) throws IOException {
         CollectorRegistry.defaultRegistry.register(new DropwizardExports(metricRegistry));
         // 启动 Prometheus HTTP Server，端口号为 10000
-
         HTTPServer httpServer = null;
-        // 注册 JVM 和系统指标
+        // 注册 JVM 和线程等指标
         DefaultExports.initialize();
         try {
             // 启动 HTTP 服务器来暴露指标

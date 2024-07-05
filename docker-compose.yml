@@ -52,7 +52,7 @@ services:
     # 也可以直接指定镜像名 但是要确保镜像存在 （如果在docker仓库, 则不需要再本地存在镜像 会自动pull）
     # image: im-business:0.0.2
 
-    # 设置容器的主机名 即修改 ： /etc/hosts 中的内容
+    # 设置容器的主机名 即修改 ： /etc/hosts 中的内容,注意 如果是在docker中 ，容器间相互访问的时使用的是 容器的hostname 那么必须配hostname
     hostname: im-business
     # 容器名称
     container_name: im-business
@@ -123,29 +123,57 @@ services:
   rmq_namesrv:
     image: apache/rocketmq:4.8.0
     container_name: rmq_namesrv
+    hostname: rmq_namesrv
     restart: always
+    networks:
+      - default_network
     ports:
       - "9876:9876"
+#      - "1099:1099" # jmxremote暴露的端口  (已弃用jmx 监控rocketmq 而使用rocket-exporter方式 )
     volumes:
       - /usr/local/soft_hzz/docker/rocketmq_namesrv/store:/root/store
       - /usr/local/soft_hzz/docker/rocketmq_namesrv/logs:/root/logs
+    environment:
+      # 配置jmxremote 以便jmx监控
+      # - JAVA_OPTS=-Djava.rmi.server.hostname=rmq_namesrv -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=1099 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false
     command: sh mqnamesrv
   # rocketMq broker
   rmq_broker:
     image: apache/rocketmq:4.8.0
     container_name: rmq_broker
     restart: always
+    hostname: rmq_broker
+    networks:
+      - default_network
     ports:
-      - "10911:10911"
-      - "10909:10909"
+      - "10911:10911" # 外部通信端口。客户端（生产者和消费者）与 Broker 进行通信时使用此端口
+      - "10909:10909" # 内部通信端口。用于 Broker 间的同步、复制和其他内部通信
+#      - "11099:11099" # jmxremote暴露的端口 (已弃用jmx 监控rocketmq 而使用rocket-exporter方式 )
     volumes:
       - /usr/local/soft_hzz/docker/rocketmq_broker/store:/root/store
       - /usr/local/soft_hzz/docker/rocketmq_broker/logs:/root/logs
       - /usr/local/soft_hzz/docker/rocketmq_broker/conf/broker.conf:/opt/rocketmq-4.8.0/conf/broker.conf
     environment:
-      - JAVA_OPT_EXT=-server -Xms512m -Xmx1g -Xmn256m # 降低内存大小 防止启动失败
-#      - LOCAL_IP=${LOCAL_IP}
+      # 降低内存大小 防止启动失败
+      - JAVA_OPT_EXT=-server -Xms512m -Xmx1g -Xmn256m
+      #- JAVA_OPT_EXT=-server -Xms512m -Xmx1g -Xmn256m -Djava.rmi.server.hostname=rmq_broker -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=11099 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false
     command: sh mqbroker -c /opt/rocketmq-4.8.0/conf/broker.conf
+
+  # 使用这个监控rocketmq , github: https://github.com/apache/rocketmq-exporter
+  rocketmq_exporter:
+    image: rocketmq-exporter:latest
+    container_name: rocketmq-exporter
+    restart: always
+    hostname: rocketmq-exporter
+    networks:
+      - default_network
+    ports:
+      - "5557:5557"
+    environment:
+      - JAVA_OPTS=-Drocketmq.namesrv.addr=rmq_namesrv:9876 -Drocketmq.broker.addr=rmq_broker:10911
+    depends_on:
+      - rmq_namesrv
+      - rmq_broker
 
   rocketmq-console:
     image: styletang/rocketmq-console-ng
@@ -154,7 +182,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      JAVA_OPTS: "-Drocketmq.namesrv.addr=172.30.128.65:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=${LOCAL_IP}:9876 -Dcom.rocketmq.sendMessageWithVIPChannel=false"
     depends_on:
       - rmq_namesrv
       - rmq_broker
@@ -175,6 +203,8 @@ services:
     image: redis
     container_name: redis
     restart: always
+    networks:
+      - default_network
     ports:
       - "6379:6379"
     volumes:
@@ -188,6 +218,8 @@ services:
     restart: always
     ports:
       - "2181:2181"
+    networks:
+      - default_network
     volumes:
       - /usr/local/soft_hzz/docker/zk/data:/data
       - /usr/local/soft_hzz/docker/zk/datalog:/datalog
@@ -198,8 +230,8 @@ services:
     container_name: prometheus
     volumes:
       # 数据挂载 防止容器重启/停止后  数据消失
-      - /usr/local/soft_hzz/docker/prometheus/conf/prometheus.yml:/etc/prometheus/prometheus.yml
-      - /usr/local/soft_hzz/docker/prometheus/data/prometheus_data:/prometheus  # 挂载数据到宿主机目录
+      - /usr/local/soft_hzz/docker/prometheus/conf/prometheus.yml:/etc/prometheus/prometheus.yml    #  prometheus配置文件，配置抓取的规则和抓取目标
+      - /usr/local/soft_hzz/docker/prometheus/data/prometheus_data:/prometheus                      # 挂载数据到宿主机目录
 
     ports:
       - "9090:9090"
@@ -243,6 +275,7 @@ services:
       - "9100:9100"
     networks:
       - default_network
+
   # 用于监控docker容器的信息
   cadvisor:
     image: google/cadvisor:latest
@@ -257,7 +290,34 @@ services:
     networks:
       - default_network
 
+  # 监控虚拟机上的mysql(目前除mysql外 全部都部署在docker)
+  mysqld-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: mysqld-exporter
+    hostname: mysqld-exporter
+    networks:
+      - default_network
+    environment:
+      DATA_SOURCE_NAME: 'root:xzllaigH95..@tcp(${LOCAL_IP}:3306)/'
+    ports:
+      - "9104:9104"
+
+  # 监控redis
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    hostname: redis-exporter
+    networks:
+      - default_network
+    environment:
+      REDIS_ADDR: 'redis:6379'
+      REDIS_PASSWORD: '123456' # redis密码
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
+
 networks:
   default_network:
-    # 桥接
+    # 使用docker默认网络即：（桥接模式）
     driver: bridge

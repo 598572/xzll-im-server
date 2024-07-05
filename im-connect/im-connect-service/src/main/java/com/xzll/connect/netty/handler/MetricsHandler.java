@@ -9,7 +9,7 @@ import io.prometheus.client.Histogram;
 /**
  * @Author: hzz
  * @Date: 2024/7/3 22:49:07
- * @Description:
+ * @Description: 业务指标记录
  */
 @ChannelHandler.Sharable
 public class MetricsHandler extends ChannelInboundHandlerAdapter {
@@ -31,7 +31,8 @@ public class MetricsHandler extends ChannelInboundHandlerAdapter {
         try {
             super.channelRead(ctx, msg);
         } finally {
-            requestTimer.observeDuration(); // 记录处理时间
+            // 记录处理时间
+            requestTimer.observeDuration();
         }
     }
 }

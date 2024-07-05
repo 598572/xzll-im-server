@@ -59,6 +59,10 @@
 
         <spring-cloud-starter-oauth2.version>2.2.5.RELEASE</spring-cloud-starter-oauth2.version>
         <nimbus-jose-jwt.version>9.23</nimbus-jose-jwt.version>
+
+        <!--prometheus抓取依赖的jar版本，注：无需指定版本，spring-boot-starter-parent 父项目中已经定义了。 -->
+<!--        <prometheus-client.version>0.16.0</prometheus-client.version>-->
+<!--        <dropwizard.version>4.1.17</dropwizard.version>-->
     </properties>
 
     <dependencies>
