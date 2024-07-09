@@ -133,7 +133,7 @@ services:
     volumes:
       - /usr/local/soft_hzz/docker/rocketmq_namesrv/store:/root/store
       - /usr/local/soft_hzz/docker/rocketmq_namesrv/logs:/root/logs
-    environment:
+#    environment:
       # 配置jmxremote 以便jmx监控
       # - JAVA_OPTS=-Djava.rmi.server.hostname=rmq_namesrv -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=1099 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false
     command: sh mqnamesrv
