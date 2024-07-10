@@ -2,7 +2,7 @@ version: '3.9'
 services:
   im-gateway:
     build:
-      context: ./im-gateway
+      context: ../../im-gateway
       dockerfile: Dockerfile
     image: im-gateway:latest
 
@@ -23,7 +23,7 @@ services:
       - rmq_namesrv
   im-auth:
     build:
-      context: ./im-auth
+      context: ../../im-auth
       dockerfile: Dockerfile
     image: im-auth:latest
 
@@ -45,7 +45,7 @@ services:
   im-business:
     # 可以根据Dockerfile构建镜像（但是，Docker Compose 会在检测到上下文变化时重新构建镜像。也就是说如果你不修改Dockerfile docker-compose应该不是每次都构建镜像 实测确实如此）
     build:
-      context: ./im-business # 指定Dockerfile文件位置
+      context: ../../im-business # 指定Dockerfile文件位置
       dockerfile: Dockerfile # 指定名称
     image: im-business:latest # 指定生成镜像的 名称
 
@@ -76,7 +76,7 @@ services:
 
   im-connect:
     build:
-      context: ./im-connect
+      context: ../../im-connect
       dockerfile: Dockerfile
     image: im-connect:latest
     hostname: im-connect
@@ -98,7 +98,7 @@ services:
 
   im-console:
     build:
-      context: ./im-console
+      context: ../../im-console
       dockerfile: Dockerfile
     image: im-console:latest
     hostname: im-console
