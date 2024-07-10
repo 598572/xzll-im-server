@@ -3,7 +3,7 @@
 FROM openjdk:11-jre-slim
 # 挂载
 VOLUME /tmp
-COPY im-gateway.jar im-gateway.jar
+COPY ../../../target/im-gateway.jar im-gateway.jar
 # 启动命令
 ENTRYPOINT ["java", "-jar", "/im-gateway.jar"]
 # 暴露端口 与服务端口保持一致
