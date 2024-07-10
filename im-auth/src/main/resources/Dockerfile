@@ -3,7 +3,7 @@
 FROM openjdk:11-jre-slim
 # 挂载
 VOLUME /tmp
-COPY ../../../target/im-auth.jar im-auth.jar
+COPY im-auth.jar im-auth.jar
 # 启动命令
 ENTRYPOINT ["java", "-jar", "/im-auth.jar"]
 # 暴露端口 与服务端口保持一致

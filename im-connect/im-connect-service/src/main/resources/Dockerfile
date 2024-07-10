@@ -3,7 +3,7 @@
 FROM openjdk:11-jre-slim
 # 挂载
 VOLUME /tmp
-COPY ../../../target/im-connect-service.jar im-connect-service.jar
+COPY im-connect-service.jar im-connect-service.jar
 # 启动命令
 ENTRYPOINT ["java", "-jar", "/im-connect-service.jar"]
 
