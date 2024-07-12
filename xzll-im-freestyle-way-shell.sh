@@ -46,7 +46,7 @@ cd xzll-im/ || { log "Failed to enter project directory"; exit 1; }
 
 git fetch
 
-# 测试自动部署9
+# 测试push后自动部署
 
 git checkout jenkins_build_20240709
 
