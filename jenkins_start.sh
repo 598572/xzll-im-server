@@ -35,7 +35,10 @@ function start(){
     local runFlag=$(isRunning)
     echo "${runFlag}"
     if [ ${runFlag} -eq "0" ]; then
-        nohup ${java_home}/bin/java -jar ${jenkins_war_path}/jenkins.war --httpPort=${jenkins_http_port} > ${jenkins_log_path} 2>&1 &
+        # nohup ${java_home}/bin/java -jar ${jenkins_war_path}/jenkins.war --httpPort=${jenkins_http_port} > ${jenkins_log_path} 2>&1 &
+
+		    # 对jenkins内存大小进行限制 否则总是超内存 被系统kill
+        nohup ${java_home}/bin/java -Xms512m -Xmx2g -jar ${jenkins_war_path}/jenkins.war --httpPort=${jenkins_http_port} > ${jenkins_log_path} 2>&1 &
         if [ $? -eq 0 ]; then
             echo "Start Jenkins success."
             exit
