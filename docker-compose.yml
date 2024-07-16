@@ -317,28 +317,9 @@ services:
     depends_on:
       - redis
 
-#  jenkins:
-#    image: jenkins/jenkins:lts-jdk11 # jenkinsci/blueocean # jenkins/jenkins:2.452.2-lts # jenkins/jenkins:lts-jdk11 # jenkins/jenkins:lts 注意 这里需要指定版本否则拉取的镜像比较旧
-#    container_name: jenkins
-#    hostname: jenkins
-#    networks:
-#      - default_network
-#    privileged: true
-#    environment:
-#      - JAVA_OPTS=-Xmx2g -Xms1g
-#    ports:
-#      - "8079:8080"
-#      - "50000:50000"
-#    volumes:
-#      - /usr/local/soft_hzz/docker/jenkins/jenkins_home:/var/jenkins_home
-#    deploy:
-#      resources:
-#        limits:
-#          memory: 2g
-#        reservations:
-#          memory: 1g
-
 networks:
   default_network:
     # 使用docker默认网络即：（桥接模式）
     driver: bridge
+
+# 走两步，没事走两步
