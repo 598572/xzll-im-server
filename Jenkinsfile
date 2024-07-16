@@ -1,19 +1,20 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(
-            name: 'GIT_BRANCH',
-            choices: ['main', 'dev01', 'jenkins_build_20240709', 'docker_compose_way_bak','group_chat_dev_20240623'],
-            defaultValue: 'jenkins_build_20240709',
-            description: '选择Git分支' // 选择Git分支
-        )
-    }
+//     parameters {
+//         choice(
+//             name: 'GIT_BRANCH',
+//             choices: ['main', 'dev01', 'docker_compose_way_bak','group_chat_dev_20240623'],
+//             description: '选择Git分支' // 选择Git分支
+//         )
+//     }
+
+
 
     environment {
         COMPOSE_DIR = "/usr/local/soft_hzz/xzll-im/jar-file/jenkins_way_build_docker_compose/" // Docker Compose目录
         GIT_REPO = "git@github.com:598572/xzll-im.git" // Git仓库地址
-        GIT_BRANCH = "${params.GIT_BRANCH}" // 选择的Git分支
+        GIT_BRANCH = "jenkins_build_20240709" // 选择的Git分支
     }
 
     stages {
