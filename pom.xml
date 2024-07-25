@@ -57,6 +57,10 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <nacos.group.name>xzll-im</nacos.group.name>
 
+        <druid..version>1.2.8</druid..version>
+        <shardingsphere.version>5.2.1</shardingsphere.version>
+
+
         <spring-cloud-starter-oauth2.version>2.2.5.RELEASE</spring-cloud-starter-oauth2.version>
         <nimbus-jose-jwt.version>9.23</nimbus-jose-jwt.version>
 
@@ -140,6 +144,24 @@
                 <artifactId>mysql-connector-java</artifactId>
                 <version>8.0.23</version>
             </dependency>
+
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid</artifactId>
+                <version>${druid..version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.shardingsphere</groupId>
+                <artifactId>shardingsphere-jdbc-core-spring-boot-starter</artifactId>
+                <version>${shardingsphere.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>1.33</version>
+            </dependency>
+
             <!--The dependencies of some of the beans in the application context form a cycle: | com.github.pagehelper.autoconfigure.PageHelperAutoConfiguration-->
             <dependency>
                 <groupId>com.github.pagehelper</groupId>

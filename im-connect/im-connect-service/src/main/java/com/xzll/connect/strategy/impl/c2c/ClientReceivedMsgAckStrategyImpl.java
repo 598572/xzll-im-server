@@ -4,6 +4,7 @@ package com.xzll.connect.strategy.impl.c2c;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseRequest;
+import com.xzll.common.util.ChatIdUtils;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
@@ -52,6 +53,7 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
     private C2CReceivedMsgAckAO supportPojo(ImBaseRequest imBaseRequest) {
         C2CReceivedMsgAckAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CReceivedMsgAckAO.class);
         packet.setMsgType(imBaseRequest.getMsgType());
+        packet.setChatId(ChatIdUtils.buildC2CChatId(null, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
     }
 

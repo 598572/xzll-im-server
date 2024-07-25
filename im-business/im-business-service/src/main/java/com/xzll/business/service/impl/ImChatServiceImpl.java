@@ -2,14 +2,13 @@ package com.xzll.business.service.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
 import com.xzll.business.entity.mysql.ImChat;
 import com.xzll.business.mapper.ImChatMapper;
 import com.xzll.business.service.ImChatService;
-import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
-import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.core.convert.ConversionService;
@@ -45,16 +44,15 @@ public class ImChatServiceImpl implements ImChatService {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public boolean saveOrUpdateC2CChat(C2CSendMsgAO dto) {
         log.info("写入或更新会话信息入参:{}", JSONUtil.toJsonStr(dto));
-        String chatId = ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(dto.getFromUserId()), Long.valueOf(dto.getToUserId()));
-        LambdaQueryWrapper<ImChat> eq = Wrappers.lambdaQuery(ImChat.class).eq(ImChat::getChatId, chatId);
+        LambdaQueryWrapper<ImChat> eq = Wrappers.lambdaQuery(ImChat.class).eq(ImChat::getChatId, dto.getChatId());
         ImChat imChat = imChatMapper.selectOne(eq);
         int row = 0;
         if (Objects.nonNull(imChat)) {
             ImChat imChatUpdate = new ImChat();
-            imChatUpdate.setId(imChat.getId());
             imChatUpdate.setLastMsgId(dto.getMsgId());
             imChatUpdate.setLastMsgTime(dto.getMsgCreateTime());
-            row = imChatMapper.updateById(imChatUpdate);
+            LambdaUpdateWrapper<ImChat> updateParam = Wrappers.lambdaUpdate(ImChat.class).eq(ImChat::getChatId, dto.getChatId());
+            row = imChatMapper.update(imChatUpdate, updateParam);
         } else {
             ImChat imChatAdd = conversionService.convert(dto, ImChat.class);
             row = imChatMapper.insert(imChatAdd);

@@ -48,6 +48,19 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     @Resource
     private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
+
+    /**
+     * 根据分片键 获取数据（chat_id是（水平）分库的分片键 msg_id是（水平）分表的分片键），从而避免广播
+     *
+     * @param chatId
+     * @param msgId
+     * @return
+     */
+    private ImC2CMsgRecord getImC2CMsgRecordByShardingKey(String chatId, String msgId) {
+        LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getChatId, chatId).eq(ImC2CMsgRecord::getMsgId, msgId);
+        return imC2CMsgRecordMapper.selectOne(msgRecord);
+    }
+
     /**
      * 保存单聊消息记录
      *
@@ -65,16 +78,18 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
             log.info("保存单聊消息结果:{}", row);
         } else {
             //如果是重试消息 需要特殊处理
-            LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
-            ImC2CMsgRecord c2CMsgRecord = imC2CMsgRecordMapper.selectOne(msgRecord);
+            ImC2CMsgRecord c2CMsgRecord = getImC2CMsgRecordByShardingKey(dto.getChatId(), dto.getMsgId());
             if (Objects.nonNull(c2CMsgRecord)) {
+                //分库分表后，对此表的读写 能用分片键尽量用分片键 避免广播
+                LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getChatId, dto.getChatId()).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
                 c2CMsgRecord.setRetryCount(c2CMsgRecord.getRetryCount() + 1);
-                row = imC2CMsgRecordMapper.updateById(c2CMsgRecord);
+                row = imC2CMsgRecordMapper.update(c2CMsgRecord, updateParam);
                 log.info("更新重试次数row:{}", row);
             }
         }
         return row > 0;
     }
+
 
     /**
      * 更新消息状态为：离线
@@ -87,12 +102,11 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     public boolean updateC2CMsgOffLineStatus(C2COffLineMsgAO dto) {
         log.info("更新消息为离线入参:{}", JSONUtil.toJsonStr(dto));
         //如果是重试消息 需要特殊处理
-        LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
-        ImC2CMsgRecord dbResult = imC2CMsgRecordMapper.selectOne(msgRecord);
+        ImC2CMsgRecord dbResult = getImC2CMsgRecordByShardingKey(dto.getChatId(), dto.getMsgId());
         Assert.isTrue(Objects.nonNull(dbResult), "数据为空抛出异常待mq重试消费,一般顺序消费情况下，不会出现此异常");
         ImC2CMsgRecord updateValue = new ImC2CMsgRecord();
         updateValue.setMsgStatus(MsgStatusEnum.MsgStatus.OFF_LINE.getCode());
-        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId()).eq(ImC2CMsgRecord::getMsgStatus, MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
+        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getChatId, dto.getChatId()).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId()).eq(ImC2CMsgRecord::getMsgStatus, MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
         int update = imC2CMsgRecordMapper.update(updateValue, updateParam);
         log.info("更新离线消息结果:{}", update);
         return update > 0;
@@ -109,8 +123,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
         String currentName = MsgStatusEnum.MsgStatus.getNameByCode(dto.getMsgStatus());
         log.info("更新消息状态为:{}，入参:{}", currentName, JSONUtil.toJsonStr(dto));
         //如果是重试消息 需要特殊处理
-        LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
-        ImC2CMsgRecord dbResult = imC2CMsgRecordMapper.selectOne(msgRecord);
+        ImC2CMsgRecord dbResult = getImC2CMsgRecordByShardingKey(dto.getChatId(), dto.getMsgId());
         if (Objects.isNull(dbResult)) {
             log.error("数据为空,可能发送消息时数据未落库成功，或者顺序消费出现了乱序，需排查具体原因");
             //如果出现此情况 ， 则大概率是客户端发送消息时  rocketMQ的生产者/消费者出现了 生产消息失败，消费消息失败，或者入db时等等异常，
@@ -157,7 +170,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
         }
         ImC2CMsgRecord updateValue = new ImC2CMsgRecord();
         updateValue.setMsgStatus(dto.getMsgStatus());
-        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
+        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getChatId, dto.getChatId()).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
         int update = imC2CMsgRecordMapper.update(updateValue, updateParam);
         log.info("更新消息状态为:{}，结果:{}", currentName, update);
         return update > 0;
@@ -172,8 +185,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
     @Override
     public boolean updateC2CMsgWithdrawStatus(C2CWithdrawMsgAO dto) {
         log.info("更新消息为撤回状态_入参:{}", JSONUtil.toJsonStr(dto));
-        LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
-        ImC2CMsgRecord dbResult = imC2CMsgRecordMapper.selectOne(msgRecord);
+        ImC2CMsgRecord dbResult = getImC2CMsgRecordByShardingKey(dto.getChatId(), dto.getMsgId());
         if (Objects.isNull(dbResult)) {
             log.error("数据为空,可能发送消息时数据未落库成功，或者顺序消费出现了乱序，需排查具体原因");
             //如果出现此情况 ， 则大概率是客户端发送消息时  rocketMQ的生产者/消费者出现了 生产消息失败，消费消息失败，或者入db时等等异常，与客户端的ack消息的思路一样 不在赘述
@@ -186,7 +198,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
         }
         ImC2CMsgRecord updateValue = new ImC2CMsgRecord();
         updateValue.setMsgStatus(MsgStatusEnum.MsgWithdrawStatus.YES.getCode());
-        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
+        LambdaUpdateWrapper<ImC2CMsgRecord> updateParam = Wrappers.lambdaUpdate(ImC2CMsgRecord.class).eq(ImC2CMsgRecord::getChatId, dto.getChatId()).eq(ImC2CMsgRecord::getMsgId, dto.getMsgId());
         int update = imC2CMsgRecordMapper.update(updateValue, updateParam);
         log.info("更新消息状态为撤回_结果:{}", update);
         return update > 0;
