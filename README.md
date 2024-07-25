@@ -40,7 +40,7 @@
 2. redis集群部署
 3. elasticsearch集群部署
 4. canal 数据同步 mysql同步到es
-5. mysql分库分表
+5. mysql分库分表 ✅(暂时只对消息记录表做了分库分表，mysql暂时还未读写分离)
 1. 等等
 
 ## 本项目涉及到的 ***【功能点】***
