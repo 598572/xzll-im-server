@@ -153,7 +153,8 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         }
         String uidStr = String.valueOf(uid);
 
-        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, false);
+        //注意 此处 allowExtensions 要设置为true ，否则flutter客户端发送消息时 im-connect服务报错： io.netty.handler.codec.CorruptedFrameException: RSV != 0 and no extension negotiated, RSV:4
+        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(getWebSocketLocation(req), null, true);
         handShaker = wsFactory.newHandshaker(req);
         if (handShaker == null) {
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
