@@ -9,6 +9,7 @@ import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CSendMsgVO;
+import com.xzll.common.util.ChatIdUtils;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.pojo.base.ImBaseRequest;
 
@@ -82,6 +83,8 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         //以服务器时间为准
         packet.setMsgCreateTime(System.currentTimeMillis());
         packet.setMsgType(imBaseRequest.getMsgType());
+        //此处必须设置，因为 消息记录表 根据chat_id分库的，读写最好都是要分片键 避免 sharding sphere 广播
+        packet.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
     }
 

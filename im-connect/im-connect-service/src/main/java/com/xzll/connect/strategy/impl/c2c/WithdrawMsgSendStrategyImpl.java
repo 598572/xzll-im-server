@@ -3,8 +3,10 @@ package com.xzll.connect.strategy.impl.c2c;
 
 import cn.hutool.core.lang.Assert;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
+import com.xzll.common.util.ChatIdUtils;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
@@ -55,6 +57,7 @@ public class WithdrawMsgSendStrategyImpl extends MsgHandlerCommonAbstract implem
     public C2CWithdrawMsgAO supportPojo(ImBaseRequest msgBaseRequest) {
         C2CWithdrawMsgAO packet = objectMapper.convertValue(msgBaseRequest.getBody(), C2CWithdrawMsgAO.class);
         packet.setMsgType(msgBaseRequest.getMsgType());
+        packet.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
     }
 

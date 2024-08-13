@@ -4,7 +4,7 @@
 
 	<properties>
 		<property name="FILE_NAME">im-auth</property>
-		<property name="LOG_HOME">/logs</property> <!-- 设置日志输出目录为 /logs -->
+		<property name="LOG_HOME">${sys:user.dir}/logs</property> <!-- 设置日志输出目录为 /logs -->
 	</properties>
 
 	<Appenders>
@@ -18,7 +18,7 @@
 			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{trace_id}] - %msg%n" />
 			<Policies>
 				<TimeBasedTriggeringPolicy />
-				<SizeBasedTriggeringPolicy size="2000MB" />
+				<SizeBasedTriggeringPolicy size="200MB" />
 			</Policies>
 
 			<DefaultRolloverStrategy max="40" />

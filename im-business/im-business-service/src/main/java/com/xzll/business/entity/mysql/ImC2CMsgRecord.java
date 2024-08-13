@@ -20,7 +20,8 @@ public class ImC2CMsgRecord implements Serializable {
 
     private static final long serialVersionUID = -1L;
 
-    @TableId(type = IdType.AUTO)
+    //分库分表后 主键id 无需自增 改用雪花算法（在sharding sphere 中配置）
+//    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**
@@ -49,7 +50,7 @@ public class ImC2CMsgRecord implements Serializable {
     private String msgContent;
 
     /**
-     * 消息唯一id
+     * 消息唯一id （水平）分表时的分片键
      */
     private String msgId;
 
@@ -82,6 +83,11 @@ public class ImC2CMsgRecord implements Serializable {
      * 撤回标志 0 未撤回 1 已撤回
      */
     private Integer withdrawFlag;
+
+    /**
+     * 会话id （水平）分库时的分片键
+     */
+    private String chatId;
 
     
 

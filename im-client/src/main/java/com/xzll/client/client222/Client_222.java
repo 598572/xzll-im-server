@@ -15,7 +15,7 @@ public class Client_222 {
     public static final String LOCAL = "127.0.0.1";
 
     public static void start(String[] args) {
-        WebsocketClient222 websocketClient222 = new WebsocketClient222(XUNIJI_家, 10001);
+        WebsocketClient222 websocketClient222 = new WebsocketClient222(LOCAL, 10001);
         try {
             websocketClient222.run();
         } catch (InterruptedException e) {
