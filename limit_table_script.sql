@@ -25,7 +25,6 @@ BEGIN
             update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL COMMENT "更新时间",
             msg_id VARCHAR(100) NOT NULL COMMENT "消息唯一id",
             msg_format TINYINT NOT NULL COMMENT "消息格式（1 文本，2 语音 ，3地理位置）",
-            msg_type TINYINT NOT NULL COMMENT "消息类型（待定）",
             msg_content VARCHAR(5000) NOT NULL COMMENT "消息内容",
             msg_create_time BIGINT NOT NULL COMMENT "消息发送时间 精确到毫秒的时间戳",
             retry_count INT DEFAULT 0 NOT NULL,

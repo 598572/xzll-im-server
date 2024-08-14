@@ -18,31 +18,20 @@ public class ImBaseResponse<T> implements Serializable {
     private static final long serialVersionUID = -1L;
 
     //消息类型
-    private MsgType msgType;
+    private String url;
     //消息业务属性和内容
     private T body;
     //附加属性 用于扩展
     private Map<String, String> extraMap;
 
 
-    @Getter
-    @Setter
-    public static class MsgType implements Serializable {
-        private int firstLevelMsgType;
-        private int secondLevelMsgType;
+
+
+    public static <T> ImBaseResponse buildPushToClientData(ImBaseRequest baseRequest, T data, Map<String, String> extraMap) {
+        return new ImBaseResponse(baseRequest.getUrl(), data, extraMap);
     }
 
-    public static <T> ImBaseResponse buildPushToClientData(ImBaseRequest msgType, T data, Map<String, String> extraMap) {
-        MsgType msgTypeResponse = new MsgType();
-        msgTypeResponse.setFirstLevelMsgType(msgType.getMsgType().getFirstLevelMsgType());
-        msgTypeResponse.setSecondLevelMsgType(msgType.getMsgType().getSecondLevelMsgType());
-        return new ImBaseResponse(msgTypeResponse, data, extraMap);
-    }
-
-    public static <T> ImBaseResponse buildPushToClientData(ImBaseResponse.MsgType msgType, T data) {
-        MsgType msgTypeResponse = new MsgType();
-        msgTypeResponse.setFirstLevelMsgType(msgType.getFirstLevelMsgType());
-        msgTypeResponse.setSecondLevelMsgType(msgType.getSecondLevelMsgType());
-        return new ImBaseResponse(msgTypeResponse, data, null);
+    public static <T> ImBaseResponse buildPushToClientData(String url, T data) {
+        return new ImBaseResponse(url, data, null);
     }
 }

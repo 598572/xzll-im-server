@@ -38,7 +38,7 @@ public class RpcSendMsg2ClientImpl implements RpcSendMsg2ClientApi {
         C2CServerReceivedMsgAckVO ackVo = (C2CServerReceivedMsgAckVO) packet;
         Assert.isTrue(Objects.nonNull(ackVo) && StringUtils.isNotBlank(ackVo.getToUserId()), "发送服务端ack时缺少必填参数");
         // 构建&响应服务端是否接收成功消息
-        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackVo.getMsgType(), ackVo);
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(packet.getUrl(), ackVo);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(ackVo.getToUserId());
         boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
@@ -51,7 +51,7 @@ public class RpcSendMsg2ClientImpl implements RpcSendMsg2ClientApi {
         C2CClientReceivedMsgAckVO ackDTO = (C2CClientReceivedMsgAckVO) packet;
         Assert.isTrue(Objects.nonNull(ackDTO) && StringUtils.isNotBlank(ackDTO.getToUserId()), "发送客户端ack时缺少必填参数");
         //构建&响应 消息接收方客户端是否接收成功消息
-        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getMsgType(), ackDTO);
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getUrl(), ackDTO);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(ackDTO.getToUserId());
         boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
@@ -63,7 +63,7 @@ public class RpcSendMsg2ClientImpl implements RpcSendMsg2ClientApi {
         Assert.isTrue(Objects.nonNull(packet), "参数错误");
         C2CWithdrawMsgVO withdrawMsgVo = (C2CWithdrawMsgVO) packet;
         //构建&响应 消息接收方客户端是否接收成功消息
-        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getMsgType(), withdrawMsgVo);
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getUrl(), withdrawMsgVo);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(withdrawMsgVo.getToUserId());
         boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;

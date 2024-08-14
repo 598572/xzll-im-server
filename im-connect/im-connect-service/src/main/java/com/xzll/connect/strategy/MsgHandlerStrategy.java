@@ -20,7 +20,7 @@ public interface MsgHandlerStrategy {
     /**
      * 适配
      */
-    boolean support(ImBaseRequest.MsgType type);
+    boolean support(ImBaseRequest url);
 
     //---------------------------------------------长连接-----------------------------------------------------
 

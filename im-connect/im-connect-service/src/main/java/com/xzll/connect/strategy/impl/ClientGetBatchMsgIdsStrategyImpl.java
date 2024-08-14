@@ -3,8 +3,7 @@ package com.xzll.connect.strategy.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.base.ImBaseResponse;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.response.ClientGetBatchMsgIdVO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
@@ -13,11 +12,10 @@ import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
-
 import javax.annotation.Resource;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * @Author: hzz
@@ -39,13 +37,12 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
     /**
      * 策略适配
      *
-     * @param msgType
+     * @param baseRequest
      * @return
      */
     @Override
-    public boolean support(ImBaseRequest.MsgType msgType) {
-        return Objects.nonNull(msgType) && msgType.getFirstLevelMsgType() == MsgTypeEnum.FirstLevelMsgType.GET_DATA_MSG.getCode()
-                && MsgTypeEnum.SecondLevelMsgType.GET_MSG_IDS.getCode() == msgType.getSecondLevelMsgType();
+    public boolean support(ImBaseRequest baseRequest) {
+        return StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.GET_BATCH_MSG_ID);
     }
 
     /**
@@ -56,7 +53,7 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
      */
     private ClientGetMsgIdsAO supportPojo(ImBaseRequest imBaseRequest) {
         ClientGetMsgIdsAO packet = objectMapper.convertValue(imBaseRequest.getBody(), ClientGetMsgIdsAO.class);
-        packet.setMsgType(imBaseRequest.getMsgType());
+        packet.setUrl(imBaseRequest.getUrl());
         return packet;
     }
 
@@ -68,10 +65,7 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
         //1. 生成一批消息id
         List<String> msgIds = msgIdUtilsService.generateBatchMessageId(Long.parseLong(packet.getFromUserId()), false);
         ClientGetBatchMsgIdVO rsp = new ClientGetBatchMsgIdVO();
-        ImBaseResponse.MsgType msgType = new ImBaseResponse.MsgType();
-        msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.GET_DATA_MSG.getCode());
-        msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.GET_MSG_IDS.getCode());
-        rsp.setMsgType(msgType);
+        rsp.setUrl(imBaseRequest.getUrl());
         rsp.setMsgIds(msgIds);
         super.msgSendTemplate(TAG, ctx.channel(), JSONUtil.toJsonStr(rsp));
         log.debug("客户端批量获取消息id_结束");

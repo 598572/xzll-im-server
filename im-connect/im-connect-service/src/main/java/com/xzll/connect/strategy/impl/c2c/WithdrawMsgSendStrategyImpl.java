@@ -4,11 +4,11 @@ package com.xzll.connect.strategy.impl.c2c;
 import cn.hutool.core.lang.Assert;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
-import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
@@ -38,14 +38,14 @@ public class WithdrawMsgSendStrategyImpl extends MsgHandlerCommonAbstract implem
     private C2CMsgProvider c2CMsgProvider;
 
     /**
-     * 策略适配
+     * 通过url路由不同的策略
      *
-     * @param msgType
+     * @param baseRequest
      * @return
      */
     @Override
-    public boolean support(ImBaseRequest.MsgType msgType) {
-        return ImBaseRequest.checkSupport(msgType, MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode(), MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
+    public boolean support(ImBaseRequest baseRequest) {
+        return StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.WITHDRAW);
     }
 
     /**
@@ -56,7 +56,7 @@ public class WithdrawMsgSendStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     public C2CWithdrawMsgAO supportPojo(ImBaseRequest msgBaseRequest) {
         C2CWithdrawMsgAO packet = objectMapper.convertValue(msgBaseRequest.getBody(), C2CWithdrawMsgAO.class);
-        packet.setMsgType(msgBaseRequest.getMsgType());
+        packet.setUrl(msgBaseRequest.getUrl());
         packet.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
     }

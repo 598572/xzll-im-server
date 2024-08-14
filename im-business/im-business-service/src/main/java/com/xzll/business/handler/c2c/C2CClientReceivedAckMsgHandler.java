@@ -5,8 +5,6 @@ import com.xzll.business.service.ImC2CMsgRecordService;
 
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
@@ -21,9 +19,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
 import javax.annotation.Resource;
-import java.util.Objects;
 
 /**
  * @Author: hzz
@@ -69,23 +65,13 @@ public class C2CClientReceivedAckMsgHandler {
 
     public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(C2CReceivedMsgAckAO packet) {
         C2CClientReceivedMsgAckVO clientReceivedMsgAckDTO = new C2CClientReceivedMsgAckVO();
-        ImBaseResponse.MsgType msgType = new ImBaseResponse.MsgType();
-        msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
-        int secondLevelMsgType = 0;
-        if (Objects.equals(packet.getMsgStatus(), MsgStatusEnum.MsgStatus.UN_READ.getCode())) {
-            secondLevelMsgType = MsgTypeEnum.SecondLevelMsgType.UN_READ.getCode();
-        }
-        if (Objects.equals(packet.getMsgStatus(), MsgStatusEnum.MsgStatus.READED.getCode())) {
-            secondLevelMsgType = MsgTypeEnum.SecondLevelMsgType.READ.getCode();
-        }
-        msgType.setSecondLevelMsgType(secondLevelMsgType);
         clientReceivedMsgAckDTO.setAckTextDesc(MsgStatusEnum.MsgStatus.getNameByCode(packet.getMsgStatus()))
                 .setMsgReceivedStatus(packet.getMsgStatus())
                 .setReceiveTime(System.currentTimeMillis())
                 .setChatId(packet.getChatId())
                 //toUser是目标客户端也就是 最初发消息的发送方，对于接收方响应ack时来说 发送方就变成：toUserId 了
                 .setToUserId(packet.getToUserId())
-                .setMsgType(msgType);
+                .setUrl(packet.getUrl());
         clientReceivedMsgAckDTO.setMsgId(packet.getMsgId());
         return clientReceivedMsgAckDTO;
     }

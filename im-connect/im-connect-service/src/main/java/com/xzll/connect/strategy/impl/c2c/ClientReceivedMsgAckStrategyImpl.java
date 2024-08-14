@@ -2,7 +2,7 @@ package com.xzll.connect.strategy.impl.c2c;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.util.ChatIdUtils;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
@@ -11,10 +11,11 @@ import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+
 import javax.annotation.Resource;
 
-import java.util.Objects;
 
 /**
  * @Author: hzz
@@ -30,18 +31,16 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
     @Resource
     private C2CMsgProvider c2CMsgProvider;
 
+
     /**
-     * 策略适配
+     * 通过url路由不同的策略
      *
-     * @param msgType
+     * @param baseRequest
      * @return
      */
     @Override
-    public boolean support(ImBaseRequest.MsgType msgType) {
-        return Objects.nonNull(msgType) &&
-                msgType.getFirstLevelMsgType() == MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode()
-                && (MsgTypeEnum.SecondLevelMsgType.UN_READ.getCode() == msgType.getSecondLevelMsgType()
-                || MsgTypeEnum.SecondLevelMsgType.READ.getCode() == msgType.getSecondLevelMsgType());
+    public boolean support(ImBaseRequest baseRequest) {
+        return StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.TO_USER_READ_ACK) || StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.TO_USER_UN_READ_ACK);
     }
 
     /**
@@ -52,7 +51,7 @@ public class ClientReceivedMsgAckStrategyImpl extends MsgHandlerCommonAbstract i
      */
     private C2CReceivedMsgAckAO supportPojo(ImBaseRequest imBaseRequest) {
         C2CReceivedMsgAckAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CReceivedMsgAckAO.class);
-        packet.setMsgType(imBaseRequest.getMsgType());
+        packet.setUrl(imBaseRequest.getUrl());
         packet.setChatId(ChatIdUtils.buildC2CChatId(null, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
     }

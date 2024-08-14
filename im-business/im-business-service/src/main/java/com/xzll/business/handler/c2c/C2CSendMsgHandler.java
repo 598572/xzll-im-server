@@ -4,9 +4,8 @@ import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
@@ -72,16 +71,13 @@ public class C2CSendMsgHandler {
      */
     public static C2CServerReceivedMsgAckVO getServerReceivedMsgAckVO(C2CSendMsgAO packet) {
         C2CServerReceivedMsgAckVO c2CServerReceivedMsgAckVO = new C2CServerReceivedMsgAckVO();
-        ImBaseResponse.MsgType msgType = new ImBaseResponse.MsgType();
-        msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
-        msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.SERVER_RECEIVE_ACK.getCode());
         c2CServerReceivedMsgAckVO.setAckTextDesc(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getDesc())
                 .setMsgReceivedStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())
                 .setReceiveTime(System.currentTimeMillis())
                 .setChatId(packet.getChatId())
                 //toUser是目标客户端也就是 发送方：fromUserId
                 .setToUserId(packet.getFromUserId())
-                .setMsgType(msgType);
+                .setUrl(ImSourceUrlConstant.C2C.SERVER_RECEIVE_ACK);
         c2CServerReceivedMsgAckVO.setMsgId(packet.getMsgId());
         return c2CServerReceivedMsgAckVO;
     }

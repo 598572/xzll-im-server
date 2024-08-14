@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 public class GroupCreateStrategyImpl  extends MsgHandlerCommonAbstract implements MsgHandlerStrategy {
 
     @Override
-    public boolean support(ImBaseRequest.MsgType type) {
+    public boolean support(ImBaseRequest baseRequest) {
         return false;
     }
 }

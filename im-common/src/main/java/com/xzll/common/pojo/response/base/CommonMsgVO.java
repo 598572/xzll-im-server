@@ -1,7 +1,6 @@
 package com.xzll.common.pojo.response.base;
 
 
-import com.xzll.common.pojo.base.ImBaseResponse;
 import lombok.Setter;
 
 import java.io.Serializable;
@@ -16,8 +15,17 @@ public class CommonMsgVO implements Serializable {
     private static final long serialVersionUID = -1L;
 
     private String msgId;
-    private ImBaseResponse.MsgType msgType;
+    private String url;
     private Long msgCreateTime;
+
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
 
     public String getMsgId() {
         return msgId;
@@ -27,13 +35,6 @@ public class CommonMsgVO implements Serializable {
         this.msgId = msgId;
     }
 
-    public ImBaseResponse.MsgType getMsgType() {
-        return msgType;
-    }
-
-    public void setMsgType(ImBaseResponse.MsgType msgType) {
-        this.msgType = msgType;
-    }
 
     public void setMsgCreateTime(Long msgCreateTime) {
         this.msgCreateTime = msgCreateTime;

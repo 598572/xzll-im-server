@@ -39,7 +39,7 @@ public class HandlerDispatcher implements ApplicationContextAware {
             return;
         }
         for (MsgHandlerStrategy item : exchangers) {
-            if (item.support(packet.getMsgType())) {
+            if (item.support(packet)) {
                 item.exchange(ctx, packet);
             }
         }
@@ -56,7 +56,7 @@ public class HandlerDispatcher implements ApplicationContextAware {
             return WebBaseResponse.returnResultError("无处理器");
         }
         for (MsgHandlerStrategy item : exchangers) {
-            if (item.support(packet.getMsgType())) {
+            if (item.support(packet)) {
                 return item.exchange(packet);
             }
         }
@@ -73,7 +73,7 @@ public class HandlerDispatcher implements ApplicationContextAware {
             return WebBaseResponse.returnResultError("无处理器");
         }
         for (MsgHandlerStrategy item : exchangers) {
-            if (item.support(msg.getMsgType())) {
+            if (item.support(msg)) {
                 return item.receiveAndSendMsg(msg);
             }
         }

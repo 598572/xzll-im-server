@@ -1,8 +1,9 @@
 package com.xzll.common.pojo.base;
 
 
-
+import cn.hutool.core.lang.Assert;
 import lombok.*;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -21,24 +22,18 @@ public class ImBaseRequest<T> implements Serializable {
     private static final long serialVersionUID = -1L;
 
     //消息类型
-    private MsgType msgType;
+    private String url;
     //消息业务属性和内容
     private T body;
     //附加属性 用于扩展
     private Map<String, String> extraMap;
 
 
-    @Getter
-    @Setter
-    public static class MsgType implements Serializable{
 
-        private int firstLevelMsgType;
-        private int secondLevelMsgType;
-    }
 
-    public static boolean checkSupport(MsgType msgType, int firstLevelMsgTypeCode, int secondLevelMsgTypeCode) {
-        return Objects.nonNull(msgType) &&
-                msgType.getFirstLevelMsgType() == firstLevelMsgTypeCode && msgType.getSecondLevelMsgType() == secondLevelMsgTypeCode;
+    public static boolean checkSupport(String url, String requestUrl) {
+        Assert.isTrue(StringUtils.isNotBlank(url) && StringUtils.isNotBlank(requestUrl), "url参数有误");
+        return StringUtils.equals(url,requestUrl);
     }
 
 }

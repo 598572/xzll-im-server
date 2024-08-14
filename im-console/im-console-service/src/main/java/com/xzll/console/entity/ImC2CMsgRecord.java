@@ -63,10 +63,6 @@ public class ImC2CMsgRecord implements Serializable {
      */
     private Integer msgFormat;
 
-    /**
-     * 消息类型
-     */
-    private Integer msgType;
 
     /**
      * 消息状态

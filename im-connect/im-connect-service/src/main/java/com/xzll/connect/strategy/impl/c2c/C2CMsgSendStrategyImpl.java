@@ -6,6 +6,7 @@ import cn.hutool.json.JSONUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CSendMsgVO;
@@ -21,7 +22,6 @@ import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
 import com.xzll.connect.pojo.dto.ServerInfoDTO;
 import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.connect.service.TransferC2CMsgService;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
@@ -61,15 +61,16 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     @Resource
     private C2CMsgProvider c2CMsgProvider;
 
+
     /**
-     * 策略适配
+     * 通过url路由不同的策略
      *
-     * @param msgType
+     * @param baseRequest
      * @return
      */
     @Override
-    public boolean support(ImBaseRequest.MsgType msgType) {
-        return ImBaseRequest.checkSupport(msgType, MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode(), MsgTypeEnum.SecondLevelMsgType.C2C.getCode());
+    public boolean support(ImBaseRequest baseRequest) {
+        return StringUtils.equals(ImSourceUrlConstant.C2C.SEND, baseRequest.getUrl());
     }
 
     /**
@@ -82,7 +83,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         C2CSendMsgAO packet = objectMapper.convertValue(imBaseRequest.getBody(), C2CSendMsgAO.class);
         //以服务器时间为准
         packet.setMsgCreateTime(System.currentTimeMillis());
-        packet.setMsgType(imBaseRequest.getMsgType());
+        packet.setUrl(imBaseRequest.getUrl());
         //此处必须设置，因为 消息记录表 根据chat_id分库的，读写最好都是要分片键 避免 sharding sphere 广播
         packet.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(packet.getFromUserId()), Long.valueOf(packet.getToUserId())));
         return packet;
@@ -168,7 +169,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
                 .build();
         build.setMsgId(packet.getMsgId());
         build.setChatId(packet.getChatId());
-        build.setMsgType(packet.getMsgType());
+        build.setUrl(packet.getUrl());
         build.setMsgCreateTime(packet.getMsgCreateTime());
         return build;
     }

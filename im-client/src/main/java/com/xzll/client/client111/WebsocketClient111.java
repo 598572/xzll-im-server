@@ -5,7 +5,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
 import com.xzll.client.client222.WebsocketClient222;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.constant.MsgTypeEnum;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
@@ -116,8 +116,8 @@ public class WebsocketClient111 {
                     continue;
                 }
 
-                //String s = sc.nextLine();
-                String s="你好啊 我发消息压死你，第"+i+"条消息";
+                String s = sc.nextLine();
+//                String s="你好啊 我发消息压死你，第"+i+"条消息";
                 i++;
                 try {
                     Thread.sleep(500);
@@ -128,10 +128,7 @@ public class WebsocketClient111 {
                     String msgId = WebsocketClientHandler111.msgIds.remove(0);
                     Assert.isTrue(StringUtils.isNotBlank(msgId), "无msgId可用");
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<C2CSendMsgAO>();
-                    ImBaseRequest.MsgType msgType = new ImBaseRequest.MsgType();
-                    msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode());
-                    msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.C2C.getCode());
-                    imBaseRequest.setMsgType(msgType);
+                    imBaseRequest.setUrl(ImSourceUrlConstant.C2C.SEND);
                     C2CSendMsgAO c2CMsgRequestDTO = new C2CSendMsgAO();
                     c2CMsgRequestDTO.setMsgId(msgId);
                     c2CMsgRequestDTO.setMsgContent(s);
@@ -156,10 +153,7 @@ public class WebsocketClient111 {
 
     private void getMsgIds(ChannelFuture channelFuture) {
         ImBaseRequest<ClientGetMsgIdsAO> getMsgIds = new ImBaseRequest<ClientGetMsgIdsAO>();
-        ImBaseRequest.MsgType msgTypeGetMsgIds = new ImBaseRequest.MsgType();
-        msgTypeGetMsgIds.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.GET_DATA_MSG.getCode());
-        msgTypeGetMsgIds.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.GET_MSG_IDS.getCode());
-        getMsgIds.setMsgType(msgTypeGetMsgIds);
+        getMsgIds.setUrl(ImSourceUrlConstant.C2C.GET_BATCH_MSG_ID);
         ClientGetMsgIdsAO msgIdsDTO = new ClientGetMsgIdsAO();
         msgIdsDTO.setFromUserId(VALUE);
         getMsgIds.setBody(msgIdsDTO);

@@ -22,7 +22,6 @@ public interface C2CMsgMapping  extends Converter<C2CSendMsgAO, ImC2CMsgRecord> 
      */
     @Override
     @Mapping(target = "msgFormat", defaultValue = "1")
-    @Mapping(target = "msgType", expression = "java(dto.getMsgType().getFirstLevelMsgType())")
     ImC2CMsgRecord convert(C2CSendMsgAO dto);
 
 

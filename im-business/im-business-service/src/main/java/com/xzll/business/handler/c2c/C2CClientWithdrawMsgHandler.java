@@ -4,8 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.constant.MsgTypeEnum;
-import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
@@ -69,10 +67,6 @@ public class C2CClientWithdrawMsgHandler {
     public static C2CWithdrawMsgVO getC2CWithdrawMsgVO(C2CWithdrawMsgAO packet) {
         C2CWithdrawMsgVO c2CWithdrawMsgVo = new C2CWithdrawMsgVO();
         BeanUtil.copyProperties(packet, c2CWithdrawMsgVo);
-        ImBaseResponse.MsgType msgType = new ImBaseResponse.MsgType();
-        msgType.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode());
-        msgType.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode());
-        c2CWithdrawMsgVo.setMsgType(msgType);
         return c2CWithdrawMsgVo;
     }
 }

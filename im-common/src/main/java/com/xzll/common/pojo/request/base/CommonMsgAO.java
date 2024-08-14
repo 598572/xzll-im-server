@@ -20,7 +20,7 @@ public class CommonMsgAO implements Serializable {
 
     private String msgId;
 
-    private ImBaseRequest.MsgType msgType;
+    private String url;
 
     private Long msgCreateTime;
 

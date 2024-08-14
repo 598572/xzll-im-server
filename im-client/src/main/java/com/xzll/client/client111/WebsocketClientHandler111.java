@@ -5,8 +5,8 @@ import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.constant.MsgTypeEnum;
 import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.pojo.base.ImBaseResponse;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
@@ -99,17 +99,13 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
 
             System.out.println("用户：（ " + WebsocketClient111.VALUE + " ），接收到TextWebSocketFrame消息，消息内容是: " + textFrame.text());
             ImBaseResponse imBaseResponse = JSON.parseObject(textFrame.text(), ImBaseResponse.class);
-            ImBaseResponse.MsgType msgType = imBaseResponse.getMsgType();
 
             //模拟接收到单聊消息后 receive client 返回已读 or 未读
-            int firstLevelMsgType = msgType.getFirstLevelMsgType();
-            int secondLevelMsgType = msgType.getSecondLevelMsgType();
 
             /**
              * 给发送者回复未读/已读消息
              */
-            if (firstLevelMsgType == MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode()
-                    && secondLevelMsgType == MsgTypeEnum.SecondLevelMsgType.C2C.getCode()) {
+            if (imBaseResponse.getUrl().equals(ImSourceUrlConstant.C2C.SEND)) {
 
                 JSONObject jsonObject = JSON.parseObject(textFrame.text());
                 String msgId = jsonObject.getObject("msgId", String.class);
@@ -123,14 +119,9 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
                 //模拟接收方已读 发送成功ack
                 c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
 
-
-                ImBaseRequest.MsgType request = new ImBaseRequest.MsgType();
-                request.setFirstLevelMsgType(MsgTypeEnum.FirstLevelMsgType.ACK_MSG.getCode());
-                request.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.UN_READ.getCode());
-
                 ImBaseRequest imBaseRequest = new ImBaseRequest<>();
 
-                imBaseRequest.setMsgType(request);
+                imBaseRequest.setUrl(ImSourceUrlConstant.C2C.TO_USER_UN_READ_ACK);
                 imBaseRequest.setBody(c2CReceivedMsgAckAO);
 
                 //模拟未读
@@ -138,9 +129,9 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
                 System.out.println("发送未读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
 
                 //模拟已读
-                request.setSecondLevelMsgType(MsgTypeEnum.SecondLevelMsgType.READ.getCode());
+
                 c2CReceivedMsgAckAO.setMsgStatus(MsgStatusEnum.MsgStatus.READED.getCode());
-                imBaseRequest.setMsgType(request);
+                imBaseRequest.setUrl(ImSourceUrlConstant.C2C.TO_USER_READ_ACK);
                 imBaseRequest.setBody(c2CReceivedMsgAckAO);
                 ctx.channel().writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(imBaseRequest)));
                 System.out.println("发送已读完成，data: " + JSONUtil.toJsonStr(imBaseRequest));
@@ -148,33 +139,28 @@ public class WebsocketClientHandler111 extends SimpleChannelInboundHandler<Objec
             /**
              * 处理单聊消息
              */
-            if (MsgTypeEnum.FirstLevelMsgType.CHAT_MSG.getCode() == firstLevelMsgType) {
-                if (MsgTypeEnum.SecondLevelMsgType.C2C.getCode() == secondLevelMsgType) {
-                    JSONObject jsonObject = JSON.parseObject(textFrame.text());
-                    String msgContent = jsonObject.getObject("msgContent", String.class);
-                    String fromUserId = jsonObject.getObject("fromUserId", String.class);
-                    System.out.println("【" + fromUserId + "】: " + msgContent);
-                }
+            if (imBaseResponse.getUrl().equals(ImSourceUrlConstant.C2C.SEND)) {
+                JSONObject jsonObject = JSON.parseObject(textFrame.text());
+                String msgContent = jsonObject.getObject("msgContent", String.class);
+                String fromUserId = jsonObject.getObject("fromUserId", String.class);
+                System.out.println("【" + fromUserId + "】: " + msgContent);
             }
             /**
              * 处理获取消息id的消息
              */
-            if (MsgTypeEnum.FirstLevelMsgType.GET_DATA_MSG.getCode() == firstLevelMsgType) {
-                if (MsgTypeEnum.SecondLevelMsgType.GET_MSG_IDS.getCode() == secondLevelMsgType) {
-                    JSONObject jsonObject = JSON.parseObject(textFrame.text());
-                    List<String> msgIds = jsonObject.getObject("msgIds", List.class);
-                    System.out.println("获取到一批消息id,长度:" + msgIds.size());
-                    if (!CollectionUtils.isEmpty(msgIds)) {
-                        WebsocketClientHandler111.msgIds.addAll(msgIds);
-                        WebsocketClient111.getMsgFlag = false;
-                    }
+            if (imBaseResponse.getUrl().equals(ImSourceUrlConstant.C2C.GET_BATCH_MSG_ID)) {
+                JSONObject jsonObject = JSON.parseObject(textFrame.text());
+                List<String> msgIds = jsonObject.getObject("msgIds", List.class);
+                System.out.println("获取到一批消息id,长度:" + msgIds.size());
+                if (!CollectionUtils.isEmpty(msgIds)) {
+                    WebsocketClientHandler111.msgIds.addAll(msgIds);
+                    WebsocketClient111.getMsgFlag = false;
                 }
+
             }
 
-            if (MsgTypeEnum.FirstLevelMsgType.COMMAND_MSG.getCode() == firstLevelMsgType) {
-                if (MsgTypeEnum.SecondLevelMsgType.WITHDRAW.getCode() == secondLevelMsgType) {
-                    System.out.println("接收到撤回消息的指令，内容：" + textFrame.text());
-                }
+            if (imBaseResponse.getUrl().equals(ImSourceUrlConstant.C2C.WITHDRAW)) {
+                System.out.println("接收到撤回消息的指令，内容：" + textFrame.text());
             }
         } else if (frame instanceof BinaryWebSocketFrame) {
             System.out.println("客户端：接收到BinaryWebSocketFrame消息，消息内容是-- ");
