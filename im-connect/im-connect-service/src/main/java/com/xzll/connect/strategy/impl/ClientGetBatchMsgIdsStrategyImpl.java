@@ -42,7 +42,7 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
      */
     @Override
     public boolean support(ImBaseRequest baseRequest) {
-        return StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.GET_BATCH_MSG_ID);
+        return ImBaseRequest.checkSupport(baseRequest.getUrl(), ImSourceUrlConstant.C2C.GET_BATCH_MSG_ID);
     }
 
     /**

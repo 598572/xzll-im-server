@@ -28,7 +28,6 @@ public interface ImSourceUrlConstant {
         //接收方响应 已读ack
         public static final String TO_USER_READ_ACK = C2C_BASE + "/response/ack/toUser/read";
 
-
     }
 
     /**
@@ -38,6 +37,12 @@ public interface ImSourceUrlConstant {
         public static final String GROUP_BASE = BASE_URL + "/group";
 
     }
+
+
+    /**
+     * 最近会话列表
+     */
+    public static final String LAST_CHAT_LIST = BASE_URL + "/last/chat/list";
 
 
 }

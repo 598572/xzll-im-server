@@ -6,7 +6,6 @@ package com.xzll.common.pojo.base;
 
 
 import com.xzll.common.constant.answercode.AnswerCode;
-import com.xzll.common.constant.answercode.ImAnswerCode;
 
 import java.io.Serializable;
 
@@ -88,7 +87,7 @@ public class WebBaseResponse<T> implements Serializable{
 	 * @param <T>
 	 * @return
 	 */
-	public static <T> WebBaseResponse<T> returnResultError(ImAnswerCode anwserCode) {
+	public static <T> WebBaseResponse<T> returnResultError(AnswerCode anwserCode) {
 		if(anwserCode == null) {
 			return returnResultError("操作失败");
 		}

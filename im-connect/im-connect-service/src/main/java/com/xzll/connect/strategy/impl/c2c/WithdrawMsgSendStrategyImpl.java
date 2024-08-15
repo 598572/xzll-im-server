@@ -45,7 +45,7 @@ public class WithdrawMsgSendStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     @Override
     public boolean support(ImBaseRequest baseRequest) {
-        return StringUtils.equals(baseRequest.getUrl(), ImSourceUrlConstant.C2C.WITHDRAW);
+        return ImBaseRequest.checkSupport(baseRequest.getUrl(), ImSourceUrlConstant.C2C.WITHDRAW);
     }
 
     /**

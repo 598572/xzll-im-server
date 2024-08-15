@@ -1,13 +1,9 @@
-
-
-
 -- 目前有两个数据源，数据源创建： create database xzll_im_db_0; create database xzll_im_db_1;
-
-
--- 此存储过程，用于批量创建 表 ，在分表时使用。
-
+-- 此存储过程，用于批量创建 消息记录表表 ，在分表时使用。
 
 DELIMITER $$
+
+drop procedure create_msg_record_tables;
 
 CREATE PROCEDURE create_msg_record_tables()
 BEGIN
@@ -93,26 +89,3 @@ FROM (
          UNION ALL
          SELECT count(1) AS count FROM im_c2c_msg_record_9
      ) AS combined_counts;
-
-
--- 会话表
--- auto-generated definition
-create table im_chat
-(
-    id            bigint auto_increment comment '主键'
-        primary key,
-    chat_id       varchar(255)                           not null comment '会话id：单聊时：（业务类型-会话类型-更小的userId-更大的userId） 群聊时（业务类型-会话类型-发起群聊的userId-时间戳） ',
-    from_user_id  varchar(100)                           not null comment '发起会话方',
-    to_user_id    varchar(100)                           not null comment '被发起会话方,群聊的话固定为-1',
-    last_msg_id   varchar(100) default ''                not null comment '此会话最后一条消息id',
-    last_msg_time bigint                                 null comment '此会话最后一条消息时间',
-    chat_type     tinyint                                not null comment '会话类型，1单聊，2群聊',
-    create_time   datetime     default CURRENT_TIMESTAMP not null comment '创建时间',
-    update_time   datetime     default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint idx_chat_id
-        unique (chat_id)
-)
-    comment 'im_单聊会话表（单聊和群聊放一起）';
-
-create index idx_last_msg_id
-    on im_chat (last_msg_id);

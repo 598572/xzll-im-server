@@ -70,7 +70,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
      */
     @Override
     public boolean support(ImBaseRequest baseRequest) {
-        return StringUtils.equals(ImSourceUrlConstant.C2C.SEND, baseRequest.getUrl());
+        return ImBaseRequest.checkSupport(ImSourceUrlConstant.C2C.SEND, baseRequest.getUrl());
     }
 
     /**
