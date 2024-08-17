@@ -11,11 +11,12 @@ import java.time.LocalDateTime;
 /**
  * @Author: hzz
  * @Date: 2024/06/03 08:11:39
- * @Description: im_某用户对某个会话的个人操作，如（置顶该聊天、不显示该聊天、删除该聊天）
+ * @Description: im_个人对会话的操作，如（置顶该聊天、不显示该聊天、删除该聊天） todo 此表数据量较大 需要根据userId 进行分表
  */
 @Data
-@TableName("im_chat_user_opt")
-public class ImChatUserOpt implements Serializable {
+@TableName("im_personal_chat_opt")
+public class ImPersonalChatOpt implements Serializable {
+
 
 
     private static final long serialVersionUID = -1L;
@@ -54,7 +55,12 @@ public class ImChatUserOpt implements Serializable {
     /**
      * 0否（不删除） ，1是（删除）
      */
-    private Boolean delChat;
+    private Boolean delFlag;
+
+    /**
+     * 此会话最后一条消息时间
+     */
+    private Long lastMsgTime;
 
     /**
      * 创建时间

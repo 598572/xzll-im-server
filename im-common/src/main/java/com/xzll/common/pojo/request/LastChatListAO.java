@@ -14,6 +14,11 @@ import lombok.Setter;
 public class LastChatListAO extends CommonMsgAO {
 
 
+    private Integer currentPage;
+
+    private Integer pageSize;
+
+
     /**
      * 当前用户id 可不传，服务端根据channel也能获取userId
      */

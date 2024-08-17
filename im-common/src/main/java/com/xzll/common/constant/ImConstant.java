@@ -1,6 +1,7 @@
 package com.xzll.common.constant;
 
 import io.netty.util.AttributeKey;
+
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -16,9 +17,6 @@ public interface ImConstant {
     public static String WEBSOCKET_PATH = "/websocket";
 
 
-
-
-
     /**
      * 默认的业务类型 方便后期区分不同业务线
      */
@@ -32,6 +30,14 @@ public interface ImConstant {
 
         public static final String TRACE_ID_HTTP = "im_trace_id_http";
 
+    }
+
+    /**
+     * im系统共工常量： 0否 ，1是
+     */
+    public static class CommonConstant {
+        public static final Integer NO = 0;
+        public static final Integer YES = 1;
     }
 
 
@@ -157,7 +163,6 @@ public interface ImConstant {
             CAN_UPDATE_READED.add(MsgStatusEnum.MsgStatus.UN_READ.getCode());
         }
     }
-
 
 
 }
