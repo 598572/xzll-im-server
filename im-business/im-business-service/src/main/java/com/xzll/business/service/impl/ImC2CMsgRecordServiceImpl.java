@@ -119,6 +119,7 @@ public class ImC2CMsgRecordServiceImpl implements ImC2CMsgRecordService {
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public boolean updateC2CMsgReceivedStatus(C2CReceivedMsgAckAO dto) {
         String currentName = MsgStatusEnum.MsgStatus.getNameByCode(dto.getMsgStatus());
         log.info("更新消息状态为:{}，入参:{}", currentName, JSONUtil.toJsonStr(dto));
