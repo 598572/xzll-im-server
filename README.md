@@ -161,7 +161,7 @@ sudo sh dev_start_dependencies_script.sh 172.30.128.65
 ![](doc/环境准备/images/img.png)
 
 
-### 4.1.1、导入 xzll-im-server 所依赖的 nacos 配置文件
+### 4.1.2、导入 xzll-im-server 所依赖的 nacos 配置文件
 在启动之后，接下来，需要配置nacos相关，首先我们先建一个命名空间，此命名空间用于区分环境，如下：
 ![](doc/环境准备/images/创建nacos命名空间.png)
 
