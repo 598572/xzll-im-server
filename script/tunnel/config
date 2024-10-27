@@ -1,0 +1,10 @@
+# 此文件位置： /Users/hzz/.ssh
+Host xzll_suzhuji
+    HostName callMe(微信：15230853779)
+    User root
+    Port 44170
+    ControlMaster auto
+    ControlPath ~/.ssh/control-%r@%h:%p
+    ControlPersist yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3

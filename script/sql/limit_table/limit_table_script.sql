@@ -3,7 +3,7 @@
 
 DELIMITER $$
 
-drop procedure create_msg_record_tables;
+drop procedure IF EXISTS create_msg_record_tables;
 
 CREATE PROCEDURE create_msg_record_tables()
 BEGIN

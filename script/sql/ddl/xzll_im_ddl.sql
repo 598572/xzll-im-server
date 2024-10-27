@@ -1,4 +1,8 @@
 
+
+
+use xzll_im_db_0;
+
 create table im_chat
 (
     id            bigint auto_increment comment '主键' primary key,
