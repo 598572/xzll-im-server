@@ -7,6 +7,8 @@ import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
 
 
@@ -23,13 +25,14 @@ public class ElasticSearchConfig {
     @Resource
     private ElasticSearchNacosConfig elasticSearchNacosConfig;
 
-
     /**
      * es 集群配置
      *
      * @return
      */
-    @Bean
+    @Bean("restHighLevelClient")
+    @Primary
+    @DependsOn(value = "elasticSearchNacosConfig")
     public RestHighLevelClient client() {
         HttpHost[] hosts = elasticSearchNacosConfig.getUris().stream()
                 .map(this::createHttpHost)
@@ -47,6 +50,7 @@ public class ElasticSearchConfig {
      * @return
      */
     @Bean
+    @DependsOn(value = "restHighLevelClient")
     public ElasticsearchRestTemplate elasticsearchRestTemplate() {
         return new ElasticsearchRestTemplate(client());
     }

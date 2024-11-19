@@ -32,7 +32,7 @@ public class ImBaseRequest<T> implements Serializable {
 
 
     public static boolean checkSupport(String url, String requestUrl) {
-        Assert.isTrue(StringUtils.isNotBlank(url) && StringUtils.isNotBlank(requestUrl), "url参数有误");
+        //Assert.isTrue(StringUtils.isNotBlank(url) && StringUtils.isNotBlank(requestUrl), "url参数有误");
         return StringUtils.equals(url,requestUrl);
     }
 
