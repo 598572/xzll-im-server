@@ -1,6 +1,6 @@
 package com.xzll.connect.config;
 
-import com.xzll.common.util.msgId.MsgIdUtilsService;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 import com.xzll.common.util.msgId.WorkerIdStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -28,7 +28,7 @@ public class ImServerConfig {
     private Map<String, WorkerIdStrategy> strategies;
 
     @Bean("msgIdUtilsService")
-    public MsgIdUtilsService msgIdUtilsService() {
+    public SnowflakeIdService msgIdUtilsService() {
         String groupId = env.getProperty("spring.cloud.nacos.config.group");
         String strategyType = env.getProperty("im.msgId.strategyType");
         if (StringUtils.isBlank(strategyType)) {
@@ -40,7 +40,7 @@ public class ImServerConfig {
         if (strategy == null) {
             throw new IllegalArgumentException("No such strategy: " + strategyType);
         }
-        return new MsgIdUtilsService(strategy.getWorkerId(), groupId);
+        return new SnowflakeIdService(strategy.getWorkerId(), groupId);
     }
 
 }

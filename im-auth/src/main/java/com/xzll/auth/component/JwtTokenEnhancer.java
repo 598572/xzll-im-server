@@ -1,5 +1,6 @@
 package com.xzll.auth.component;
 
+import com.xzll.auth.constant.AuthConstant;
 import com.xzll.auth.domain.SecurityUser;
 import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
@@ -21,8 +22,14 @@ public class JwtTokenEnhancer implements TokenEnhancer {
     public OAuth2AccessToken enhance(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
         SecurityUser securityUser = (SecurityUser) authentication.getPrincipal();
         Map<String, Object> info = new HashMap<>();
-        //把用户ID设置到JWT中
-        info.put("id", securityUser.getId());
+        
+        // 验证用户ID
+        if (securityUser.getId() == null) {
+            throw new RuntimeException("用户ID不能为空");
+        }
+        
+        // 把用户ID设置到JWT中
+        info.put(AuthConstant.JWT_USER_ID_KEY, securityUser.getId());
         ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(info);
         return accessToken;
     }

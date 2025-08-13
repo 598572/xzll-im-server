@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * @Description:
  */
 @Data
-@TableName("im_c2c_msg_record")
+@TableName("im_c2c_msg_record_0")
 public class ImC2CMsgRecord implements Serializable {
 
 

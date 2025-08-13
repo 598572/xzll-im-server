@@ -11,6 +11,10 @@ spring:
         namespace: @nacos.config.namespace@
         group: @nacos.group.name@
         prefix: ${spring.application.name} # 每个服务不同，无需往maven配
+        shared-configs[0]:
+          data-id: global.yaml
+          group: DEFAULT_GROUP
+          refresh: true
 logging:
   level:
     com.alibaba: DEBUG

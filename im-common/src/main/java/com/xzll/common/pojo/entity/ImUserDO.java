@@ -1,4 +1,4 @@
-package com.xzll.business.entity.mysql;
+package com.xzll.common.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("im_user")
-public class ImUser implements Serializable {
+public class ImUserDO implements Serializable {
 
     private static final long serialVersionUID = -1L;
 

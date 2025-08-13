@@ -33,12 +33,12 @@ public class TestConsoleController {
 
 
 	@GetMapping("/get")
-	public Long get() {
+	public List<ImC2CMsgRecord> get() {
 		log.info("测试管理后台服务，nacos timeOutConfig：{}",timeOutConfig);
 		LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class);
 		List<ImC2CMsgRecord> imC2CMsgRecords = imC2CMsgRecordMapper.selectList(msgRecord);
 		log.info("测试orm结果:{}", JSONUtil.toJsonStr(imC2CMsgRecords));
-		return timeOutConfig;
+		return imC2CMsgRecords;
 	}
 
 }

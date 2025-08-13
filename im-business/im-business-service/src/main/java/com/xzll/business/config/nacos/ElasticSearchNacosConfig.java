@@ -15,7 +15,7 @@ import java.util.List;
  */
 @Setter
 @Getter
-@Component
+@Component(value = "elasticSearchNacosConfig")
 @RefreshScope
 @ConfigurationProperties(prefix = "im.elasticsearch")
 public class ElasticSearchNacosConfig {

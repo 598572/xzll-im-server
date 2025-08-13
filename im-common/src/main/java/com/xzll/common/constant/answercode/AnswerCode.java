@@ -35,6 +35,8 @@ public class AnswerCode implements Serializable {
     public static final AnswerCode ID_NOTNULL = new AnswerCode(-301, "id不能为空");
     public static final AnswerCode ID_NOTEXIT = new AnswerCode(-302, "id不存在");
     public static final AnswerCode DATA_NOTEXIT = new AnswerCode(-303, "查无数据");
+    public static final AnswerCode USER_EXIST = new AnswerCode(-400, "用户已存在");
+
 
     public static AnswerCode create(String message) {
         return new AnswerCode(message);

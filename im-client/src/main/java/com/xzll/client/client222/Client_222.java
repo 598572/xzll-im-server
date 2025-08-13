@@ -13,6 +13,7 @@ public class Client_222 {
     private static final String XUNIJI="172.30.128.65";
     private static final String XUNIJI_家="192.168.1.103";
     public static final String LOCAL = "127.0.0.1";
+    public static final String GONGWANG = "1.92.82.32";
 
     public static void start(String[] args) {
         WebsocketClient222 websocketClient222 = new WebsocketClient222(LOCAL, 10001);

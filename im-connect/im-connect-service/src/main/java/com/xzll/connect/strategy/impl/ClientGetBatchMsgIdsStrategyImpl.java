@@ -7,12 +7,11 @@ import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.response.ClientGetBatchMsgIdVO;
 import com.xzll.common.pojo.request.ClientGetMsgIdsAO;
 import com.xzll.common.pojo.base.ImBaseRequest;
-import com.xzll.common.util.msgId.MsgIdUtilsService;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.MsgHandlerStrategy;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.List;
@@ -32,7 +31,7 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
     @Resource
     private ObjectMapper objectMapper;
     @Resource
-    private MsgIdUtilsService msgIdUtilsService;
+    private SnowflakeIdService snowflakeIdService;
 
     /**
      * 策略适配
@@ -63,7 +62,7 @@ public class ClientGetBatchMsgIdsStrategyImpl extends MsgHandlerCommonAbstract i
         log.debug("客户端批量获取消息id_开始");
         ClientGetMsgIdsAO packet = this.supportPojo(imBaseRequest);
         //1. 生成一批消息id
-        List<String> msgIds = msgIdUtilsService.generateBatchMessageId(Long.parseLong(packet.getFromUserId()), false);
+        List<String> msgIds = snowflakeIdService.generateBatchMessageId(Long.parseLong(packet.getFromUserId()), false);
         ClientGetBatchMsgIdVO rsp = new ClientGetBatchMsgIdVO();
         rsp.setUrl(imBaseRequest.getUrl());
         rsp.setMsgIds(msgIds);

@@ -25,6 +25,9 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.skywalking.apm.toolkit.trace.SpanRef;
+import org.apache.skywalking.apm.toolkit.trace.TraceContext;
+import org.apache.skywalking.apm.toolkit.trace.Tracer;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.CollectionUtils;
@@ -65,6 +68,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        log.info("当前 Trace ID: {}", TraceContext.traceId());
         super.channelActive(ctx);
         String channelId = ctx.channel().id().asLongText();
         //添加连接
@@ -106,17 +110,24 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // 传统的HTTP接入
-        if (msg instanceof FullHttpRequest) {
-            log.info("=========处理Http请求接入=========");
-            handleHttpRequest(ctx, ((FullHttpRequest) msg));
-        }
-        // WebSocket接入 PooledUnsafeDirectByteBuf
-        else if (msg instanceof WebSocketFrame) {
-            log.info("=========处理websocket请求=========");
-            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
-        } else {
-            log.info("=========其他类型=========");
+
+        SpanRef span = Tracer.createEntrySpan("Netty/ChannelRead", null);
+        try {
+            log.info("当前 Trace ID: {}", TraceContext.traceId());
+            // 传统的HTTP接入
+            if (msg instanceof FullHttpRequest) {
+                log.info("=========处理Http请求接入=========");
+                handleHttpRequest(ctx, ((FullHttpRequest) msg));
+            }
+            // WebSocket接入 PooledUnsafeDirectByteBuf
+            else if (msg instanceof WebSocketFrame) {
+                log.info("=========处理websocket请求=========");
+                handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+            } else {
+                log.info("=========其他类型=========");
+            }
+        } finally {
+            Tracer.stopSpan();
         }
     }
 

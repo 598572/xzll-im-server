@@ -521,7 +521,9 @@
             <properties>
                 <!--替换bootstrap.properties中的 ${nacos.serverAddress}变量-->
                 <!-- 18848 连的是洋宝贝 的 vm03 （192.168.122.138）本机18848映射到 vm03的8848 -->
-                <nacos.serverAddr>127.0.0.1:18848</nacos.serverAddr>
+<!--                <nacos.serverAddr>127.0.0.1:18848</nacos.serverAddr>-->
+<!--                使用vm06的nacos-->
+                <nacos.serverAddr>120.46.85.43:8848</nacos.serverAddr>
                 <nacos.config.namespace>dev_id
                 </nacos.config.namespace><!--               f407f750-961e-44f2-80d7-6983374ad1e0-->
                 <boot.profile>dev</boot.profile>

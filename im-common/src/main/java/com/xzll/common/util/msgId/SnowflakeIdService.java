@@ -14,7 +14,7 @@ import java.util.zip.CRC32;
  * 融入会话类型和uid使其信息【更丰富】
  * 增加本地序列号 保证 消息id 【严格自增】 暂不需要 雪花id中有序列号
  */
-public class MsgIdUtilsService {
+public class SnowflakeIdService {
 
     public static final int ONCE_BATCH_COUNT = 1000;
     // 定义 Snowflake 算法的参数
@@ -44,7 +44,7 @@ public class MsgIdUtilsService {
     private final AtomicInteger poolIndex = new AtomicInteger(0);
 
 
-    public MsgIdUtilsService(Long workerId, String datacenterIdStr) {
+    public SnowflakeIdService(Long workerId, String datacenterIdStr) {
         //workId
         if (workerId > maxWorkerId || workerId < 0) {
             throw new IllegalArgumentException(String.format("worker Id can't be greater than %d or less than 0", maxWorkerId));
@@ -58,8 +58,18 @@ public class MsgIdUtilsService {
         this.datacenterId = datacenterId;
     }
 
-    public MsgIdUtilsService() {
+    public SnowflakeIdService() {
+        this.workerId = 1L;
+        //根据集群名 生成数据中心id
+        long datacenterId = generateDatacenterId("common");
+        if (datacenterId > maxDatacenterId || datacenterId < 0) {
+            throw new IllegalArgumentException(String.format("datacenter Id can't be greater than %d or less than 0", maxDatacenterId));
+        }
+        this.datacenterId = datacenterId;
     }
+
+//    public MsgIdUtilsService() {
+//    }
 
     //集群名称转为数字
     private long generateDatacenterId(String groupName) {
@@ -69,7 +79,7 @@ public class MsgIdUtilsService {
     }
 
 
-    private synchronized long nextId() {
+    public synchronized long nextId() {
         long timestamp = timeGen();
 
         //如果当前时间戳比上一次生成ID的时间戳小，说明系统时钟出现了回拨，抛出异常以避免生成重复ID
@@ -190,11 +200,11 @@ public class MsgIdUtilsService {
 
 
     public static void main(String[] args) {
-        MsgIdUtilsService generator = new MsgIdUtilsService(2L, "xzll-im");
-
-        //批量生成
-        List<String> strings = generator.generateBatchMessageId(11L, false);
-        System.out.println(strings);
+//        MsgIdUtilsService generator = new MsgIdUtilsService(2L, "xzll-im");
+//
+//        //批量生成
+//        List<String> strings = generator.generateBatchMessageId(11L, false);
+//        System.out.println(strings);
 
         //单个生成
 //        for (int i = 0; i < 10; i++) {
@@ -204,6 +214,11 @@ public class MsgIdUtilsService {
 //            Long snowflakeId = getSnowflakeId(msgId);
 //            parser.parseId(snowflakeId);
 //            System.out.println("\n");
+//        }
+
+//        MsgIdUtilsService msgIdUtilsService = new MsgIdUtilsService();
+//        for (int i = 0; i <100; i++) {
+//            System.out.println(msgIdUtilsService.nextId());
 //        }
 
 

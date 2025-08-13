@@ -3,6 +3,8 @@ package com.xzll.client.client111;
 
 
 import java.net.URISyntaxException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @Author: hzz
@@ -14,6 +16,7 @@ public class Client_111 {
     private static final String XUNIJI="172.30.128.65";
     private static final String XUNIJI_家="192.168.1.103";
     public static final String LOCAL = "127.0.0.1";
+    public static final String GONGWANG = "1.92.82.32";
 
     public static void start(String[] args) {
         WebsocketClient111 websocketClient111 = new WebsocketClient111(LOCAL, 10001);

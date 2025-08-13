@@ -8,7 +8,7 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.util.msgId.MsgIdUtilsService;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -49,7 +49,7 @@ public class C2COffLineMsgHandler {
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgOffLineStatus(dto);
 
         //2. 往redis存储离线消息(防止大量用户同时上线造成db压力)，用于上线后主动push 根据score 取，此处的score取msgId中的 雪花算法id，
-        redisTemplate.opsForZSet().add(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getToUserId(), JSONUtil.toJsonStr(dto), MsgIdUtilsService.getSnowflakeId(dto.getMsgId()));
+        redisTemplate.opsForZSet().add(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getToUserId(), JSONUtil.toJsonStr(dto), SnowflakeIdService.getSnowflakeId(dto.getMsgId()));
 
         //3. 响应给 发送方客户端 未读ack
         if (updateResult) {

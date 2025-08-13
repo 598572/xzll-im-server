@@ -10,7 +10,7 @@
 
 	<Appenders>
 		<Console name="Console" target="SYSTEM_OUT">
-			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{im_trace_id}] - %msg%n" />
+			<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%traceId] [%logger{50}.%M:%L] - %msg%n" />
 			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
 		</Console>
 
@@ -18,7 +18,7 @@
 		<RollingRandomAccessFile name="File"
 								 fileName="${LOG_HOME}/${FILE_NAME}.log"
 								 filePattern="${LOG_HOME}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd}-%i.log">
-			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{trace_id}] - %msg%n" />
+			<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%traceId] [%logger{50}.%M:%L] - %msg%n" />
 			<Policies>
 				<TimeBasedTriggeringPolicy />
 				<!--当日志文件大于200mb时  滚动更新-->
@@ -29,13 +29,22 @@
 			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
 		</RollingRandomAccessFile>
 
+		<!--使用grpc来将日志上报给sw-->
+		<GRPCLogClientAppender name="SkyWalking">
+			<!--上报的日志样式-->
+			<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%traceId] [%logger{50}.%M:%L] - %msg%n" />
+		</GRPCLogClientAppender>
+
 	</Appenders>
 
 	<Loggers>
 		<Root level="info">
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="File" />
+			<!-- 将日志发送到 SkyWalking -->
+			<AppenderRef ref="SkyWalking" />
 		</Root>
+
 		<logger level="info" name="jdbc.sqlonly" additivity="false">
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="File" />
@@ -71,4 +80,5 @@
 			<AppenderRef ref="File" />
 		</logger>
 	</Loggers>
+
 </Configuration>

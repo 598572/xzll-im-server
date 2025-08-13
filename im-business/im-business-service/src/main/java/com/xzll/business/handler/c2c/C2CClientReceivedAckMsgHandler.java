@@ -9,7 +9,7 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.util.msgId.MsgIdUtilsService;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -48,7 +48,7 @@ public class C2CClientReceivedAckMsgHandler {
         //1. 更新消息状态为：未读/已读
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
         //2. （收到未读/已读ack后）删除离线消息缓存
-        long needDeleteMsgId = MsgIdUtilsService.getSnowflakeId(dto.getMsgId());
+        long needDeleteMsgId = SnowflakeIdService.getSnowflakeId(dto.getMsgId());
         redisTemplate.opsForZSet().removeRangeByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
 
         //3. 接收方客户端ack发送至发送方

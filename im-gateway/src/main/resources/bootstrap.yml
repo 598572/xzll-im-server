@@ -11,6 +11,12 @@ spring:
         namespace: @nacos.config.namespace@
         group: @nacos.group.name@
         prefix: ${spring.application.name} # 每个服务不同，无需往maven配
+        # nacos共享配置
+        shared-configs[0]:
+          data-id: global.yaml
+          group: DEFAULT_GROUP
+          refresh: true
+
       discovery:
         server-addr: @nacos.serverAddr@
 

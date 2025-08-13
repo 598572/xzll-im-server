@@ -32,7 +32,7 @@ public class ElasticSearchConfig {
      */
     @Bean("restHighLevelClient")
     @Primary
-    @DependsOn(value = "elasticSearchNacosConfig")
+    @DependsOn("elasticSearchNacosConfig")
     public RestHighLevelClient client() {
         HttpHost[] hosts = elasticSearchNacosConfig.getUris().stream()
                 .map(this::createHttpHost)
@@ -51,6 +51,7 @@ public class ElasticSearchConfig {
      */
     @Bean
     @DependsOn(value = "restHighLevelClient")
+    @Primary
     public ElasticsearchRestTemplate elasticsearchRestTemplate() {
         return new ElasticsearchRestTemplate(client());
     }

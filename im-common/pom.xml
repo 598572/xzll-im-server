@@ -186,12 +186,25 @@
             <version>1.0.6</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
+
 
         <!--添加 Spring Boot Actuator 依赖，以启用 Actuator 端点-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.skywalking</groupId>
+            <artifactId>apm-toolkit-log4j-2.x</artifactId>
+            <version>9.3.0</version> <!-- 请根据实际情况选择版本 -->
+        </dependency>
+
+
 
     </dependencies>
 

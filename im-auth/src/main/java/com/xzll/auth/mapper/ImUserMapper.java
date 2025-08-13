@@ -1,4 +1,4 @@
-package com.xzll.business.mapper;
+package com.xzll.auth.mapper;
 
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
