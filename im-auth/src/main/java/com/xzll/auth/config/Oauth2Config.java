@@ -1,4 +1,4 @@
-package com.xzll.auth.config.nacos;
+package com.xzll.auth.config;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;

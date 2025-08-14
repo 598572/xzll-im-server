@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +39,7 @@ public class C2CSendMsgHandler {
     @DubboReference
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedissonUtils redissonUtils;
 
 
     /**
@@ -56,7 +56,7 @@ public class C2CSendMsgHandler {
             //根据fromId找到他登录的机器并响应ack(rpc调用连接服务)
             C2CServerReceivedMsgAckVO ackVo = getServerReceivedMsgAckVO(dto);
             //指定ip调用 与消息转发一样
-            String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getFromUserId());
+            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getFromUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
             WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseServerAck2Client(ackVo);
             log.info("服务端ack发送至发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));

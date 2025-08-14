@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,7 @@ public class C2CClientReceivedAckMsgHandler {
     @Resource
     private ImC2CMsgRecordService imC2CMsgRecordService;
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedissonUtils redissonUtils;
     @DubboReference
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
 
@@ -49,13 +49,13 @@ public class C2CClientReceivedAckMsgHandler {
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
         //2. （收到未读/已读ack后）删除离线消息缓存
         long needDeleteMsgId = SnowflakeIdService.getSnowflakeId(dto.getMsgId());
-        redisTemplate.opsForZSet().removeRangeByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
+        redissonUtils.removeZSetByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
 
         //3. 接收方客户端ack发送至发送方
         if (updateResult) {
             C2CClientReceivedMsgAckVO ackVo = getClientReceivedMsgAckVO(dto);
             //指定ip调用 与消息转发一样
-            String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
+            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
             WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseClientAck2Client(ackVo);
             log.info("接收方客户端ack发送至发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));

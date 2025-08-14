@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -28,7 +28,7 @@ import java.util.Set;
 public class ShutdownHandler implements ApplicationListener<ContextClosedEvent> {
 
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedissonUtils redissonUtils;
     @Resource
     private UserStatusManagerService userStatusManagerService;
 
@@ -54,7 +54,7 @@ public class ShutdownHandler implements ApplicationListener<ContextClosedEvent> 
         }
         Map.Entry<String, Integer> ipPortMap = NettyAttrUtil.getIpPortMap();
         if (Objects.nonNull(ipPortMap) && StringUtils.isNotBlank(ipPortMap.getKey())) {
-            redisTemplate.opsForHash().delete(ImConstant.RedisKeyConstant.NETTY_IP_PORT, ipPortMap.getKey());
+            redissonUtils.deleteHash(ImConstant.RedisKeyConstant.NETTY_IP_PORT, ipPortMap.getKey());
         }
         allOnLineUserId.forEach(uid -> {
             //清除用户登录信息和状态  TODO 此处需要考虑： 如果客户端通过他的断线重连功能 连上其他实例 此处该如何处理？ 不能删了吧？ 那样的话 岂不是误删了？

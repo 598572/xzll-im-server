@@ -28,10 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.toolkit.trace.SpanRef;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.apache.skywalking.apm.toolkit.trace.Tracer;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.CollectionUtils;
 
+import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +51,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     private static final HeartBeatHandler heartBeatHandler = SpringUtil.getBean(NettyServerHeartBeatHandlerImpl.class);
     private static final HandlerDispatcher handlerDispatcher = SpringUtil.getBean(HandlerDispatcher.class);
-    private static final RedisTemplate<String, String> redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
+    private static final RedissonUtils redissonUtils = SpringUtil.getBean(RedissonUtils.class);
     private static final ThreadPoolTaskExecutor threadPoolTaskExecutor = SpringUtil.getBean(ThreadPoolTaskExecutor.class);
     private static final ImMsgConfig imMsgConfig = SpringUtil.getBean(ImMsgConfig.class);
     private static final UserStatusManagerService userStatusManagerService = SpringUtil.getBean(UserStatusManagerServiceImpl.class);
@@ -175,7 +176,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 log.info("握手成功");
                 userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
                 //用户上线 此时需要处理离线消息【此时机主动push 10条最近的离线消息，后续依赖客户下拉获取也即pull 】
-                Set<String> lastOffLineMsgs = redisTemplate.opsForZSet().reverseRange(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 0, imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount());
+                Collection<String> lastOffLineMsgs = redissonUtils.getZSetRevRange(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 0, imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount());
                 if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
                     lastOffLineMsgs.forEach(msg -> {
                         try {

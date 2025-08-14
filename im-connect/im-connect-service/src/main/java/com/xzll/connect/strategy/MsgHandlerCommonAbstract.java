@@ -11,7 +11,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 
 import java.util.Optional;
 
@@ -29,21 +29,21 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
      * 获取接收人信息
      *
      * @param toUserId
-     * @param redisTemplate
+     * @param redissonUtils
      * @return
      */
-    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedisTemplate<String, Object> redisTemplate) {
-        if (redisTemplate == null) {
-            redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
+    public ReceiveUserDataDTO getReceiveUserDataTemplate(String toUserId, RedissonUtils redissonUtils) {
+        if (redissonUtils == null) {
+            redissonUtils = SpringUtil.getBean(RedissonUtils.class);
         }
-        if (null == redisTemplate) {
+        if (null == redissonUtils) {
             return ReceiveUserDataDTO.builder().build();
         }
         ReceiveUserDataDTO build = null;
         try {
             Channel targetChannel = LocalChannelManager.getChannelByUserId(toUserId);
-            String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, toUserId);
-            String userStatus = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, toUserId);
+            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, toUserId);
+            String userStatus = redissonUtils.getHash(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, toUserId);
             build = ReceiveUserDataDTO.builder()
                     .channelIdByUserId(targetChannel != null ? targetChannel.id().asLongText() : null)
                     .targetChannel(targetChannel)

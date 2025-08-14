@@ -1,7 +1,6 @@
 package com.xzll.auth.config;
 
 import com.xzll.auth.component.JwtTokenEnhancer;
-import com.xzll.auth.config.nacos.Oauth2Config;
 import com.xzll.auth.service.impl.UserServiceImpl;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;

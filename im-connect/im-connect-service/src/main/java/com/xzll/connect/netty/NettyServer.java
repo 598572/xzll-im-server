@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.net.InetSocketAddress;
@@ -36,7 +36,7 @@ public class NettyServer implements ApplicationRunner {
     @Resource
     private IMConnectServerConfig imConnectServerConfig;
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedissonUtils redissonUtils;
     /**
      * 本机mac 取en0，  虚拟机centos7 取 enp0s3 ，docker 部署的话 取得就是容器的ip 直接使用 NetUtils.getRealIp()就行。应该是靠宿主机进行了桥接。所以无需手动指定了
      */
@@ -78,7 +78,7 @@ public class NettyServer implements ApplicationRunner {
 
             String realUseIp = StringUtils.isBlank(dubboPreferredResult) ? realIp : dubboPreferredResult;
             //将来 每一个服务的ip和端口 是要注册到zk中 以便客户请求连接时进行路由
-            redisTemplate.opsForHash().put(ImConstant.RedisKeyConstant.NETTY_IP_PORT, realUseIp, String.valueOf(usableLocalPort));
+            redissonUtils.setHash(ImConstant.RedisKeyConstant.NETTY_IP_PORT, realUseIp, String.valueOf(usableLocalPort));
             //存储到本地，登录时 每一个用户对应一个机器的信息 <c1,s1> 保存到redis 使用 map存储
             NettyAttrUtil.setIpPort(realUseIp, usableLocalPort);
             channel = bootstrap.bind(new InetSocketAddress(usableLocalPort)).sync().channel();

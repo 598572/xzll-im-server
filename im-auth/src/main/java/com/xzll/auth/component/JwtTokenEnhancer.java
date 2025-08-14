@@ -2,6 +2,8 @@ package com.xzll.auth.component;
 
 import com.xzll.auth.constant.AuthConstant;
 import com.xzll.auth.domain.SecurityUser;
+import com.xzll.common.constant.enums.ImTerminalType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
@@ -15,7 +17,12 @@ import java.util.Map;
  * @Author: hzz
  * @Date: 2024/6/10 11:06:10
  * @Description: jwt内容增强
+ * <p>
+ * 增强功能：
+ * 1. 将用户ID添加到JWT中
+ * 2. 将设备类型添加到JWT中（从OAuth2认证请求参数中获取）
  */
+@Slf4j
 @Component
 public class JwtTokenEnhancer implements TokenEnhancer {
     @Override
@@ -30,6 +37,28 @@ public class JwtTokenEnhancer implements TokenEnhancer {
         
         // 把用户ID设置到JWT中
         info.put(AuthConstant.JWT_USER_ID_KEY, securityUser.getId());
+        
+        // 从OAuth2认证请求参数中获取设备类型
+        try {
+            Map<String, String> requestParameters = authentication.getOAuth2Request().getRequestParameters();
+            String deviceTypeStr = requestParameters.get("device_type");
+            if (deviceTypeStr != null) {
+                Integer deviceTypeCode = Integer.valueOf(deviceTypeStr);
+                ImTerminalType deviceType = ImTerminalType.fromCode(deviceTypeCode);
+                if (deviceType != null && deviceType != ImTerminalType.UNKNOWN) {
+                    // 把设备类型设置到JWT中
+                    info.put(AuthConstant.JWT_DEVICE_TYPE_KEY, deviceTypeCode);
+                    log.debug("将设备类型添加到JWT中: userId={}, deviceType={}", securityUser.getId(), deviceType.getDescription());
+                } else {
+                    log.warn("无效的设备类型: {}", deviceTypeStr);
+                }
+            } else {
+                log.warn("OAuth2请求参数中未找到device_type");
+            }
+        } catch (Exception e) {
+            log.warn("从OAuth2请求参数中获取设备类型失败", e);
+        }
+        
         ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(info);
         return accessToken;
     }

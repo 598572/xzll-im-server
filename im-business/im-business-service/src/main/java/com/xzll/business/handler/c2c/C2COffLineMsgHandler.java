@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +33,7 @@ public class C2COffLineMsgHandler {
     @Resource
     private ImC2CMsgRecordService imC2CMsgRecordService;
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedissonUtils redissonUtils;
     @DubboReference
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
 
@@ -49,7 +49,7 @@ public class C2COffLineMsgHandler {
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgOffLineStatus(dto);
 
         //2. 往redis存储离线消息(防止大量用户同时上线造成db压力)，用于上线后主动push 根据score 取，此处的score取msgId中的 雪花算法id，
-        redisTemplate.opsForZSet().add(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getToUserId(), JSONUtil.toJsonStr(dto), SnowflakeIdService.getSnowflakeId(dto.getMsgId()));
+        redissonUtils.addToZSet(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getToUserId(), JSONUtil.toJsonStr(dto), SnowflakeIdService.getSnowflakeId(dto.getMsgId()));
 
         //3. 响应给 发送方客户端 未读ack
         if (updateResult) {
@@ -57,7 +57,7 @@ public class C2COffLineMsgHandler {
             //根据fromId找到他登录的机器并响应ack(rpc调用连接服务)
             C2CClientReceivedMsgAckVO ackDTO = getClientReceivedMsgAckVO(dto);
             //指定ip调用 与消息转发一样
-            String ipPort = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
+            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
             UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
             WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseClientAck2Client(ackDTO);
             log.info("接收方离线时，服务器伪造未读ack给发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));

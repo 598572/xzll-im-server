@@ -89,3 +89,18 @@ FROM (
          UNION ALL
          SELECT count(1) AS count FROM im_c2c_msg_record_9
      ) AS combined_counts;
+
+
+
+-- 清空表
+
+TRUNCATE TABLE im_c2c_msg_record_0;
+TRUNCATE TABLE im_c2c_msg_record_1;
+TRUNCATE TABLE im_c2c_msg_record_2;
+TRUNCATE TABLE im_c2c_msg_record_3;
+TRUNCATE TABLE im_c2c_msg_record_4;
+TRUNCATE TABLE im_c2c_msg_record_5;
+TRUNCATE TABLE im_c2c_msg_record_6;
+TRUNCATE TABLE im_c2c_msg_record_7;
+TRUNCATE TABLE im_c2c_msg_record_8;
+TRUNCATE TABLE im_c2c_msg_record_9;

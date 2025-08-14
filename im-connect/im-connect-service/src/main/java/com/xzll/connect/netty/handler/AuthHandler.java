@@ -12,7 +12,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaders;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 
 import java.util.Objects;
 
@@ -25,7 +25,7 @@ import java.util.Objects;
 @ChannelHandler.Sharable
 public class AuthHandler extends ChannelInboundHandlerAdapter {
 
-    private static final RedisTemplate<String, String> redisTemplate = SpringUtil.getBean("redisTemplate", RedisTemplate.class);
+    private static final RedissonUtils redissonUtils = SpringUtil.getBean(RedissonUtils.class);
 
 
     @Override

@@ -19,6 +19,13 @@
         <dependency>
             <groupId>com.xzll</groupId>
             <artifactId>im-common</artifactId>
+            <!--            要排除这个 否则gateway会以传统 tomcat形式启动，期望是以 WebFlux形式启动gateway-->
+            <exclusions>
+                <exclusion>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                    <groupId>org.springframework.boot</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>

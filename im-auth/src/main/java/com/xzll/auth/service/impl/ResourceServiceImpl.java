@@ -1,10 +1,9 @@
 package com.xzll.auth.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
-import com.xzll.auth.constant.RedisConstant;
+import com.xzll.common.constant.RedisConstant;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -24,8 +23,7 @@ public class ResourceServiceImpl {
     private Map<String, List<String>> resourceRolesMap;
 
     @Autowired
-    @Qualifier(value = "secondaryRedisTemplate")
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedissonUtils redissonUtils;
 
     @PostConstruct
     public void initData() {
@@ -34,6 +32,11 @@ public class ResourceServiceImpl {
         resourceRolesMap.put("/xzll/im/login", CollUtil.toList("ADMIN"));
         resourceRolesMap.put("/im-auth/oauth/logout", CollUtil.toList("ADMIN"));
 
-        redisTemplate.opsForHash().putAll(RedisConstant.RESOURCE_ROLES_MAP, resourceRolesMap);
+        // 将Map<String, List<String>>转换为Map<String, String>存储
+        Map<String, String> stringMap = new TreeMap<>();
+        for (Map.Entry<String, List<String>> entry : resourceRolesMap.entrySet()) {
+            stringMap.put(entry.getKey(), String.join(",", entry.getValue()));
+        }
+        redissonUtils.setHash(RedisConstant.RESOURCE_ROLES_MAP, stringMap);
     }
 }

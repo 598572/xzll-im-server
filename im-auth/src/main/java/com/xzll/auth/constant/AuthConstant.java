@@ -38,6 +38,11 @@ public class AuthConstant {
     public static final String JWT_USER_ID_KEY = "id";
     
     /**
+     * 设备类型在JWT中的键名
+     */
+    public static final String JWT_DEVICE_TYPE_KEY = "device_type";
+    
+    /**
      * 用户名最小长度
      */
     public static final int USERNAME_MIN_LENGTH = 4;

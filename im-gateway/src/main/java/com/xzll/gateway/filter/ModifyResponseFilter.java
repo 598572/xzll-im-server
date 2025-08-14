@@ -12,7 +12,7 @@ import org.reactivestreams.Publisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferFactory;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
@@ -50,7 +50,7 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
     @Resource
     private NeedAddImServerUrlsConfig needAddImServerUrlsConfig;
     @Resource
-    private RedisTemplate<String, String> redisTemplate;
+    private RedissonUtils redissonUtils;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -98,7 +98,7 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
      * @param needAddImServerMap
      */
     private void fillImServerAddress(Map<String, Object> needAddImServerMap) {
-        Map<Object, Object> entries = redisTemplate.opsForHash().entries(NETTY_IP_PORT);
+        Map<String, String> entries = redissonUtils.getAllHash(NETTY_IP_PORT);
         Assert.isTrue(!CollectionUtils.isEmpty(entries), "无长连接服务可用");
 
         List<ImServerAddressDTO> addressDTOS = entries.entrySet().stream().map(x -> {
@@ -117,7 +117,7 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
 
         //【轮询】
         int seatCount = addressDTOS.size();
-        long current = redisTemplate.opsForValue().increment(IM_SERVER_ROUND_COUNTER_KEY) - 1;
+        long current = redissonUtils.getAtomicLong(IM_SERVER_ROUND_COUNTER_KEY).incrementAndGet() - 1;
         long index = current % seatCount;
 
         ImServerAddressDTO roundResult = addressDTOS.get((int) index);

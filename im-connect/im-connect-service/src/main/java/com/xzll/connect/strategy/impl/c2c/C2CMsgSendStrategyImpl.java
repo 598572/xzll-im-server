@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
 import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -51,7 +51,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private static final String TAG = "[客户端发送单聊消息]_";
 
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private RedissonUtils redissonUtils;
     @Resource
     private ObjectMapper objectMapper;
     //需要此注解 否则 C2CMsgSendStrategyImpl 和 TransferC2CMsgService将循环依赖
@@ -100,7 +100,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         c2CMsgProvider.sendC2CMsg(packet);
 
         //2. 获取接收人登录，服务信息，根据状态进行处理
-        ReceiveUserDataDTO receiveUserData = super.getReceiveUserDataTemplate(packet.getToUserId(), this.redisTemplate);
+        ReceiveUserDataDTO receiveUserData = super.getReceiveUserDataTemplate(packet.getToUserId(), this.redissonUtils);
 
         String channelIdByUserId = receiveUserData.getChannelIdByUserId();
         Channel targetChannel = receiveUserData.getTargetChannel();
@@ -139,7 +139,7 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
         log.debug("目标服务器接收并转发消息_开始");
         C2CSendMsgAO packet = supportPojo(msg);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(packet.getToUserId());
-        String userStatus = (String) redisTemplate.opsForHash().get(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, packet.getToUserId());
+        String userStatus = redissonUtils.getHash(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, packet.getToUserId());
         //二次校验接收人在线状态
         if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
             log.info((TAG + "跳转后用户{}在线,将直接发送消息"), packet.getToUserId());

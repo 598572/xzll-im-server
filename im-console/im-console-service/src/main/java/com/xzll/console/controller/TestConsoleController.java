@@ -41,4 +41,14 @@ public class TestConsoleController {
 		return imC2CMsgRecords;
 	}
 
+	/**
+	 * 测试权限绕过接口
+	 * 当配置 auth.enable-permission-check=false 时，此接口可以绕过权限验证
+	 */
+	@GetMapping("/test-permission-bypass")
+	public String testPermissionBypass() {
+		log.info("测试权限绕过接口被调用");
+		return "权限绕过测试成功！当前时间：" + System.currentTimeMillis();
+	}
+
 }

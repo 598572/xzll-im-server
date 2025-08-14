@@ -5,16 +5,16 @@ import com.xzll.common.constant.enums.ImTerminalType;
 
 /**
  * @Author: hzz
- * @Date: 2025/8/13 20:10:00
- * @Description: Token验证请求对象
+ * @Date: 2025/8/14 17:30:00
+ * @Description: 登出请求对象
  */
 @Data
-public class TokenRequest {
+public class LogoutRequest {
     
     /**
-     * JWT token
+     * 用户ID（必传）
      */
-    private String token;
+    private String userId;
     
     /**
      * 设备类型（必传）
