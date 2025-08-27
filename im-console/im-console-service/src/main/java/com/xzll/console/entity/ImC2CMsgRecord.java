@@ -84,4 +84,9 @@ public class ImC2CMsgRecord implements Serializable {
      */
     private String chatId;
 
+    /**
+     * HBase的RowKey
+     */
+    private String rowkey;
+
 }

@@ -63,11 +63,11 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
 
     /**
      * 构建RowKey
-     * 格式：chatId + "_" + (Long.MAX_VALUE - msgCreateTime) + "_" + msgId
-     * 这样设计可以保证同一会话的消息按时间倒序排列
+     * 格式：chatId + "_" + msgId
+     * 雪花算法生成的 msgId 本身就具有时间顺序性，可以保证同一会话的消息按时间顺序排列
      */
-    private String buildRowKey(String chatId, Long msgCreateTime, String msgId) {
-        return chatId + "_" + (Long.MAX_VALUE - msgCreateTime) + "_" + msgId;
+    private String buildRowKey(String chatId, String msgId) {
+        return chatId + "_" + msgId;
     }
 
     /**
@@ -84,29 +84,28 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
      * 根据chatId和msgId获取消息
      */
     private ImC2CMsgRecord getC2CMsgRecordByChatIdAndMsgId(String chatId, String msgId) throws IOException {
-        Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+        Table table = null;
         try {
-            // 由于我们不知道msgCreateTime，需要使用Scan来查找
-            Scan scan = new Scan();
-            scan.withStartRow(Bytes.toBytes(chatId + "_"));
-            scan.withStopRow(Bytes.toBytes(chatId + "_" + Long.MAX_VALUE));
-            scan.setFilter(new SingleColumnValueFilter(
-                    Bytes.toBytes(COLUMN_FAMILY),
-                    Bytes.toBytes(COLUMN_MSG_ID),
-                    CompareOperator.EQUAL,
-                    Bytes.toBytes(msgId)
-            ));
+            table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             
-            ResultScanner scanner = table.getScanner(scan);
-            Result result = scanner.next();
-            scanner.close();
+            // 直接通过 chatId + "_" + msgId 构建 rowkey 进行精确查询
+            String rowKey = buildRowKey(chatId, msgId);
+            Get get = new Get(Bytes.toBytes(rowKey));
+            Result result = table.get(get);
             
             if (result != null && !result.isEmpty()) {
                 return convertResultToImC2CMsgRecord(result);
             }
             return null;
         } finally {
-            table.close();
+            // 确保table被正确关闭
+            if (table != null) {
+                try {
+                    table.close();
+                } catch (Exception e) {
+                    log.warn("关闭HBase表时发生异常", e);
+                }
+            }
         }
     }
 
@@ -116,47 +115,92 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
     private ImC2CMsgRecord convertResultToImC2CMsgRecord(Result result) {
         ImC2CMsgRecord record = new ImC2CMsgRecord();
         
+        // 设置RowKey
+        String rowKey = Bytes.toString(result.getRow());
+        record.setRowkey(rowKey);
+        
         for (Cell cell : result.listCells()) {
             String column = Bytes.toString(CellUtil.cloneQualifier(cell));
             byte[] value = CellUtil.cloneValue(cell);
+            String stringValue = Bytes.toString(value);
+            
+            // 跳过null值
+            if ("null".equals(stringValue)) {
+                continue;
+            }
             
             switch (column) {
                 case COLUMN_FROM_USER_ID:
-                    record.setFromUserId(Bytes.toString(value));
+                    record.setFromUserId(stringValue);
                     break;
                 case COLUMN_TO_USER_ID:
-                    record.setToUserId(Bytes.toString(value));
+                    record.setToUserId(stringValue);
                     break;
                 case COLUMN_MSG_ID:
-                    record.setMsgId(Bytes.toString(value));
+                    record.setMsgId(stringValue);
                     break;
                 case COLUMN_MSG_FORMAT:
-                    record.setMsgFormat(Integer.parseInt(Bytes.toString(value)));
+                    try {
+                        record.setMsgFormat(Integer.parseInt(stringValue));
+                    } catch (NumberFormatException e) {
+                        log.warn("无法解析msg_format值: {}, 设置默认值0", stringValue);
+                        record.setMsgFormat(0);
+                    }
                     break;
                 case COLUMN_MSG_CONTENT:
                     // 处理Base64编码的内容
-                    record.setMsgContent(Bytes.toString(value));
+                    record.setMsgContent(stringValue);
                     break;
                 case COLUMN_MSG_CREATE_TIME:
-                    record.setMsgCreateTime(Long.parseLong(Bytes.toString(value)));
+                    try {
+                        record.setMsgCreateTime(Long.parseLong(stringValue));
+                    } catch (NumberFormatException e) {
+                        log.warn("无法解析msg_create_time值: {}, 设置默认值0", stringValue);
+                        record.setMsgCreateTime(0L);
+                    }
                     break;
                 case COLUMN_RETRY_COUNT:
-                    record.setRetryCount(Integer.parseInt(Bytes.toString(value)));
+                    try {
+                        record.setRetryCount(Integer.parseInt(stringValue));
+                    } catch (NumberFormatException e) {
+                        log.warn("无法解析retry_count值: {}, 设置默认值0", stringValue);
+                        record.setRetryCount(0);
+                    }
                     break;
                 case COLUMN_MSG_STATUS:
-                    record.setMsgStatus(Integer.parseInt(Bytes.toString(value)));
+                    try {
+                        record.setMsgStatus(Integer.parseInt(stringValue));
+                    } catch (NumberFormatException e) {
+                        log.warn("无法解析msg_status值: {}, 设置默认值0", stringValue);
+                        record.setMsgStatus(0);
+                    }
                     break;
                 case COLUMN_WITHDRAW_FLAG:
-                    record.setWithdrawFlag(Integer.parseInt(Bytes.toString(value)));
+                    try {
+                        record.setWithdrawFlag(Integer.parseInt(stringValue));
+                    } catch (NumberFormatException e) {
+                        log.warn("无法解析withdraw_flag值: {}, 设置默认值0", stringValue);
+                        record.setWithdrawFlag(0);
+                    }
                     break;
                 case COLUMN_CHAT_ID:
-                    record.setChatId(Bytes.toString(value));
+                    record.setChatId(stringValue);
                     break;
                 case COLUMN_CREATE_TIME:
-                    record.setCreateTime(LocalDateTime.parse(Bytes.toString(value)));
+                    try {
+                        record.setCreateTime(LocalDateTime.parse(stringValue));
+                    } catch (Exception e) {
+                        log.warn("无法解析create_time值: {}, 设置默认值", stringValue);
+                        record.setCreateTime(LocalDateTime.now());
+                    }
                     break;
                 case COLUMN_UPDATE_TIME:
-                    record.setUpdateTime(LocalDateTime.parse(Bytes.toString(value)));
+                    try {
+                        record.setUpdateTime(LocalDateTime.parse(stringValue));
+                    } catch (Exception e) {
+                        log.warn("无法解析update_time值: {}, 设置默认值", stringValue);
+                        record.setUpdateTime(LocalDateTime.now());
+                    }
                     break;
             }
         }
@@ -168,64 +212,101 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
     public boolean saveC2CMsg(C2CSendMsgAO dto) {
         log.info("保存单聊消息入参:{}", JSONUtil.toJsonStr(dto));
         
-        try {
-            Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+        int maxRetries = 3;
+        int retryCount = 0;
+        
+        while (retryCount < maxRetries) {
             try {
-                // 如果是重试消息，需要特殊处理
-                if (Boolean.TRUE.equals(dto.getRetryMsgFlag())) {
-                    ImC2CMsgRecord existingRecord = getC2CMsgRecordByChatIdAndMsgId(dto.getChatId(), dto.getMsgId());
-                    if (existingRecord != null) {
-                        // 更新重试次数
-                        String rowKey = buildRowKey(dto.getChatId(), existingRecord.getMsgCreateTime(), dto.getMsgId());
-                        Put put = new Put(Bytes.toBytes(rowKey));
-                        put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
-                                      Bytes.toBytes(COLUMN_RETRY_COUNT), 
-                                      Bytes.toBytes(String.valueOf(existingRecord.getRetryCount() + 1)));
-                        put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
-                                      Bytes.toBytes(COLUMN_UPDATE_TIME), 
-                                      Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
-                        table.put(put);
-                        log.info("更新重试次数成功");
-                        return true;
-                    }
+                return doSaveC2CMsg(dto);
+            } catch (Exception e) {
+                retryCount++;
+                log.warn("保存单聊消息失败，第{}次重试: {}", retryCount, e.getMessage());
+                
+                if (retryCount >= maxRetries) {
+                    log.error("保存单聊消息失败，已重试{}次", maxRetries, e);
+                    return false;
                 }
                 
-                // 转换并设置所有字段
-                ImC2CMsgRecord imC2CMsgRecord = conversionService.convert(dto, ImC2CMsgRecord.class);
-                imC2CMsgRecord.setMsgStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
-                
-                // 设置当前时间
-                LocalDateTime now = LocalDateTime.now();
-                String nowStr = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-                
-                // 构建RowKey
-                String rowKey = buildRowKey(dto.getChatId(), dto.getMsgCreateTime(), dto.getMsgId());
-                Put put = new Put(Bytes.toBytes(rowKey));
-                
-                // 添加列值
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_FROM_USER_ID), Bytes.toBytes(imC2CMsgRecord.getFromUserId()));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_TO_USER_ID), Bytes.toBytes(imC2CMsgRecord.getToUserId()));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_ID), Bytes.toBytes(imC2CMsgRecord.getMsgId()));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_FORMAT), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgFormat())));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_CONTENT), Bytes.toBytes(imC2CMsgRecord.getMsgContent()));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_CREATE_TIME), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgCreateTime())));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_RETRY_COUNT), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getRetryCount())));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_STATUS), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgStatus())));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_WITHDRAW_FLAG), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getWithdrawFlag())));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CHAT_ID), Bytes.toBytes(imC2CMsgRecord.getChatId()));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CREATE_TIME), Bytes.toBytes(nowStr));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_UPDATE_TIME), Bytes.toBytes(nowStr));
-                
-                // 执行插入
-                table.put(put);
-                log.info("保存单聊消息成功");
-                return true;
-            } finally {
-                table.close();
+                // 等待一段时间后重试
+                try {
+                    Thread.sleep(1000 * retryCount); // 递增等待时间
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.error("重试等待被中断", ie);
+                    return false;
+                }
             }
-        } catch (Exception e) {
-            log.error("保存单聊消息失败", e);
-            return false;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 实际执行保存消息的方法
+     */
+    private boolean doSaveC2CMsg(C2CSendMsgAO dto) throws Exception {
+        Table table = null;
+        try {
+            table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+            
+            // 如果是重试消息，需要特殊处理
+            if (Boolean.TRUE.equals(dto.getRetryMsgFlag())) {
+                ImC2CMsgRecord existingRecord = getC2CMsgRecordByChatIdAndMsgId(dto.getChatId(), dto.getMsgId());
+                if (existingRecord != null) {
+                    // 更新重试次数
+                    String rowKey = buildRowKey(dto.getChatId(), existingRecord.getMsgId());
+                    Put put = new Put(Bytes.toBytes(rowKey));
+                    put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
+                                  Bytes.toBytes(COLUMN_RETRY_COUNT), 
+                                  Bytes.toBytes(String.valueOf(existingRecord.getRetryCount() + 1)));
+                    put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
+                                  Bytes.toBytes(COLUMN_UPDATE_TIME), 
+                                  Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+                    table.put(put);
+                    log.info("更新重试次数成功");
+                    return true;
+                }
+            }
+            
+            // 转换并设置所有字段
+            ImC2CMsgRecord imC2CMsgRecord = conversionService.convert(dto, ImC2CMsgRecord.class);
+            imC2CMsgRecord.setMsgStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode());
+            
+            // 设置当前时间
+            LocalDateTime now = LocalDateTime.now();
+            String nowStr = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            
+            // 构建RowKey
+            String rowKey = buildRowKey(dto.getChatId(), dto.getMsgId());
+            Put put = new Put(Bytes.toBytes(rowKey));
+            
+            // 添加列值
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_FROM_USER_ID), Bytes.toBytes(imC2CMsgRecord.getFromUserId()));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_TO_USER_ID), Bytes.toBytes(imC2CMsgRecord.getToUserId()));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_ID), Bytes.toBytes(imC2CMsgRecord.getMsgId()));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_FORMAT), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgFormat())));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_CONTENT), Bytes.toBytes(imC2CMsgRecord.getMsgContent()));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_CREATE_TIME), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgCreateTime())));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_RETRY_COUNT), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getRetryCount())));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_STATUS), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getMsgStatus())));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_WITHDRAW_FLAG), Bytes.toBytes(String.valueOf(imC2CMsgRecord.getWithdrawFlag())));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CHAT_ID), Bytes.toBytes(imC2CMsgRecord.getChatId()));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CREATE_TIME), Bytes.toBytes(nowStr));
+            put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_UPDATE_TIME), Bytes.toBytes(nowStr));
+            
+            // 执行插入
+            table.put(put);
+            log.info("保存单聊消息成功");
+            return true;
+        } finally {
+            // 确保table被正确关闭
+            if (table != null) {
+                try {
+                    table.close();
+                } catch (Exception e) {
+                    log.warn("关闭HBase表时发生异常", e);
+                }
+            }
         }
     }
 
@@ -246,7 +327,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             // 更新状态
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
-                String rowKey = buildRowKey(dto.getChatId(), dbResult.getMsgCreateTime(), dto.getMsgId());
+                String rowKey = buildRowKey(dto.getChatId(), dto.getMsgId());
                 Put put = new Put(Bytes.toBytes(rowKey));
                 
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
@@ -304,7 +385,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             // 执行更新
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
-                String rowKey = buildRowKey(dto.getChatId(), dbResult.getMsgCreateTime(), dto.getMsgId());
+                String rowKey = buildRowKey(dto.getChatId(), dto.getMsgId());
                 Put put = new Put(Bytes.toBytes(rowKey));
                 
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
@@ -347,7 +428,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             // 执行更新
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
-                String rowKey = buildRowKey(dto.getChatId(), dbResult.getMsgCreateTime(), dto.getMsgId());
+                String rowKey = buildRowKey(dto.getChatId(), dto.getMsgId());
                 Put put = new Put(Bytes.toBytes(rowKey));
                 
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), 
