@@ -76,7 +76,7 @@ public class TestController {
 	 */
 	@PostMapping("/testes")
 	public Long testes(@RequestBody C2CSendMsgAO dto) {
-		imC2CMsgRecordService.testEs(dto);
+//		imC2CMsgRecordService.testEs(dto);
 		return timeOutConfig;
 	}
 

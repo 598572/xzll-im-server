@@ -16,5 +16,4 @@ public interface ImC2CMsgRecordHBaseService {
 
     public boolean updateC2CMsgWithdrawStatus(C2CWithdrawMsgAO dto);
 
-    public void testEs(C2CSendMsgAO dto);
 }

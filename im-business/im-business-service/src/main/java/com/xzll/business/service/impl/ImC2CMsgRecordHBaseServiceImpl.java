@@ -450,9 +450,4 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         }
     }
 
-    @Override
-    public void testEs(C2CSendMsgAO dto) {
-        // 保留原有接口方法，但HBase实现不需要ES相关操作
-        log.info("HBase实现不执行ES测试操作");
-    }
 }
