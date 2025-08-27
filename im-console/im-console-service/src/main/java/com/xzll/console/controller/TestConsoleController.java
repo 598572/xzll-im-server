@@ -2,10 +2,8 @@ package com.xzll.console.controller;
 
 
 import cn.hutool.json.JSONUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xzll.console.entity.ImC2CMsgRecord;
-import com.xzll.console.mapper.ImC2CMsgRecordMapper;
+import com.xzll.console.service.ImC2CMsgRecordHBaseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -29,15 +27,14 @@ public class TestConsoleController {
 	@Value("${timeOutConfig}")
 	private Long timeOutConfig;
 	@Resource
-	private ImC2CMsgRecordMapper imC2CMsgRecordMapper;
+	private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
 
 
 	@GetMapping("/get")
 	public List<ImC2CMsgRecord> get() {
 		log.info("测试管理后台服务，nacos timeOutConfig：{}",timeOutConfig);
-		LambdaQueryWrapper<ImC2CMsgRecord> msgRecord = Wrappers.lambdaQuery(ImC2CMsgRecord.class);
-		List<ImC2CMsgRecord> imC2CMsgRecords = imC2CMsgRecordMapper.selectList(msgRecord);
-		log.info("测试orm结果:{}", JSONUtil.toJsonStr(imC2CMsgRecords));
+		List<ImC2CMsgRecord> imC2CMsgRecords = imC2CMsgRecordHBaseService.getAllMessages();
+		log.info("测试HBase查询结果:{}", JSONUtil.toJsonStr(imC2CMsgRecords));
 		return imC2CMsgRecords;
 	}
 
