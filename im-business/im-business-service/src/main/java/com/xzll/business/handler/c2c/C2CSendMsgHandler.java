@@ -1,7 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import cn.hutool.json.JSONUtil;
-import com.xzll.business.service.ImC2CMsgRecordService;
+import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.ImSourceUrlConstant;
@@ -34,7 +34,7 @@ public class C2CSendMsgHandler {
     @Resource
     private ImChatService imChatService;
     @Resource
-    private ImC2CMsgRecordService imC2CMsgRecordService;
+    	private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     //配置check = false 后生产者不启动也无所谓，不会报错影响本服务启动，当然也可全局配(这里全局配置了)
     @DubboReference
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;

@@ -45,4 +45,5 @@ public class C2CSendMsgAO extends CommonMsgAO {
     private Integer retryMsgFlag;
 
 
+
 }

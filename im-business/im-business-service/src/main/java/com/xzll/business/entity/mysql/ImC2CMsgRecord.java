@@ -22,7 +22,7 @@ public class ImC2CMsgRecord implements Serializable {
 
     //分库分表后 主键id 无需自增 改用雪花算法（在sharding sphere 中配置）
 //    @TableId(type = IdType.AUTO)
-    private Long id;
+//    private Long id;
 
     /**
      * 发送人id
@@ -85,6 +85,11 @@ public class ImC2CMsgRecord implements Serializable {
      * 会话id （水平）分库时的分片键
      */
     private String chatId;
+
+    /**
+     * HBase的RowKey
+     */
+    private String rowkey;
 
     
 

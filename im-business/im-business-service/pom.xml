@@ -152,6 +152,47 @@
             <version>3.0.5</version>
         </dependency>
 
+        <!-- HBase 依赖 - 专门为Hadoop 3.x设计 -->
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase</artifactId>
+            <type>pom</type>
+        </dependency>
+
+        <!-- 具体的HBase客户端依赖 -->
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-client</artifactId>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.hbase/hbase-common -->
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-common</artifactId>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.hbase/hbase-server -->
+        <dependency>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-server</artifactId>
+        </dependency>
+        
+        <!-- Hadoop 3.x 核心依赖 -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+        </dependency>
+
+        <!-- Phoenix 5.2.1 依赖 - 兼容HBase 2.5.x -->
+        <dependency>
+            <groupId>org.apache.phoenix</groupId>
+            <artifactId>phoenix-core</artifactId>
+            <version>5.2.1</version>
+        </dependency>
+
+
+
+
     </dependencies>
 
     <build>

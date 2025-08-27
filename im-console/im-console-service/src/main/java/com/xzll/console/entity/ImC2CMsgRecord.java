@@ -74,6 +74,19 @@ public class ImC2CMsgRecord implements Serializable {
      */
     private Integer retryCount;
 
-    
+    /**
+     * 撤回标志
+     */
+    private Integer withdrawFlag;
+
+    /**
+     * 会话ID
+     */
+    private String chatId;
+
+    /**
+     * HBase的RowKey
+     */
+    private String rowkey;
 
 }

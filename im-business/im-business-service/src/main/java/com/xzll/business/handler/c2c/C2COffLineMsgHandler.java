@@ -1,7 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import cn.hutool.json.JSONUtil;
-import com.xzll.business.service.ImC2CMsgRecordService;
+import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.base.WebBaseResponse;
@@ -31,7 +31,7 @@ public class C2COffLineMsgHandler {
 
 
     @Resource
-    private ImC2CMsgRecordService imC2CMsgRecordService;
+    	private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     @Resource
     private RedissonUtils redissonUtils;
     @DubboReference

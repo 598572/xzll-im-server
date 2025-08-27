@@ -2,7 +2,7 @@ package com.xzll.business.controller;
 
 import com.alibaba.excel.EasyExcel;
 import com.google.common.collect.Lists;
-import com.xzll.business.service.ImC2CMsgRecordService;
+import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +31,7 @@ public class TestController {
 	@Value("${timeOutConfig}")
 	private Long timeOutConfig;
 	@Resource
-	private ImC2CMsgRecordService imC2CMsgRecordService;
+	private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
 
 	@GetMapping("/get")
 	public Long get() {
