@@ -34,3 +34,9 @@ build/
 
 /mvnw
 /mvnw.cmd
+
+
+
+logs/
+im-auth/logs/
+im-business/im-business-service/logs/
