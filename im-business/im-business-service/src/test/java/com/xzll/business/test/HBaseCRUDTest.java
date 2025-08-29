@@ -85,7 +85,54 @@ public class HBaseCRUDTest {
         config.set("zookeeper.session.timeout", "60000");
         config.set("zookeeper.recovery.retry", "10");
         config.set("zookeeper.recovery.retry.intervalmill", "1000");
-        
+
+
+
+
+
+//        // 基础优化配置 - 针对高延迟网络增加超时时间
+//        config.set("hbase.client.retries.number", "10"); // 减少重试次数但增加超时时间
+//        config.set("hbase.client.pause", "2000"); // 增加重试间隔，避免快速耗尽重试
+//        config.set("hbase.client.operation.timeout", "120000"); // 增加到120秒
+//        config.set("hbase.client.scanner.timeout.period", "120000"); // 增加到120秒
+//
+//        // 禁用缓存，强制实时查找（保持原样）
+//        config.set("hbase.client.cache.region", "false");
+//        config.set("hbase.client.cache.meta", "false");
+//        config.set("hbase.client.cache.config", "false");
+//
+//        // Region查找重试配置 - 增加超时时间和重试间隔
+//        config.set("hbase.client.locate.region.retry.count", "10");
+//        config.set("hbase.client.locate.region.retry.delay", "1000"); // 增加到1秒
+//        config.set("hbase.client.locate.region.timeout", "120000"); // 增加到120秒
+//
+//        // 连接重试配置 - 增加重试间隔
+//        config.set("hbase.client.connection.retry.count", "10");
+//        config.set("hbase.client.connection.retry.delay", "1000"); // 增加到1秒
+//
+//        // 元数据操作配置 - 增加超时时间
+//        config.set("hbase.client.meta.operation.timeout", "120000"); // 增加到120秒
+//        config.set("hbase.client.meta.scanner.timeout.period", "120000"); // 增加到120秒
+//        config.set("hbase.client.meta.retry.delay", "2000"); // 增加到2秒
+//        config.set("hbase.client.meta.retry.number", "10");
+//
+//        // ZooKeeper配置 - 保持原样
+//        config.set("zookeeper.session.timeout", "60000");
+//        config.set("zookeeper.recovery.retry", "10");
+//        config.set("zookeeper.recovery.retry.intervalmill", "1000");
+//
+//        // 新增连接池配置
+//        config.set("hbase.client.ipc.pool.size", "10"); // 连接池大小
+//        config.set("hbase.client.ipc.pool.type", "RoundRobinPool"); // 连接池类型
+//        config.set("hbase.client.max.perregion.tasks", "100"); // 每区域最大任务数
+//        config.set("hbase.client.max.perserver.tasks", "500"); // 每服务器最大任务数
+//
+//        // RPC配置优化
+//        config.set("hbase.rpc.timeout", "120000"); // RPC超时时间
+//        config.set("hbase.ipc.client.socket.timeout.read", "120000"); // Socket读取超时
+//        config.set("hbase.ipc.client.socket.timeout.write", "60000"); // Socket写入超时
+//
+//
         return config;
     }
 

@@ -1,0 +1,13 @@
+# 测试环境主配置文件
+spring:
+  profiles:
+    active: test
+
+# 日志配置
+logging:
+  level:
+    com.xzll.business: DEBUG
+    org.elasticsearch: DEBUG
+    org.apache.hadoop.hbase: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n" 

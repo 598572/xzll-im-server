@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
+import com.xzll.business.entity.es.ImC2CMsgRecordES;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -14,12 +15,11 @@ import com.xzll.common.pojo.request.C2CSendMsgAO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.springframework.core.convert.ConversionService;
+import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -60,6 +60,9 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
     
     @Resource
     private ConversionService conversionService;
+    
+    @Resource
+    private ElasticsearchRestTemplate elasticsearchRestTemplate;
 
     /**
      * 构建RowKey
@@ -78,6 +81,30 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             return null;
         }
         return rowKey.split("_")[0];
+    }
+
+    /**
+     * 保存消息到ES
+     * @param imC2CMsgRecord 消息记录
+     * @return 是否成功
+     */
+    private boolean saveToES(ImC2CMsgRecord imC2CMsgRecord) {
+        try {
+            ImC2CMsgRecordES esRecord = new ImC2CMsgRecordES();
+            BeanUtil.copyProperties(imC2CMsgRecord, esRecord);
+            
+            // 构建ES文档ID
+            esRecord.buildId();
+            
+            // 保存到ES
+            ImC2CMsgRecordES savedRecord = elasticsearchRestTemplate.save(esRecord);
+            log.info("消息保存到ES成功，ES ID: {}", savedRecord.getId());
+            return true;
+        } catch (Exception e) {
+            log.error("保存消息到ES失败", e);
+            // ES保存失败不影响HBase的保存，返回false但不抛出异常
+            return false;
+        }
     }
 
     /**
@@ -212,39 +239,6 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
     public boolean saveC2CMsg(C2CSendMsgAO dto) {
         log.info("保存单聊消息入参:{}", JSONUtil.toJsonStr(dto));
         
-        int maxRetries = 3;
-        int retryCount = 0;
-        
-        while (retryCount < maxRetries) {
-            try {
-                return doSaveC2CMsg(dto);
-            } catch (Exception e) {
-                retryCount++;
-                log.warn("保存单聊消息失败，第{}次重试: {}", retryCount, e.getMessage());
-                
-                if (retryCount >= maxRetries) {
-                    log.error("保存单聊消息失败，已重试{}次", maxRetries, e);
-                    return false;
-                }
-                
-                // 等待一段时间后重试
-                try {
-                    Thread.sleep(1000 * retryCount); // 递增等待时间
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    log.error("重试等待被中断", ie);
-                    return false;
-                }
-            }
-        }
-        
-        return false;
-    }
-    
-    /**
-     * 实际执行保存消息的方法
-     */
-    private boolean doSaveC2CMsg(C2CSendMsgAO dto) throws Exception {
         Table table = null;
         try {
             table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
@@ -263,7 +257,22 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                                   Bytes.toBytes(COLUMN_UPDATE_TIME), 
                                   Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
                     table.put(put);
-                    log.info("更新重试次数成功");
+                    log.info("更新HBase重试次数成功");
+                    
+                    // 同时更新ES中的重试次数
+                    try {
+                        existingRecord.setRetryCount(existingRecord.getRetryCount() + 1);
+                        existingRecord.setUpdateTime(LocalDateTime.now());
+                        boolean esResult = saveToES(existingRecord);
+                        if (esResult) {
+                            log.info("ES重试次数更新成功");
+                        } else {
+                            log.warn("ES重试次数更新失败，但HBase更新成功");
+                        }
+                    } catch (Exception e) {
+                        log.error("更新ES重试次数失败", e);
+                    }
+                    
                     return true;
                 }
             }
@@ -296,19 +305,32 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             
             // 执行插入
             table.put(put);
-            log.info("保存单聊消息成功");
+            log.info("保存单聊消息到HBase成功");
+            
+            // 同时保存到ES
+            boolean esResult = saveToES(imC2CMsgRecord);
+            if (esResult) {
+                log.info("消息同时保存到ES成功");
+            } else {
+                log.warn("消息保存到ES失败，但HBase保存成功");
+            }
+            
             return true;
+        } catch (Exception e) {
+            log.error("保存单聊消息失败: {}", e.getMessage(), e);
+            return false;
         } finally {
             // 确保table被正确关闭
             if (table != null) {
                 try {
-                    table.close();
+                table.close();
                 } catch (Exception e) {
                     log.warn("关闭HBase表时发生异常", e);
                 }
             }
         }
     }
+
 
     @Override
     public boolean updateC2CMsgOffLineStatus(C2COffLineMsgAO dto) {
@@ -338,7 +360,22 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                              Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
                 
                 table.put(put);
-                log.info("更新离线消息成功");
+                log.info("更新HBase离线消息成功");
+                
+                // 同时更新ES中的消息状态
+                try {
+                    dbResult.setMsgStatus(MsgStatusEnum.MsgStatus.OFF_LINE.getCode());
+                    dbResult.setUpdateTime(LocalDateTime.now());
+                    boolean esResult = saveToES(dbResult);
+                    if (esResult) {
+                        log.info("ES离线消息状态更新成功");
+                    } else {
+                        log.warn("ES离线消息状态更新失败，但HBase更新成功");
+                    }
+                } catch (Exception e) {
+                    log.error("更新ES离线消息状态失败", e);
+                }
+                
                 return true;
             } finally {
                 table.close();
@@ -396,7 +433,22 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                              Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
                 
                 table.put(put);
-                log.info("更新消息状态为:{} 成功", currentName);
+                log.info("更新HBase消息状态为:{} 成功", currentName);
+                
+                // 同时更新ES中的消息状态
+                try {
+                    dbResult.setMsgStatus(dto.getMsgStatus());
+                    dbResult.setUpdateTime(LocalDateTime.now());
+                    boolean esResult = saveToES(dbResult);
+                    if (esResult) {
+                        log.info("ES消息状态更新为:{} 成功", currentName);
+                    } else {
+                        log.warn("ES消息状态更新为:{} 失败，但HBase更新成功", currentName);
+                    }
+                } catch (Exception e) {
+                    log.error("更新ES消息状态失败", e);
+                }
+                
                 return true;
             } finally {
                 table.close();
@@ -439,7 +491,22 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                              Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
                 
                 table.put(put);
-                log.info("更新消息状态为撤回成功");
+                log.info("更新HBase消息状态为撤回成功");
+                
+                // 同时更新ES中的撤回状态
+                try {
+                    dbResult.setWithdrawFlag(MsgStatusEnum.MsgWithdrawStatus.YES.getCode());
+                    dbResult.setUpdateTime(LocalDateTime.now());
+                    boolean esResult = saveToES(dbResult);
+                    if (esResult) {
+                        log.info("ES消息撤回状态更新成功");
+                    } else {
+                        log.warn("ES消息撤回状态更新失败，但HBase更新成功");
+                    }
+                } catch (Exception e) {
+                    log.error("更新ES消息撤回状态失败", e);
+                }
+                
                 return true;
             } finally {
                 table.close();
