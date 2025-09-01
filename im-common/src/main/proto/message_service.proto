@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package com.xzll.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.xzll.grpc";
+option java_outer_classname = "MessageServiceProto";
+
+// 消息转发服务
+service MessageService {
+  // 响应服务端ack到客户端
+  rpc ResponseServerAck2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  
+  // 响应客户端ack到客户端
+  rpc ResponseClientAck2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  
+  // 发送撤回消息到客户端
+  rpc SendWithdrawMsg2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  
+  // 转发C2C消息
+  rpc TransferC2CMsg (ImBaseRequest) returns (WebBaseResponse) {}
+  
+  // 批量发送消息到多个用户
+  rpc BatchSendToUsers (BatchSendRequest) returns (BatchSendResponse) {}
+}
+
+// 通用消息请求
+message CommonMsgRequest {
+  string url = 1;
+  string msgId = 2;
+  string chatId = 3;
+  string fromUserId = 4;
+  string toUserId = 5;
+  string msgContent = 6;
+  string msgFormat = 7;
+  int64 msgCreateTime = 8;
+  int32 msgStatus = 9;
+  string ackTextDesc = 10;
+  int32 msgReceivedStatus = 11;
+  int64 receiveTime = 12;
+}
+
+// IM基础请求
+message ImBaseRequest {
+  string url = 1;
+  bytes body = 2;
+  map<string, string> headers = 3;
+}
+
+// 批量发送请求
+message BatchSendRequest {
+  repeated string userIds = 1;
+  CommonMsgRequest message = 2;
+  string messageType = 3; // ACK, WITHDRAW, etc.
+}
+
+// 批量发送响应
+message BatchSendResponse {
+  repeated UserSendResult results = 1;
+  int32 totalCount = 2;
+  int32 successCount = 3;
+  int32 failureCount = 4;
+}
+
+// 用户发送结果
+message UserSendResult {
+  string userId = 1;
+  bool success = 2;
+  string message = 3;
+  string error = 4;
+}
+
+// Web基础响应
+message WebBaseResponse {
+  int32 code = 1;
+  string message = 2;
+  string data = 3;
+  bool success = 4;
+} 

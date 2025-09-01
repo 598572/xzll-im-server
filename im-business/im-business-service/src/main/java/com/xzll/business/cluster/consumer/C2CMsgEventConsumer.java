@@ -61,7 +61,7 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
     }
 
     @Override
-    public void handleEvent(String topicName, ClusterEvent clusterEvent) {
+    public void handleEvent(String topicName, com.xzll.common.rocketmq.ClusterEvent clusterEvent) {
         Integer clusterEventType = clusterEvent.getClusterEventType();
         if (Objects.isNull(clusterEventType)) {
             log.error("缺少必填参数clusterEventType，不处理，请检查消息发送方");
@@ -74,7 +74,9 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_OFF_LINE_MSG:
                 C2COffLineMsgAO c2COffLineMsgAo = JSONUtil.toBean(clusterEvent.getData(), C2COffLineMsgAO.class);
-                c2COffLineMsgHandler.offLineMsgDeal(c2COffLineMsgAo);
+                // 转换为C2CSendMsgAO进行处理
+                C2CSendMsgAO c2CSendMsgAO = convertToC2CSendMsgAO(c2COffLineMsgAo);
+                c2COffLineMsgHandler.sendC2CMsgDeal(c2CSendMsgAO);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_CLIENT_RECEIVED_ACK_MSG:
                 C2CReceivedMsgAckAO c2CReceivedMsgAckAo = JSONUtil.toBean(clusterEvent.getData(), C2CReceivedMsgAckAO.class);
@@ -87,5 +89,21 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
             default:
                 log.warn("不适配的事件类型:{},请检查", clusterEvent);
         }
+    }
+    
+    /**
+     * 将C2COffLineMsgAO转换为C2CSendMsgAO
+     */
+    private C2CSendMsgAO convertToC2CSendMsgAO(C2COffLineMsgAO offLineMsgAO) {
+        C2CSendMsgAO sendMsgAO = new C2CSendMsgAO();
+        sendMsgAO.setFromUserId(offLineMsgAO.getFromUserId());
+        sendMsgAO.setToUserId(offLineMsgAO.getToUserId());
+        sendMsgAO.setMsgContent(offLineMsgAO.getMsgContent());
+        sendMsgAO.setMsgFormat(offLineMsgAO.getMsgFormat());
+        sendMsgAO.setMsgId(offLineMsgAO.getMsgId());
+        sendMsgAO.setChatId(offLineMsgAO.getChatId());
+        sendMsgAO.setUrl(offLineMsgAO.getUrl());
+        sendMsgAO.setMsgCreateTime(offLineMsgAO.getMsgCreateTime());
+        return sendMsgAO;
     }
 }

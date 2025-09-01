@@ -2,86 +2,77 @@ package com.xzll.business.handler.c2c;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.ImChatService;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.common.pojo.request.C2COffLineMsgAO;
-import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
-import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.util.msgId.SnowflakeIdService;
-import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
+import com.xzll.common.pojo.request.C2CSendMsgAO;
+import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
+import com.xzll.common.pojo.response.base.CommonMsgVO;
+import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboReference;
-import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
-import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
 import javax.annotation.Resource;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @Author: hzz
  * @Date: 2024/6/16 20:23:33
- * @Description: 离线消息处理器
+ * @Description: 离线消息处理器 - 已升级为gRPC
  */
 @Slf4j
 @Component
 public class C2COffLineMsgHandler {
-
-
     @Resource
-    	private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
+    private ImChatService imChatService;
+    @Resource
+    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
+    
+    // 替换Dubbo为gRPC
+    @Resource
+    private GrpcMessageService grpcMessageService;
+    
     @Resource
     private RedissonUtils redissonUtils;
-    @DubboReference
-    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
-
 
     /**
-     * 离线消息
-     *
-     * @param dto
+     * 离线消息处理 - 入库并发送服务端ACK
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void offLineMsgDeal(C2COffLineMsgAO dto) {
-        //1. 更新消息状态为离线
-        boolean updateResult = imC2CMsgRecordService.updateC2CMsgOffLineStatus(dto);
-
-        //2. 往redis存储离线消息(防止大量用户同时上线造成db压力)，用于上线后主动push 根据score 取，此处的score取msgId中的 雪花算法id，
-        redissonUtils.addToZSet(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getToUserId(), JSONUtil.toJsonStr(dto), SnowflakeIdService.getSnowflakeId(dto.getMsgId()));
-
-        //3. 响应给 发送方客户端 未读ack
-        if (updateResult) {
-            //如果接收方离线 需要伪造未读ack给发送方
-            //根据fromId找到他登录的机器并响应ack(rpc调用连接服务)
-            C2CClientReceivedMsgAckVO ackDTO = getClientReceivedMsgAckVO(dto);
-            //指定ip调用 与消息转发一样
-            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, dto.getToUserId());
-            UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
-            WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.responseClientAck2Client(ackDTO);
-            log.info("接收方离线时，服务器伪造未读ack给发送方结果:{}", JSONUtil.toJsonStr(webBaseResponse));
+    public void sendC2CMsgDeal(C2CSendMsgAO dto) {
+        boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
+        boolean writeMsg = imC2CMsgRecordHBaseService.saveC2CMsg(dto);
+        if (writeChat && writeMsg) {
+            // 发送服务端ACK，告知发送方消息已接收并存储
+            C2CServerReceivedMsgAckVO ackVo = getServerReceivedMsgAckVO(dto);
+            CompletableFuture<Boolean> future = grpcMessageService.sendServerAck(ackVo);
+            future.whenComplete((success, throwable) -> {
+                if (throwable != null) {
+                    log.error("离线消息服务端ACK发送失败: {}", throwable.getMessage(), throwable);
+                } else {
+                    log.info("离线消息服务端ACK发送成功，msgId:{} from:{} to:{}", dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
+                }
+            });
         }
     }
 
     /**
-     * 目标用户离线，构建伪造ack 给发送方
-     * @param packet
-     * @return
+     * 构建响应给客户端的服务端ack（保留工具方法，若后续策略变更可复用）
      */
-    public static C2CClientReceivedMsgAckVO getClientReceivedMsgAckVO(C2COffLineMsgAO packet) {
-        //目标用户离线，响应给发送者的ack固定为未读
-        packet.setMsgStatus(MsgStatusEnum.MsgStatus.UN_READ.getCode());
-
-        C2CClientReceivedMsgAckVO clientReceivedMsgAckDTO = new C2CClientReceivedMsgAckVO();
-        clientReceivedMsgAckDTO.setAckTextDesc(MsgStatusEnum.MsgStatus.getNameByCode(packet.getMsgStatus()))
-                .setMsgReceivedStatus(packet.getMsgStatus())
+    public static C2CServerReceivedMsgAckVO getServerReceivedMsgAckVO(C2CSendMsgAO packet) {
+        C2CServerReceivedMsgAckVO c2CServerReceivedMsgAckVO = new C2CServerReceivedMsgAckVO();
+        c2CServerReceivedMsgAckVO.setAckTextDesc(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getDesc())
+                .setMsgReceivedStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())
                 .setReceiveTime(System.currentTimeMillis())
                 .setChatId(packet.getChatId())
-                //toUser是目标客户端也就是 最初发消息的发送方，对于接收方响应ack时来说 发送方就变成：toUserId 了
                 .setToUserId(packet.getFromUserId())
-                .setUrl(packet.getUrl());
-        clientReceivedMsgAckDTO.setMsgId(packet.getMsgId());
-        return clientReceivedMsgAckDTO;
+                .setUrl(ImSourceUrlConstant.C2C.SERVER_RECEIVE_ACK);
+        c2CServerReceivedMsgAckVO.setMsgId(packet.getMsgId());
+        return c2CServerReceivedMsgAckVO;
     }
 }

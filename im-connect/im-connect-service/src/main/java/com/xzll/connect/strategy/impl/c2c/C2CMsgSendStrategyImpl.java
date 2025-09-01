@@ -29,8 +29,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
-import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
+import com.xzll.common.grpc.SmartGrpcClientManager;
+import com.xzll.common.config.GrpcClientConfig;
 import org.springframework.context.annotation.Lazy;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Service;
@@ -60,6 +60,10 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
     private TransferC2CMsgService transferC2CMsgService;
     @Resource
     private C2CMsgProvider c2CMsgProvider;
+    @Resource
+    private SmartGrpcClientManager grpcClientManager;
+    @Resource
+    private GrpcClientConfig grpcClientConfig;
 
 
     /**
@@ -122,13 +126,27 @@ public class C2CMsgSendStrategyImpl extends MsgHandlerCommonAbstract implements 
                 && StringUtils.isNotBlank(ipPortStr)) {
             log.info((TAG + "用户{}在线但是不在该机器上,跳转到用户所在的服务器,服务器信息:{}"), packet.getToUserId(), ipPortStr);
 
-            // 根据provider的ip,port创建Address实例并调用
-            //dubbo 2.7.13 使用此方式指定 ip 调用
-            //Address address = new Address(NettyAttrUtil.getIpStr(ipPortStr), NettyAttrUtil.getPortInt(ipPortStr));
-            //RpcContext.getContext().setObjectAttachment("address", address);
-            //dubbo 3.x 使用此方式指定 ip:port 调用 官方建议：[必须每次都设置，而且设置后必须马上发起调用]， 这里无需指定端口，指定ip就足够
-            UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPortStr), 0, false));
-            transferC2CMsgService.transferC2CMsg(imBaseRequest);
+            // 使用SmartGrpcClientManager进行跨服务器消息转发
+            String targetIp = NettyAttrUtil.getIpStr(ipPortStr);
+            int targetPort = grpcClientConfig.getDefaultPort(); // 从配置读取gRPC端口
+            try {
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStubByIP(targetIp, targetPort);
+                com.xzll.grpc.MessageServiceGrpc.MessageServiceBlockingStub stub = com.xzll.grpc.MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
+                
+                // 构建gRPC请求
+                com.xzll.grpc.ImBaseRequest grpcReq = com.xzll.grpc.ImBaseRequest.newBuilder()
+                        .setUrl(imBaseRequest.getUrl())
+                        .putAllHeaders(java.util.Collections.emptyMap())
+                        .setBody(com.google.protobuf.ByteString.copyFrom(JSONUtil.toJsonStr(imBaseRequest).getBytes()))
+                        .build();
+                
+                // 调用目标服务器的transferC2CMsg方法
+                com.xzll.grpc.WebBaseResponse resp = stub.transferC2CMsg(grpcReq);
+                log.info("通过gRPC转发消息结果: code={}, msg={}", resp.getCode(), resp.getMessage());
+                
+            } catch (Exception e) {
+                log.error("gRPC转发消息失败: {}", e.getMessage(), e);
+            }
         }
         log.debug("客户端发送单聊消息_结束");
     }

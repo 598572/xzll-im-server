@@ -8,17 +8,15 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
+import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.dubbo.config.annotation.DubboReference;
-import org.apache.dubbo.rpc.cluster.specifyaddress.Address;
-import org.apache.dubbo.rpc.cluster.specifyaddress.UserSpecifiedAddressUtil;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @Author: hzz
@@ -30,11 +28,11 @@ import javax.annotation.Resource;
 public class C2CClientWithdrawMsgHandler {
 
     @Resource
-    	private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
+    private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     @Resource
     private RedissonUtils redissonUtils;
-    @DubboReference
-    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
+    @Resource
+    private GrpcMessageService grpcMessageService;
 
 
     /**
@@ -49,11 +47,16 @@ public class C2CClientWithdrawMsgHandler {
         //2. 撤回消息发送至接收方
         if (updateResult) {
             C2CWithdrawMsgVO c2CWithdrawMsgVo = getC2CWithdrawMsgVO(ao);
-            //指定ip调用 与消息转发一样
-            String ipPort = redissonUtils.getHash(ImConstant.RedisKeyConstant.ROUTE_PREFIX, ao.getToUserId());
-            UserSpecifiedAddressUtil.setAddress(new Address(NettyAttrUtil.getIpStr(ipPort), 0, false));
-            WebBaseResponse webBaseResponse = rpcSendMsg2ClientApi.sendWithdrawMsg2Client(c2CWithdrawMsgVo);
-            log.info("发送撤回消息至接收方结果:{}", JSONUtil.toJsonStr(webBaseResponse));
+            
+            // 使用gRPC异步发送撤回消息
+            CompletableFuture<Boolean> future = grpcMessageService.sendWithdrawMsg(c2CWithdrawMsgVo);
+            future.whenComplete((success, throwable) -> {
+                if (throwable != null) {
+                    log.error("gRPC发送撤回消息失败: {}", throwable.getMessage(), throwable);
+                } else {
+                    log.info("发送撤回消息至接收方结果: success={}", success);
+                }
+            });
         }
     }
 
