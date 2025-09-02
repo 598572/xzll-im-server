@@ -1,0 +1,39 @@
+server:
+  port: 8093
+
+spring:
+  application:
+    name: data-sync
+
+# Elasticsearch配置
+elasticsearch:
+  rest:
+    uris: http://120.46.85.43:9200
+    connection-timeout: 5000
+    read-timeout: 5000
+
+# RocketMQ配置
+rocketmq:
+  name-server: 120.46.85.43:9876
+  producer:
+    group: im-data-sync-producer-group
+    send-message-timeout: 3000
+  consumer:
+    group: im-data-sync-consumer-group
+
+# 日志配置
+logging:
+  level:
+    com.xzll.datasync: DEBUG
+    org.apache.rocketmq: INFO
+    org.elasticsearch: INFO
+
+# 禁用Elasticsearch健康检查
+management:
+  health:
+    elasticsearch:
+      enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info

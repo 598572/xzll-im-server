@@ -23,6 +23,7 @@
         <module>im-connect</module>
         <module>im-business</module>
         <module>im-console</module>
+        <module>data-sync</module>
     </modules>
 
 
@@ -131,6 +132,12 @@
                 <artifactId>rocketmq-client</artifactId>
                 <!--注意client 版本 大于4.6.0会报错 RocketMQ invokeSync call timeout， 另外记录下 目前我的server是4.8.0的-->
                 <version>4.5.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>2.2.3</version>
             </dependency>
 
             <dependency>

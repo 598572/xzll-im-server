@@ -63,6 +63,7 @@ public interface ImConstant {
      */
     public static class TopicConstant {
         public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
+        public static final String XZLL_DATA_SYNC_TOPIC = "im_c2cmsg-sync-es-topic";
     }
 
     public static class RedisKeyConstant {
@@ -112,6 +113,8 @@ public interface ImConstant {
         public static final int C2C_CLIENT_RECEIVED_ACK_MSG = 30;
         //撤回消息
         public static final int C2C_CLIENT_WITHDRAW_MSG = 40;
+        //数据同步消息
+        public static final int C2C_DATA_SYNC = 50;
     }
 
 
