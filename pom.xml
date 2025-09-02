@@ -17,12 +17,12 @@
     <description>开源im项目</description>
 
     <modules>
+        <module>im-common</module>
         <module>im-gateway</module>
         <module>im-auth</module>
         <module>im-connect</module>
         <module>im-business</module>
         <module>im-console</module>
-        <module>im-common</module>
     </modules>
 
 
