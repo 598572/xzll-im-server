@@ -41,6 +41,14 @@ public interface ImConstant {
     }
 
 
+
+    // 数据同步相关常量
+    public static final String DATA_TYPE_C2C_MSG_RECORD = "C2C_MSG_RECORD";
+    public static final String OPERATION_TYPE_SAVE = "SAVE";
+    public static final String OPERATION_TYPE_UPDATE_STATUS = "UPDATE_STATUS";
+    public static final String OPERATION_TYPE_UPDATE_WITHDRAW = "UPDATE_WITHDRAW";
+
+
     /**
      * 会话类型
      */

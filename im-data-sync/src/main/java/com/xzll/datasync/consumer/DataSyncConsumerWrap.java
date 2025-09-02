@@ -53,4 +53,40 @@ public class DataSyncConsumerWrap {
             log.error("启动RocketMq consumer异常 ", e);
         }
     }
+
+    /**
+     * 批量消费方法 - 启用RocketMQ批量消费能力
+     *
+     * @param topics               订阅的topic列表
+     * @param batchConsumer       批量消息处理逻辑的实现
+     */
+    public void subscribeByBatchConsumer(List<String> topics, BatchDataSyncConsumer batchConsumer) {
+        // 订阅topic
+        if (!CollectionUtils.isEmpty(topics)) {
+            for (String topic : topics) {
+                try {
+                    this.defaultMQPushConsumer.subscribe(topic, "*");
+                    log.info("成功订阅topic: {}", topic);
+                } catch (MQClientException e) {
+                    log.error("订阅topic异常, topic={}", topic, e);
+                }
+            }
+        }
+        
+        // 配置批量消费参数
+        defaultMQPushConsumer.setConsumeMessageBatchMaxSize(100); // 单次消费最大消息数
+        // 注意：某些版本的RocketMQ可能没有setConsumeMessageBatchMaxSizeInterval方法
+        // 可以通过配置文件或启动参数来设置
+        
+        // 注册批量消息监听者
+        defaultMQPushConsumer.registerMessageListener(batchConsumer);
+
+        //启动consumer
+        try {
+            defaultMQPushConsumer.start();
+            log.info("DataSyncConsumerWrap批量消费启动成功");
+        } catch (MQClientException e) {
+            log.error("启动RocketMq批量consumer异常 ", e);
+        }
+    }
 }

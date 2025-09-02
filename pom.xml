@@ -23,7 +23,7 @@
         <module>im-connect</module>
         <module>im-business</module>
         <module>im-console</module>
-        <module>data-sync</module>
+        <module>im-data-sync</module>
     </modules>
 
 
