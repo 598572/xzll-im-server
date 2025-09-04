@@ -87,6 +87,22 @@ services:
     volumes:
       - "/tmp/data/logs:/logs"
 
+
+  im-data-sync:
+    build:
+      context: ./im-data-sync/src/main/resources
+      dockerfile: Dockerfile
+    image: im-data-sync:latest
+    hostname: im-data-sync
+    container_name: im-data-sync
+    restart: always
+    ports:
+      - "8085:8085"
+    networks:
+      - default_network
+    volumes:
+      - "/tmp/data/logs:/logs"
+
 networks:
   default_network:
     # 使用docker默认网络即：（桥接模式）
