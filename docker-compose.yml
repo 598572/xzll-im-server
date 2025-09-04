@@ -4,6 +4,9 @@ services:
     build:
       context: ./im-gateway/src/main/resources
       dockerfile: Dockerfile
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-gateway:latest
 
     hostname: im-gateway
@@ -19,6 +22,9 @@ services:
     build:
       context: ./im-auth/src/main/resources
       dockerfile: Dockerfile
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-auth:latest
 
     hostname: im-auth
@@ -35,6 +41,9 @@ services:
     build:
       context: ./im-business/im-business-service/src/main/resources # 指定Dockerfile文件位置
       dockerfile: Dockerfile # 指定名称
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-business:latest # 指定生成镜像的 名称
 
     # 也可以直接指定镜像名 但是要确保镜像存在 （如果在docker仓库, 则不需要再本地存在镜像 会自动pull）
@@ -64,6 +73,9 @@ services:
     build:
       context: ./im-connect/im-connect-service/src/main/resources
       dockerfile: Dockerfile
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-connect:latest
     hostname: im-connect
     container_name: im-connect
@@ -80,6 +92,9 @@ services:
     build:
       context: ./im-console/im-console-service/src/main/resources
       dockerfile: Dockerfile
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-console:latest
     hostname: im-console
     container_name: im-console
@@ -96,6 +111,9 @@ services:
     build:
       context: ./im-data-sync/src/main/resources
       dockerfile: Dockerfile
+      # 添加此配置确保使用本地镜像
+      cache_from:
+        - openjdk:11-jdk
     image: im-data-sync:latest
     hostname: im-data-sync
     container_name: im-data-sync
