@@ -1,6 +1,8 @@
 package com.xzll.client.client222;
 
 
+import com.xzll.client.client111.WebsocketClient111;
+
 import java.net.URISyntaxException;
 
 /**
@@ -18,7 +20,8 @@ public class Client_222 {
     public static final String GONGWANG = "1.92.82.32";
 
     public static void start(String[] args) {
-        WebsocketClient222 websocketClient222 = new WebsocketClient222(huawei, 10001);
+        WebsocketClient222 websocketClient222 = new WebsocketClient222(huawei, 80);
+//        WebsocketClient111 websocketClient222 = new WebsocketClient111(LOCAL, 10001);
         try {
             websocketClient222.run();
         } catch (InterruptedException e) {

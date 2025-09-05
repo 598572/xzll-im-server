@@ -603,10 +603,11 @@
             <activation>
             </activation>
             <properties>
-                <!--模拟test环境  vm06-->
+                <!--模拟test环境  内网 zk RocketMQ hbase hadoop都已集群部署， redis es 暂时单机-->
 
                 <!--替换bootstrap.properties中的 ${nacos.serverAddr}变量-->
-                <nacos.serverAddr>120.46.85.43:8848</nacos.serverAddr>
+                <!--test对应内网环境 各个服务都部署在内网，所以nacos也配内网地址-->
+                <nacos.serverAddr>192.168.1.150:8848</nacos.serverAddr>
                 <!--根据test的命名空间 填写此处的命名空间ID-->
                 <nacos.config.namespace>test_id</nacos.config.namespace>
                 <boot.profile>test</boot.profile>
@@ -614,6 +615,8 @@
             </properties>
         </profile>
         <profile>
+
+            <!--暂时没用到-->
             <id>prod</id>
             <activation>
             </activation>
