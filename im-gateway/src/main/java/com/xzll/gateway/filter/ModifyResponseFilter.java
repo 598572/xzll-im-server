@@ -76,7 +76,8 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
                             String str = new String(content, StandardCharsets.UTF_8);
                             Map<String, Object> map = JSONUtil.toBean(str, TreeMap.class);
                             //填充im-server信息
-                            fillImServerAddress(map);
+                            //使用nginx， 不用登录后返回ip了
+//                            fillImServerAddress(map);
                             originalResponse.getHeaders().setContentLength(JSONUtil.toJsonStr(map).getBytes().length);
                             return bufferFactory.wrap(JSONUtil.toJsonStr(map).getBytes());
                         }));
@@ -97,34 +98,34 @@ public class ModifyResponseFilter implements WebFilter {//, Ordered
      *
      * @param needAddImServerMap
      */
-    private void fillImServerAddress(Map<String, Object> needAddImServerMap) {
-        Map<String, String> entries = redissonUtils.getAllHash(NETTY_IP_PORT);
-        Assert.isTrue(!CollectionUtils.isEmpty(entries), "无长连接服务可用");
-
-        List<ImServerAddressDTO> addressDTOS = entries.entrySet().stream().map(x -> {
-            ImServerAddressDTO imServerAddressDTO = new ImServerAddressDTO();
-            imServerAddressDTO.setIp(x.getKey().toString());
-            imServerAddressDTO.setPort(Integer.valueOf(x.getValue().toString()));
-            return imServerAddressDTO;
-        }).collect(Collectors.toList());
-
-        //todo 策略模式 支持多种负载算法 ：随机 hash 轮询
-
-        //【随机】边界： 左闭 右开
-        int randomIndex = ThreadLocalRandom.current().nextInt(0, addressDTOS.size());
-        log.info("随机策略_randomIndex值:{}", randomIndex);
-        ImServerAddressDTO randomResult = addressDTOS.get(randomIndex);
-
-        //【轮询】
-        int seatCount = addressDTOS.size();
-        long current = redissonUtils.getAtomicLong(IM_SERVER_ROUND_COUNTER_KEY).incrementAndGet() - 1;
-        long index = current % seatCount;
-
-        ImServerAddressDTO roundResult = addressDTOS.get((int) index);
-        log.info("轮询策略_当前轮询值:{},index结果:{},胜出的ip端口:{}", current, index, JSONUtil.toJsonStr(roundResult));
-        JSONObject jsonObject = JSONUtil.parseObj(needAddImServerMap.get("data"));
-        Map<String, Object> ipPortMap = BeanUtil.beanToMap(roundResult, new TreeMap<>(), false, false);
-        jsonObject.putAll(ipPortMap);
-        needAddImServerMap.put("data", jsonObject);
-    }
+//    private void fillImServerAddress(Map<String, Object> needAddImServerMap) {
+//        Map<String, String> entries = redissonUtils.getAllHash(NETTY_IP_PORT);
+//        Assert.isTrue(!CollectionUtils.isEmpty(entries), "无长连接服务可用");
+//
+//        List<ImServerAddressDTO> addressDTOS = entries.entrySet().stream().map(x -> {
+//            ImServerAddressDTO imServerAddressDTO = new ImServerAddressDTO();
+//            imServerAddressDTO.setIp(x.getKey().toString());
+//            imServerAddressDTO.setPort(Integer.valueOf(x.getValue().toString()));
+//            return imServerAddressDTO;
+//        }).collect(Collectors.toList());
+//
+//        //todo 策略模式 支持多种负载算法 ：随机 hash 轮询
+//
+//        //【随机】边界： 左闭 右开
+//        int randomIndex = ThreadLocalRandom.current().nextInt(0, addressDTOS.size());
+//        log.info("随机策略_randomIndex值:{}", randomIndex);
+//        ImServerAddressDTO randomResult = addressDTOS.get(randomIndex);
+//
+//        //【轮询】
+//        int seatCount = addressDTOS.size();
+//        long current = redissonUtils.getAtomicLong(IM_SERVER_ROUND_COUNTER_KEY).incrementAndGet() - 1;
+//        long index = current % seatCount;
+//
+//        ImServerAddressDTO roundResult = addressDTOS.get((int) index);
+//        log.info("轮询策略_当前轮询值:{},index结果:{},胜出的ip端口:{}", current, index, JSONUtil.toJsonStr(roundResult));
+//        JSONObject jsonObject = JSONUtil.parseObj(needAddImServerMap.get("data"));
+//        Map<String, Object> ipPortMap = BeanUtil.beanToMap(roundResult, new TreeMap<>(), false, false);
+//        jsonObject.putAll(ipPortMap);
+//        needAddImServerMap.put("data", jsonObject);
+//    }
 }
