@@ -37,12 +37,11 @@ public class ImPersonalChatOptServiceImpl implements ImPersonalChatOptService {
      * @return
      */
     @Override
-    public List<ImPersonalChatOpt> findPersonalChatByUserId(ImPersonalChatOpt ao,int currentPage,int pageSize) {
+    public List<ImPersonalChatOpt> findPersonalChatByUserId(ImPersonalChatOpt ao, int currentPage, int pageSize) {
         log.info("查询最近会话列表_入参:{}", JSONUtil.toJsonStr(ao));
         LambdaQueryWrapper<ImPersonalChatOpt> queryWrapper = Wrappers.lambdaQuery(ImPersonalChatOpt.class)
-                //将根据此字段（userId） 分表
                 .and(query -> query.eq(ImPersonalChatOpt::getUserId, ao.getUserId()))
-                .and(query -> query.eq(ImPersonalChatOpt::getDelFlag, ImConstant.CommonConstant.NO))
+                .and(query -> query.eq(ImPersonalChatOpt::getDelChat, ImConstant.CommonConstant.NO))
                 .and(query -> query.eq(ImPersonalChatOpt::getUnShow, ImConstant.CommonConstant.NO))
                 .orderByDesc(ImPersonalChatOpt::getToTop, ImPersonalChatOpt::getLastMsgTime);
 

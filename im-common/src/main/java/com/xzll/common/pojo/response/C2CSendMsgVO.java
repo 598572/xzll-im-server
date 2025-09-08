@@ -44,7 +44,25 @@ public class C2CSendMsgVO extends CommonMsgVO {
      */
     private Integer retryMsgFlag;
 
-
+    /**
+     * 会话ID - 用于客户端更新会话列表
+     */
+    private String chatId;
+    
+    /**
+     * 会话最后消息时间 - 用于排序
+     */
+    private Long lastMsgTime;
+    
+    /**
+     * 会话最后消息格式 - 用于显示
+     */
+    private Integer lastMsgFormat;
+    
+    /**
+     * 会话最后消息内容 - 用于显示
+     */
+    private String lastMessageContent;
 
 
 }

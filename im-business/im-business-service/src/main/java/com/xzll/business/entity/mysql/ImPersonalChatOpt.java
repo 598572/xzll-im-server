@@ -1,6 +1,7 @@
 package com.xzll.business.entity.mysql;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -14,7 +15,7 @@ import java.time.LocalDateTime;
  * @Description: im_个人对会话的操作，如（置顶该聊天、不显示该聊天、删除该聊天） todo 此表数据量较大 需要根据userId 进行分表
  */
 @Data
-@TableName("im_personal_chat_opt")
+@TableName("im_chat_user_opt")  // 修正表名
 public class ImPersonalChatOpt implements Serializable {
 
 
@@ -40,22 +41,26 @@ public class ImPersonalChatOpt implements Serializable {
     /**
      * 0否 （不置顶） ，1是（置顶）
      */
-    private Boolean toTop;
+    @TableField("to_top")
+    private Integer toTop;  // 改为Integer类型，与DDL中的tinyint对应
 
     /**
      * 0否（展示） ，1是（不展示）
      */
-    private Boolean unShow;
+    @TableField("un_show")
+    private Integer unShow;  // 改为Integer类型
 
     /**
      * 某人某会话的未读总数
      */
+    @TableField("un_read_count")
     private Integer unReadCount;
 
     /**
      * 0否（不删除） ，1是（删除）
      */
-    private Boolean delFlag;
+    @TableField("del_chat")
+    private Integer delChat;  // 改为Integer类型，字段名改为delChat
 
     /**
      * 此会话最后一条消息时间

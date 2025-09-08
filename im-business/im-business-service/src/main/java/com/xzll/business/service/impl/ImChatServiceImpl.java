@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
 import com.google.common.collect.Lists;
+import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.entity.mysql.ImChat;
 import com.xzll.business.entity.mysql.ImPersonalChatOpt;
 import com.xzll.business.mapper.ImChatMapper;
@@ -23,9 +24,17 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.function.Function;
+import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+
+
+
+import org.apache.commons.lang3.StringUtils;
+
+
+
 
 
 /**
@@ -43,6 +52,8 @@ public class ImChatServiceImpl implements ImChatService {
     private ConversionService conversionService;
     @Resource
     private ImPersonalChatOptService imPersonalChatOptService;
+    @Resource
+    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
 
     /**
      * 保存单聊会话信息
@@ -102,16 +113,62 @@ public class ImChatServiceImpl implements ImChatService {
                 .orderByDesc(ImChat::getLastMsgTime);
         List<ImChat> imChats = imChatMapper.selectList(queryWrapper);
 
-        //todo 查询最后一条消息 内容&格式（可到redis存取）
+        // 构建批量查询参数
+        Map<String, String> chatMsgIds = imChats.stream()
+                .filter(chat -> StringUtils.isNotBlank(chat.getLastMsgId()))
+                .collect(Collectors.toMap(
+                        ImChat::getChatId,
+                        ImChat::getLastMsgId,
+                        (existing, replacement) -> existing // 处理重复key
+                ));
 
-        //todo 将置顶的会话 排到头部
+        // 批量查询最后一条消息内容&格式 - 完全由HBase服务层处理
+        Map<String, ImC2CMsgRecord> lastMsgMap = imC2CMsgRecordHBaseService.batchGetLastMessages(chatMsgIds);
+
+        // 组装返回结果
         lastChatListVOs = imChats.stream().map(x -> {
             LastChatListVO convert = conversionService.convert(x, LastChatListVO.class);
+
+            // 从批量查询结果中获取最后一条消息的详细内容
+            ImC2CMsgRecord lastMsg = lastMsgMap.get(x.getChatId());
+            if (lastMsg != null) {
+                convert.setLastMessageContent(lastMsg.getMsgContent());
+                convert.setLastMsgFormat(lastMsg.getMsgFormat());
+            }
+
             return convert;
         }).collect(Collectors.toList());
+
+        // 将置顶的会话排到头部
+        lastChatListVOs = sortChatListWithTopPriority(lastChatListVOs, personalChatByUserId);
+
         log.debug("查询最近会话列表_出参:{}", JSONUtil.toJsonStr(lastChatListVOs));
-        //todo 返回分页结构
         return lastChatListVOs;
     }
 
+
+
+    /**
+     * 根据置顶状态排序会话列表
+     */
+    private List<LastChatListVO> sortChatListWithTopPriority(List<LastChatListVO> chatList,
+                                                        List<ImPersonalChatOpt> personalChatOpts) {
+        // 创建置顶会话的映射
+        Map<String, ImPersonalChatOpt> topChatMap = personalChatOpts.stream()
+            .filter(opt -> opt.getToTop() != null && opt.getToTop() == 1)
+            .collect(Collectors.toMap(ImPersonalChatOpt::getChatId, Function.identity()));
+
+        return chatList.stream()
+            .sorted((a, b) -> {
+                boolean aIsTop = topChatMap.containsKey(a.getChatId());
+                boolean bIsTop = topChatMap.containsKey(b.getChatId());
+
+                if (aIsTop && !bIsTop) return -1;
+                if (!aIsTop && bIsTop) return 1;
+
+                // 都是置顶或都不是置顶，按时间排序
+                return Long.compare(b.getLastMsgTime(), a.getLastMsgTime());
+            })
+            .collect(Collectors.toList());
+    }
 }

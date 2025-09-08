@@ -1,8 +1,8 @@
 package com.xzll.business.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
+import com.xzll.business.config.HBaseTableUtil;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.constant.ImConstant;
@@ -29,6 +29,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.xzll.common.constant.ImConstant.*;
 import static com.xzll.common.constant.ImConstant.TopicConstant.XZLL_DATA_SYNC_TOPIC;
@@ -552,4 +555,91 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         }
     }
 
+    @Override
+    public ImC2CMsgRecord getMessageByMsgId(String chatId, String msgId) {
+        log.info("根据消息ID查询消息记录: chatId={}, msgId={}", chatId, msgId);
+        
+        if (StringUtils.isBlank(chatId) || StringUtils.isBlank(msgId)) {
+            log.warn("chatId或msgId为空，无法查询消息记录");
+            return null;
+        }
+        
+        try {
+            Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+            try {
+                // 使用HBaseTableUtil创建Get请求
+                Get get = HBaseTableUtil.createMessageGet(chatId, msgId);
+                Result result = table.get(get);
+                
+                if (result.isEmpty()) {
+                    log.warn("未找到消息记录: chatId={}, msgId={}", chatId, msgId);
+                    return null;
+                }
+                
+                ImC2CMsgRecord msgRecord = convertResultToImC2CMsgRecord(result);
+                log.info("成功查询到消息记录: chatId={}, msgId={}", chatId, msgId);
+                return msgRecord;
+                
+            } finally {
+                if (table != null) {
+                    table.close();
+                }
+            }
+        } catch (Exception e) {
+            log.error("根据消息ID查询消息记录失败: chatId={}, msgId={}", chatId, msgId, e);
+            return null;
+        }
+    }
+
+    @Override
+    public Map<String, ImC2CMsgRecord> batchGetLastMessages(Map<String, String> chatMsgIds) {
+        log.info("批量查询最后一条消息记录: chatMsgIds={}", chatMsgIds);
+        Map<String, ImC2CMsgRecord> lastMsgMap = new HashMap<>();
+        
+        if (chatMsgIds == null || chatMsgIds.isEmpty()) {
+            return lastMsgMap;
+        }
+        
+        try {
+            Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+            try {
+                // 构建批量Get请求
+                List<Get> getList = new ArrayList<>();
+                for (Map.Entry<String, String> entry : chatMsgIds.entrySet()) {
+                    String chatId = entry.getKey();
+                    String msgId = entry.getValue();
+                    if (StringUtils.isNotBlank(chatId) && StringUtils.isNotBlank(msgId)) {
+                        Get get = HBaseTableUtil.createMessageGet(chatId, msgId);
+                        getList.add(get);
+                    }
+                }
+                
+                if (getList.isEmpty()) {
+                    return lastMsgMap;
+                }
+                
+                // 批量查询
+                Result[] results = table.get(getList);
+                
+                for (Result result : results) {
+                    if (!result.isEmpty()) {
+                        ImC2CMsgRecord msgRecord = convertResultToImC2CMsgRecord(result);
+                        if (msgRecord != null) {
+                            lastMsgMap.put(msgRecord.getChatId(), msgRecord);
+                        }
+                    }
+                }
+                
+                log.info("批量查询最后一条消息记录完成，查询到{}条记录", lastMsgMap.size());
+            } finally {
+                if (table != null) {
+                    table.close();
+                }
+            }
+        } catch (Exception e) {
+            log.error("批量查询最后一条消息失败", e);
+        }
+        
+        return lastMsgMap;
+    }
 }
