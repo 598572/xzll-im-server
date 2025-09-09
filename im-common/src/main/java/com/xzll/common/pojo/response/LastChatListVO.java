@@ -42,4 +42,9 @@ public class LastChatListVO extends CommonMsgVO {
      * 最后一条消息时间
      */
     private Long lastMsgTime;
+    
+    /**
+     * 未读消息数量
+     */
+    private Integer unReadCount;
 }

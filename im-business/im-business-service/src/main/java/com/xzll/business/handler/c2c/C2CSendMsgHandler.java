@@ -3,6 +3,7 @@ package com.xzll.business.handler.c2c;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
+import com.xzll.business.service.UnreadCountService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -40,6 +41,8 @@ public class C2CSendMsgHandler {
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
     @Resource
     private RedissonUtils redissonUtils;
+    @Resource
+    private UnreadCountService unreadCountService;
 
 
     /**
@@ -52,6 +55,15 @@ public class C2CSendMsgHandler {
         boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
         boolean writeMsg = imC2CMsgRecordService.saveC2CMsg(dto);
         if (writeChat && writeMsg) {
+            // 增加接收方的未读消息数
+            try {
+                unreadCountService.incrementUnreadCount(dto.getToUserId(), dto.getChatId());
+                log.info("增加未读消息数成功: toUserId={}, chatId={}", dto.getToUserId(), dto.getChatId());
+            } catch (Exception e) {
+                log.error("增加未读消息数失败: toUserId={}, chatId={}", dto.getToUserId(), dto.getChatId(), e);
+                // 这里不抛异常，避免影响消息发送的主流程
+            }
+            
             //发送server_ack消息 告诉发送方此消息服务端已收到（想要可靠，必须落库后在ack）
             //根据fromId找到他登录的机器并响应ack(rpc调用连接服务)
             C2CServerReceivedMsgAckVO ackVo = getServerReceivedMsgAckVO(dto);

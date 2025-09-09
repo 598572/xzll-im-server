@@ -36,14 +36,7 @@ public class ImChat implements Serializable {
      * 被发起会话方,群聊的话固定为-1
      */
     private String toUserId;
-    /**
-     * 最后一条消息id
-     */
-    private String lastMsgId;
-    /**
-     * 此会话最后一条消息时间
-     */
-    private Long lastMsgTime;
+    
     /**
      * 会话类型，1单聊，2群聊
      */

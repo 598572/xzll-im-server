@@ -31,11 +31,13 @@ public class ImPersonalChatOpt implements Serializable {
     /**
      * 会话id
      */
+    @TableField("chat_id")
     private String chatId;
 
     /**
      * 操作的用户id
      */
+    @TableField("user_id")
     private String userId;
 
     /**
@@ -63,18 +65,20 @@ public class ImPersonalChatOpt implements Serializable {
     private Integer delChat;  // 改为Integer类型，字段名改为delChat
 
     /**
-     * 此会话最后一条消息时间
-     */
-    private Long lastMsgTime;
+//     * 此会话最后一条消息时间
+//     */
+//    private Long lastMsgTime;
 
     /**
      * 创建时间
      */
+    @TableField("create_time")
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
+    @TableField("update_time")
     private LocalDateTime updateTime;
 
 

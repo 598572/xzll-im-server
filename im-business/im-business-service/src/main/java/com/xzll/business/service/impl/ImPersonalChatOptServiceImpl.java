@@ -31,9 +31,11 @@ public class ImPersonalChatOptServiceImpl implements ImPersonalChatOptService {
     private ImPersonalChatOptMapper imPersonalChatOptMapper;
 
     /**
-     * 查询用户对会话的个人操作
+     * 查询用户对会话的个人操作（分页）
      *
      * @param ao
+     * @param currentPage 当前页码
+     * @param pageSize 每页大小
      * @return
      */
     @Override
@@ -43,8 +45,37 @@ public class ImPersonalChatOptServiceImpl implements ImPersonalChatOptService {
                 .and(query -> query.eq(ImPersonalChatOpt::getUserId, ao.getUserId()))
                 .and(query -> query.eq(ImPersonalChatOpt::getDelChat, ImConstant.CommonConstant.NO))
                 .and(query -> query.eq(ImPersonalChatOpt::getUnShow, ImConstant.CommonConstant.NO))
-                .orderByDesc(ImPersonalChatOpt::getToTop, ImPersonalChatOpt::getLastMsgTime);
+                .orderByDesc(ImPersonalChatOpt::getToTop);
 
+        Page<ImPersonalChatOpt> page = new Page<>(currentPage, pageSize);
+        IPage<ImPersonalChatOpt> resultPage = imPersonalChatOptMapper.selectPage(page, queryWrapper);
+        return resultPage.getRecords();
+    }
+
+    /**
+     * 查询用户对会话的个人操作（不分页）
+     *
+     * @param ao
+     * @param currentPage 当前页码（可为null，表示不分页）
+     * @param pageSize 每页大小（可为null，表示不分页）
+     * @return
+     */
+    @Override
+    public List<ImPersonalChatOpt> findPersonalChatByUserId(ImPersonalChatOpt ao, Integer currentPage, Integer pageSize) {
+        log.info("查询用户所有会话_入参:{}", JSONUtil.toJsonStr(ao));
+        
+        LambdaQueryWrapper<ImPersonalChatOpt> queryWrapper = Wrappers.lambdaQuery(ImPersonalChatOpt.class)
+                .and(query -> query.eq(ImPersonalChatOpt::getUserId, ao.getUserId()))
+                .and(query -> query.eq(ImPersonalChatOpt::getDelChat, ImConstant.CommonConstant.NO))
+                .and(query -> query.eq(ImPersonalChatOpt::getUnShow, ImConstant.CommonConstant.NO))
+                .orderByDesc(ImPersonalChatOpt::getToTop);
+
+        // 如果分页参数为null，则查询所有记录
+        if (currentPage == null || pageSize == null) {
+            return imPersonalChatOptMapper.selectList(queryWrapper);
+        }
+
+        // 否则进行分页查询
         Page<ImPersonalChatOpt> page = new Page<>(currentPage, pageSize);
         IPage<ImPersonalChatOpt> resultPage = imPersonalChatOptMapper.selectPage(page, queryWrapper);
         return resultPage.getRecords();

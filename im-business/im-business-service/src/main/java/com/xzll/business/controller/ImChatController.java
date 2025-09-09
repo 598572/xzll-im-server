@@ -37,8 +37,7 @@ public class ImChatController {
         try {
             // 参数校验
             if (ao == null || ao.getUserId() == null) {
-                WebBaseResponse<List<LastChatListVO>> failResponse = WebBaseResponse.returnResultError("用户ID不能为空");
-                return WebBaseResponse.returnResultError(HttpStatus.BAD_REQUEST.toString());
+                return WebBaseResponse.returnResultError("用户ID不能为空");
             }
             
             if (ao.getCurrentPage() == null || ao.getCurrentPage() <= 0) {
@@ -57,13 +56,11 @@ public class ImChatController {
             List<LastChatListVO> result = imChatService.findLastChatList(ao);
             
             log.info("查询最近会话列表成功，用户ID:{}, 返回{}条记录", ao.getUserId(), result.size());
-            WebBaseResponse<List<LastChatListVO>> successResponse = WebBaseResponse.returnResultSuccess(result);
-            return WebBaseResponse.returnResultError(HttpStatus.OK.toString());
+            return WebBaseResponse.returnResultSuccess(result);
             
         } catch (Exception e) {
             log.error("查询最近会话列表失败，用户ID:{}", ao != null ? ao.getUserId() : "null", e);
-            WebBaseResponse<List<LastChatListVO>> errorResponse = WebBaseResponse.returnResultError("查询会话列表失败: " + e.getMessage());
-            return WebBaseResponse.returnResultError(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            return WebBaseResponse.returnResultError("查询会话列表失败: " + e.getMessage());
         }
     }
 } 

@@ -6,6 +6,7 @@ import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 
+import java.util.List;
 import java.util.Map;
 
 public interface ImC2CMsgRecordHBaseService {
@@ -33,4 +34,11 @@ public interface ImC2CMsgRecordHBaseService {
      * @return 消息记录映射 Map<chatId, ImC2CMsgRecord>
      */
     Map<String, ImC2CMsgRecord> batchGetLastMessages(Map<String, String> chatMsgIds);
+
+    /**
+     * 批量查询每个会话的最后一条消息记录
+     * @param chatIds 会话ID列表
+     * @return 消息记录映射 Map<chatId, ImC2CMsgRecord>
+     */
+    Map<String, ImC2CMsgRecord> batchGetLastMessagesByChatIds(List<String> chatIds);
 }

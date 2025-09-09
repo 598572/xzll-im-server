@@ -2,6 +2,7 @@ package com.xzll.business.handler.c2c;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.UnreadCountService;
 
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -36,6 +37,8 @@ public class C2CClientReceivedAckMsgHandler {
     private RedissonUtils redissonUtils;
     @DubboReference
     private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
+    @Resource
+    private UnreadCountService unreadCountService;
 
 
     /**
@@ -47,11 +50,23 @@ public class C2CClientReceivedAckMsgHandler {
     public void clientReceivedAckMsgDeal(C2CReceivedMsgAckAO dto) {
         //1. 更新消息状态为：未读/已读
         boolean updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
-        //2. （收到未读/已读ack后）删除离线消息缓存
+        
+        //2. 如果是已读消息，清零该会话的未读数
+        if (updateResult && MsgStatusEnum.MsgStatus.READED.getCode() == dto.getMsgStatus()) {
+            try {
+                unreadCountService.clearUnreadCount(dto.getFromUserId(), dto.getChatId());
+                log.info("清零未读消息数成功: userId={}, chatId={}", dto.getFromUserId(), dto.getChatId());
+            } catch (Exception e) {
+                log.error("清零未读消息数失败: userId={}, chatId={}", dto.getFromUserId(), dto.getChatId(), e);
+                // 这里不抛异常，避免影响消息ACK的主流程
+            }
+        }
+        
+        //3. （收到未读/已读ack后）删除离线消息缓存
         long needDeleteMsgId = SnowflakeIdService.getSnowflakeId(dto.getMsgId());
         redissonUtils.removeZSetByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
 
-        //3. 接收方客户端ack发送至发送方
+        //4. 接收方客户端ack发送至发送方
         if (updateResult) {
             C2CClientReceivedMsgAckVO ackVo = getClientReceivedMsgAckVO(dto);
             //指定ip调用 与消息转发一样
