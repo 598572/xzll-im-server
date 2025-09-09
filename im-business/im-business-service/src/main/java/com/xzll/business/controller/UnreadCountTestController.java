@@ -1,6 +1,7 @@
 package com.xzll.business.controller;
 
 import com.xzll.business.service.UnreadCountService;
+import com.xzll.business.service.impl.UnreadCountServiceImpl;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,9 @@ public class UnreadCountTestController {
 
     @Resource
     private UnreadCountService unreadCountService;
+    
+    @Resource
+    private UnreadCountServiceImpl unreadCountServiceImpl;
 
     /**
      * 增加未读数测试
@@ -145,6 +149,40 @@ public class UnreadCountTestController {
         } catch (Exception e) {
             log.error("删除未读数记录失败: userId={}, chatId={}", userId, chatId, e);
             return WebBaseResponse.returnResultError("删除未读数记录失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清理用户损坏的未读数据
+     * 当出现 "ERR hash value is not a float" 错误时可以调用此接口
+     */
+    @PostMapping("/cleanup-corrupted")
+    public WebBaseResponse<String> cleanupCorruptedData(@RequestParam String userId) {
+        try {
+            unreadCountServiceImpl.cleanupCorruptedData(userId);
+            log.info("清理用户损坏数据成功: userId={}", userId);
+            return WebBaseResponse.returnResultSuccess("用户未读数据清理成功");
+        } catch (Exception e) {
+            log.error("清理用户损坏数据失败: userId={}", userId, e);
+            return WebBaseResponse.returnResultError("清理用户损坏数据失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 修复指定会话的数据类型问题
+     * 当特定会话出现类型错误时可以调用此接口
+     */
+    @PostMapping("/fix-data-type")
+    public WebBaseResponse<String> fixDataType(
+            @RequestParam String userId,
+            @RequestParam String chatId) {
+        try {
+            unreadCountServiceImpl.fixDataType(userId, chatId);
+            log.info("修复数据类型成功: userId={}, chatId={}", userId, chatId);
+            return WebBaseResponse.returnResultSuccess("数据类型修复成功");
+        } catch (Exception e) {
+            log.error("修复数据类型失败: userId={}, chatId={}", userId, chatId, e);
+            return WebBaseResponse.returnResultError("修复数据类型失败: " + e.getMessage());
         }
     }
 }

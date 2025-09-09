@@ -78,4 +78,20 @@ public interface UnreadCountService {
      * @return 总未读消息数
      */
     int getTotalUnreadCount(String userId);
+
+    /**
+     * 清理指定用户的损坏未读数据
+     * 当出现类型转换错误时可以调用此方法进行数据清理
+     * 
+     * @param userId 用户ID
+     */
+    void cleanupCorruptedData(String userId);
+
+    /**
+     * 修复指定用户指定会话的数据类型问题
+     * 
+     * @param userId 用户ID
+     * @param chatId 会话ID
+     */
+    void fixDataType(String userId, String chatId);
 }

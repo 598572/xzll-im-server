@@ -20,8 +20,8 @@ public class Client_111 {
     public static final String GONGWANG = "1.92.82.32";
 
     public static void start(String[] args) {
-//        WebsocketClient111 websocketClient111 = new WebsocketClient111(huawei, 80);
-        WebsocketClient111 websocketClient111 = new WebsocketClient111(LOCAL, 10001);
+        WebsocketClient111 websocketClient111 = new WebsocketClient111(huawei, 80);
+//        WebsocketClient111 websocketClient111 = new WebsocketClient111(LOCAL, 10001);
         try {
             websocketClient111.run();
         } catch (InterruptedException e) {
