@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 
 import static com.xzll.common.constant.ImConstant.*;
 import static com.xzll.common.constant.ImConstant.TopicConstant.XZLL_DATA_SYNC_TOPIC;
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
 /**
  * @Author: hzz
@@ -61,7 +62,7 @@ import static com.xzll.common.constant.ImConstant.TopicConstant.XZLL_DATA_SYNC_T
 public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseService {
 
     // HBase表名
-    private static final String TABLE_NAME = "im_c2c_msg_record";
+    private static final String TABLE_NAME = IM_C2C_MSG_RECORD;
     // 列族名
     private static final String COLUMN_FAMILY = "info";
     // 列名
@@ -169,6 +170,10 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                 table.put(put);
                 
                 log.info("C2C消息离线状态更新成功: chatId={}, msgId={}, status={}", dto.getChatId(), dto.getMsgId(), dto.getMsgStatus());
+                
+                // 发送数据同步消息
+                sendDataSyncMessage(OPERATION_TYPE_UPDATE_STATUS, dto.getChatId(), dto.getMsgId(), dto);
+                
                 return true;
             } finally {
                 if (table != null) {
@@ -200,6 +205,10 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                 table.put(put);
                 
                 log.info("C2C消息接收状态更新成功: chatId={}, msgId={}, status={}", dto.getChatId(), dto.getMsgId(), dto.getMsgStatus());
+                
+                // 发送数据同步消息
+                sendDataSyncMessage(OPERATION_TYPE_UPDATE_STATUS, dto.getChatId(), dto.getMsgId(), dto);
+                
                 return true;
             } finally {
                 if (table != null) {
@@ -231,6 +240,10 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                 table.put(put);
                 
                 log.info("C2C消息撤回状态更新成功: chatId={}, msgId={}", dto.getChatId(), dto.getMsgId());
+                
+                // 发送数据同步消息
+                sendDataSyncMessage(OPERATION_TYPE_UPDATE_WITHDRAW, dto.getChatId(), dto.getMsgId(), dto);
+                
                 return true;
             } finally {
                 if (table != null) {
@@ -591,14 +604,62 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
      * 发送消息到RocketMQ进行数据同步
      */
     private void sendToRocketMQ(C2CSendMsgAO dto) {
+        sendDataSyncMessage(dto, OPERATION_TYPE_SAVE);
+    }
+
+    /**
+     * 发送数据同步消息到RocketMQ
+     */
+    private void sendDataSyncMessage(C2CSendMsgAO dto, String operationType) {
         try {
+            log.info("开始发送数据同步消息，operationType: {}, chatId: {}, msgId: {}", 
+                    operationType, dto.getChatId(), dto.getMsgId());
+            
+            // 构造数据同步消息格式
+            Map<String, Object> dataSyncMessage = new HashMap<>();
+            dataSyncMessage.put("operationType", operationType);
+            dataSyncMessage.put("dataType", DATA_TYPE_C2C_MSG_RECORD);
+            dataSyncMessage.put("data", dto);
+            
             ClusterEvent event = new ClusterEvent();
-            event.setData(JSONUtil.toJsonStr(dto));
+            event.setClusterEventType(ClusterEventTypeConstant.C2C_DATA_SYNC);
+            event.setData(JSONUtil.toJsonStr(dataSyncMessage));
             
             rocketMqProducerWrap.sendClusterEvent(XZLL_DATA_SYNC_TOPIC, event, dto.getChatId());
-            log.info("C2C消息发送到RocketMQ成功: chatId={}, msgId={}", dto.getChatId(), dto.getMsgId());
+            
+            log.info("数据同步消息发送成功，topic: {}, operationType: {}, chatId: {}, msgId: {}", 
+                    XZLL_DATA_SYNC_TOPIC, operationType, dto.getChatId(), dto.getMsgId());
         } catch (Exception e) {
-            log.error("C2C消息发送到RocketMQ失败: chatId={}, msgId={}", dto.getChatId(), dto.getMsgId(), e);
+            log.error("数据同步消息发送失败，operationType: {}, chatId: {}, msgId: {}", 
+                    operationType, dto.getChatId(), dto.getMsgId(), e);
+        }
+    }
+
+    /**
+     * 发送通用数据同步消息到RocketMQ
+     */
+    private void sendDataSyncMessage(String operationType, String chatId, String msgId, Object data) {
+        try {
+            log.info("开始发送数据同步消息，operationType: {}, chatId: {}, msgId: {}", 
+                    operationType, chatId, msgId);
+            
+            // 构造数据同步消息格式
+            Map<String, Object> dataSyncMessage = new HashMap<>();
+            dataSyncMessage.put("operationType", operationType);
+            dataSyncMessage.put("dataType", DATA_TYPE_C2C_MSG_RECORD);
+            dataSyncMessage.put("data", data);
+            
+            ClusterEvent event = new ClusterEvent();
+            event.setClusterEventType(ClusterEventTypeConstant.C2C_DATA_SYNC);
+            event.setData(JSONUtil.toJsonStr(dataSyncMessage));
+            
+            rocketMqProducerWrap.sendClusterEvent(XZLL_DATA_SYNC_TOPIC, event, chatId);
+            
+            log.info("数据同步消息发送成功，topic: {}, operationType: {}, chatId: {}, msgId: {}", 
+                    XZLL_DATA_SYNC_TOPIC, operationType, chatId, msgId);
+        } catch (Exception e) {
+            log.error("数据同步消息发送失败，operationType: {}, chatId: {}, msgId: {}", 
+                    operationType, chatId, msgId, e);
         }
     }
 }

@@ -48,6 +48,15 @@ public interface ImConstant {
     public static final String OPERATION_TYPE_UPDATE_STATUS = "UPDATE_STATUS";
     public static final String OPERATION_TYPE_UPDATE_WITHDRAW = "UPDATE_WITHDRAW";
 
+    /**
+     * 表名/索引名常量
+     */
+    public static class TableConstant {
+        /**
+         * C2C消息记录表名/索引名（用于 MySQL、HBase、ES）
+         */
+        public static final String IM_C2C_MSG_RECORD = "im_c2c_msg_record";
+    }
 
     /**
      * 会话类型

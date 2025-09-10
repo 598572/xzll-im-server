@@ -15,6 +15,8 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
+
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.io.IOException;
@@ -33,7 +35,7 @@ import org.apache.hadoop.hbase.client.Scan;
 public class HBaseTableUtil {
 
     // 表名
-    public static final String IM_C2C_MSG_RECORD_TABLE = "im_c2c_msg_record";
+    public static final String IM_C2C_MSG_RECORD_TABLE = IM_C2C_MSG_RECORD;
     // 列族名
     public static final String COLUMN_FAMILY_INFO = "info";
     

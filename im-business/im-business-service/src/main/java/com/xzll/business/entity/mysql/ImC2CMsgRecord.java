@@ -8,13 +8,14 @@ import lombok.Data;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
+
 /**
  * @Author: hzz
  * @Date: 2024/06/03 08:11:39
  * @Description:
  */
 @Data
-@TableName("im_c2c_msg_record")
 public class ImC2CMsgRecord implements Serializable {
 
 

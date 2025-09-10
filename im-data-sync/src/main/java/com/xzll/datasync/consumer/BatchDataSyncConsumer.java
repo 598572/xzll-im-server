@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.xzll.common.constant.ImConstant.*;
+import static com.xzll.common.constant.ImConstant.TableConstant.*;
+
 /**
  * 批量数据同步消费者
  * 直接利用RocketMQ的批量消费能力，实现高性能批量写入ES
@@ -73,7 +76,7 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
                     String operationType = (String) eventMap.get("operationType");
                     String dataType = (String) eventMap.get("dataType");
                     
-                    if ("C2C_MSG_RECORD".equals(dataType)) {
+                    if (DATA_TYPE_C2C_MSG_RECORD.equals(dataType)) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> recordData = (Map<String, Object>) eventMap.get("data");
                         
@@ -83,7 +86,7 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
                         esRecord.buildId();
                         
                         // 按操作类型分组，减少ES操作次数
-                        if ("SAVE".equals(operationType)) {
+                        if (OPERATION_TYPE_SAVE.equals(operationType)) {
                             insertRecords.add(esRecord);
                         } else {
                             updateRecords.add(esRecord);
@@ -105,7 +108,7 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
                 try {
                     BulkRequest bulkRequest = new BulkRequest();
                     for (ImC2CMsgRecordES record : insertRecords) {
-                        IndexRequest indexRequest = new IndexRequest("im_c2c_msg_record")
+                        IndexRequest indexRequest = new IndexRequest(IM_C2C_MSG_RECORD)
                                 .id(record.getId())
                                 .source(JSONUtil.toJsonStr(record), XContentType.JSON);
                         bulkRequest.add(indexRequest);
@@ -127,7 +130,7 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
                 try {
                     BulkRequest bulkRequest = new BulkRequest();
                     for (ImC2CMsgRecordES record : updateRecords) {
-                        UpdateRequest updateRequest = new UpdateRequest("im_c2c_msg_record", record.getId())
+                        UpdateRequest updateRequest = new UpdateRequest(IM_C2C_MSG_RECORD, record.getId())
                                 .doc(JSONUtil.toJsonStr(record), XContentType.JSON)
                                 .docAsUpsert(true);
                         bulkRequest.add(updateRequest);

@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
+
 
 /**
  * @Author: hzz
@@ -54,7 +56,7 @@ public class TestConsoleController {
 		try {
 			boolean isHealthy = hBaseHealthChecker.isConnectionHealthy();
 			String status = hBaseHealthChecker.getConnectionStatus();
-			boolean tableExists = hBaseHealthChecker.isTableExists("im_c2c_msg_record");
+			boolean tableExists = hBaseHealthChecker.isTableExists(IM_C2C_MSG_RECORD);
 			
 			result.put("success", true);
 			result.put("hbaseHealthy", isHealthy);
