@@ -3,6 +3,8 @@ package com.xzll.connect.netty.channel;
 import cn.hutool.extra.spring.SpringUtil;
 import com.xzll.connect.config.IMConnectServerConfig;
 import com.xzll.connect.netty.handler.AuthHandler;
+import com.xzll.connect.netty.handler.ConnectionLimitHandler;
+import com.xzll.connect.netty.handler.FlowControlHandler;
 import com.xzll.connect.netty.handler.MetricsHandler;
 import com.xzll.connect.netty.handler.WebSocketServerHandler;
 import io.netty.channel.ChannelInitializer;
@@ -44,13 +46,16 @@ public class WebSocketChannelInitializer extends ChannelInitializer<SocketChanne
         pipeline.addLast(new ChunkedWriteHandler());
         // 支持WebSocket数据压缩
         pipeline.addLast(new WebSocketServerCompressionHandler());
-        //设置心跳
-        pipeline.addLast("heart-notice", new IdleStateHandler(11, 0, 0, TimeUnit.SECONDS));
+        //设置心跳 - 根据IM场景调整为30秒读超时
+        pipeline.addLast("heart-notice", new IdleStateHandler(30, 0, 0, TimeUnit.SECONDS));
 
-        //添加自定义handler
-        pipeline.addLast(new MetricsHandler());
-        pipeline.addLast(new AuthHandler());
-        pipeline.addLast(new WebSocketServerHandler());
+        //添加安全和统计相关handler
+        // 使用Spring管理的Bean，支持@Sharable单例模式
+        pipeline.addLast("connection-limit", SpringUtil.getBean(ConnectionLimitHandler.class));
+        pipeline.addLast("flow-control", SpringUtil.getBean(FlowControlHandler.class));
+        pipeline.addLast("metrics", new MetricsHandler()); // 无状态，可以new
+        pipeline.addLast("auth", SpringUtil.getBean(AuthHandler.class)); // Spring管理的单例
+        pipeline.addLast("websocket", SpringUtil.getBean(WebSocketServerHandler.class)); // Spring管理的单例
 
     }
 }

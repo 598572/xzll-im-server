@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NettyAttrUtil {
 
     private static final AttributeKey<String> ATTR_KEY_READER_TIME = AttributeKey.valueOf("readerTime");
+    private static final AttributeKey<String> ATTR_KEY_CONNECT_TIME = AttributeKey.valueOf("connectTime");
     public static final String LINK = ":";
     private static final ConcurrentHashMap<String, Integer> IP_PORT_MAP = new ConcurrentHashMap<>(1);
 
@@ -22,6 +23,19 @@ public class NettyAttrUtil {
 
     public static Long getReaderTime(Channel channel) {
         String value = getAttribute(channel, ATTR_KEY_READER_TIME);
+
+        if (value != null) {
+            return Long.valueOf(value);
+        }
+        return null;
+    }
+    
+    public static void setConnectTime(Channel channel, Long time) {
+        channel.attr(ATTR_KEY_CONNECT_TIME).set(time.toString());
+    }
+
+    public static Long getConnectTime(Channel channel) {
+        String value = getAttribute(channel, ATTR_KEY_CONNECT_TIME);
 
         if (value != null) {
             return Long.valueOf(value);

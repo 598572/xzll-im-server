@@ -30,6 +30,7 @@ public class ResourceServiceImpl {
         resourceRolesMap = new TreeMap<>();
         //暂时在代码中只配一个 后期读库
         resourceRolesMap.put("/xzll/im/login", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/chat/lastChatList", CollUtil.toList("ADMIN"));
         resourceRolesMap.put("/im-auth/oauth/logout", CollUtil.toList("ADMIN"));
 
         // 将Map<String, List<String>>转换为Map<String, String>存储

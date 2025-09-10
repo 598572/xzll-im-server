@@ -209,6 +209,13 @@
             <version>9.3.0</version>
         </dependency>
 
+        <!-- JWT解析依赖，用于Token验证 -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>${nimbus-jose-jwt.version}</version>
+        </dependency>
+
 
     </dependencies>
 
