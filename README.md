@@ -142,49 +142,13 @@
 # 4、如何启动并运行此项目？
 
 ## 4.1、在idea中运行此项目
-注意：因为此项目目前还在开发中，多数情况下，都是在idea（xzll-im-server）和 Android Studio（xzll-im-client） 中写完代码并调试自测。所以着重看这个就行。
+直接下载此项目main分支，一键启动即可（因为相关依赖的中间件都已经部署在服务器上了，公网可流畅连接）：
+![img.png](img.png)
 
-### 4.1.1、xzll-im-server 依赖环境准备
-
-首先需要安装依赖的环境，想运行服务端，以下几个是中间件和db是必不可少的
-- RocketMQ：（docker部署）
-  - 包含（rocket_nameserver,rocket_broker,rocket_console）
-- Redis （docker部署）
-- Zookeeper（docker部署）
-- Nacos（docker部署）
-- MySQL（虚拟机部署）详见：[Centos7安装mysql8.0.35（亲测）](https://juejin.cn/post/7299389919953272883)
-- ElasticSearch（虚拟机部署）详见：[Centos7安装Elasticsearch和Kibana 记录（无坑版）](https://juejin.cn/post/7295672695001120795)
-
-为了方便，其中docker部署的，写了个脚本（脚本内容 [戳这里（注意运行脚本时需要指定你的ip）](script/start_dependencies/dev_start_dependencies_script.sh)），启动脚本的命令是：
-```
-sudo sh dev_start_dependencies_script.sh 172.30.128.65
-```
-启动后的效果如下:
-![](doc/环境准备/images/img.png)
-
-
-### 4.1.2、导入 xzll-im-server 所依赖的 nacos 配置文件
-在启动之后，接下来，需要配置nacos相关，首先我们先建一个命名空间，此命名空间用于区分环境，如下：
-![](doc/环境准备/images/创建nacos命名空间.png)
-
-接下来 导入nacos配置（nacos 配置文件[戳这里](doc/环境准备/nacos_config)）：
-![](doc/环境准备/images/导入nacos配置.png)
-
-导入后的结果：
-![](doc/环境准备/images/导入后结果.png)
 
 ## 4.2、演示
 
 编写中.....
-
-
-
-
-## 4.3、在虚拟机中运行此项目
-参考我在掘金的文章：[使用Jenkins 部署我的 xzll-im-server 项目](https://juejin.cn/post/7392104848973709352)
-
-提示：在开发阶段，基本不需要这样做。到了测试环境，生产环境，那再来看这个指南。不过随着项目迭代，此指南是不断更新的。
-
 
 # 为了方便协作，可加我微信，然后我给拉进此项目相关群聊。
 
