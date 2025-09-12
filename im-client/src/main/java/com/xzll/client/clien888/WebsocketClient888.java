@@ -131,7 +131,7 @@ public class WebsocketClient888 {
                     C2CSendMsgAO c2CMsgRequestDTO = new C2CSendMsgAO();
                     c2CMsgRequestDTO.setMsgId(msgId);
                     c2CMsgRequestDTO.setMsgContent(s);
-                    c2CMsgRequestDTO.setChatId("999");
+                    c2CMsgRequestDTO.setChatId("100-1-1966369607918948352-1966479049087913984");
                     c2CMsgRequestDTO.setToUserId("1966369607918948352");
                     c2CMsgRequestDTO.setFromUserId(VALUE);
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());
