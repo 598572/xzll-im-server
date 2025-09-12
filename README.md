@@ -43,6 +43,7 @@
 1. Mybatis Plus【ORM】✅
 1. Mysql【会话/用户信息等量级不大的数据存储】✅
 1. hbase【消息数据存储】✅
+1. im-data-sync会同步聊天数据到ElasticSearch【用于聊天记录模糊搜索】
 2. Spring Cloud GateWay 【网关】✅
 1. Oauth2 + Spring Security 【认证&鉴权】✅
 1. 在雪花算法基础上 生成含有业务信息的 msgId，长连接获取批量消息id ✅
@@ -55,7 +56,6 @@
 1. Sentinel 【限流】
 1. docker ✅ +k8s【项目部署】
 1. SkyWalking 【链路追踪】
-1. ElasticSearch【聊天记录等搜索】
 1. Jmeter+python脚本【压测】
 2. redis集群部署
 3. elasticsearch集群部署
