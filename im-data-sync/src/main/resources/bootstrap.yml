@@ -16,8 +16,8 @@ spring:
           data-id: global.yaml
           group: DEFAULT_GROUP
           refresh: true
-      discovery:
-        server-addr: @nacos.serverAddr@
+#      discovery:
+#        server-addr: @nacos.serverAddr@
 
 #排查问题时使用
 logging:
