@@ -15,3 +15,5 @@ spring:
           data-id: global.yaml
           group: DEFAULT_GROUP
           refresh: true
+      discovery:
+        server-addr: @nacos.serverAddr@
