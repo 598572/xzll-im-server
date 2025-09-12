@@ -63,11 +63,11 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
     private boolean tokenExpireCheck;
     
     // 最大认证失败次数
-    @Value("${im.netty.auth.max-auth-failures:5}")
+    @Value("${im.netty.auth.max-auth-failures:50}")
     private int maxAuthFailures;
     
     // 认证失败锁定时间（分钟）
-    @Value("${im.netty.auth.lockout-duration-minutes:30}")
+    @Value("${im.netty.auth.lockout-duration-minutes:1}")
     private int lockoutDurationMinutes;
 
     @Override

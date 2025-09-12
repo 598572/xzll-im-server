@@ -42,7 +42,7 @@ public class WebsocketClient222 {
 
 
     private static EventLoopGroup group = new NioEventLoopGroup();
-    public static final String VALUE = "1965687073912524800";
+    public static final String VALUE = "1966369607918948352";
     private String ip;
     private int port;
     private String uriStr;
@@ -61,7 +61,7 @@ public class WebsocketClient222 {
         URI wsUri = new URI(uriStr);
 
         DefaultHttpHeaders entries = new DefaultHttpHeaders();
-        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJ4emxsYWRnMDIiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxOTY1Njg3MDczOTEyNTI0ODAwLCJleHAiOjE3NTc1MTI4NzUsImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6IjZhNDQzZTZlLTg3MDUtNDk1ZC05YzQxLWU4NjliNDVlZTFjYSIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.rxUxrRY-s_LMjmYXMO-8GRCdXFPsW0zCCg8TpWKFi36B8q0PtWfYiWVj3uFRk2qhf-2RAi7d4uf6d5IQOH1FtE2IgaHvEDK4RjbREIORWeKZ8ujw83wCkYslWF4iYkFoxTGtYJ9HRaQSknGs9UB5d2VYmQuN4HQDTRYesoAjelD5fY_-hdSbNxnOWfzuO0F0ywhXT5oi0SRso-EjJf6jtrsvuwxwur0G7Yyl7dYDVKVijENq0j6bAohE1eRmKsA9vMZj7OFHb4DbUpOcRREIts3kAK0VfDLFPF3rCV5UguaRiSc9EbZj3L9Ud0-qgbOyG7-6roPKs6WSlt427Psn5A");
+        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJ4emxsYWRnMDIiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxOTY1Njg3MDczOTEyNTI0ODAwLCJleHAiOjE3NTc1MTQwMTAsImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6Ijc2OGYzNmM0LTk1YjEtNDgyNi1iNThiLWZkZmMzNWE1OTU1MiIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.hEhq5q0dKb1TV-nDqOre57e9-4KiSnDdGWdvYxNAdlnIFoYr2wJqMuydPl13XDmUuJZjN1WXE2Hk6UtCIV_4w7c8PwU8qcWlrElKGSt9ivtidSdH3ZRX3cHNa32_jhLpVkBDJA1bU1MCHQwq8nuxFv3sAI-AgKW8P_ZQAMCmuVtyNiT7Pqzd8xYkyJlQmCzOztSMs4vd1YEVxc9CYpp2RSxtVPqH6gshlEMUlvceGIrysX2gQOvLsPMkLhDoAeRazdzXnekt02BpwV5QYg3jJ8VrLQ0M8nTq0pZP5UM7DPDjRiv7_7F3ylLC21iAZk8vgtkhKNns1C0OHaFDUjUH6Q");
         entries.set("uid", VALUE);
 
         // 设置Bootstrap

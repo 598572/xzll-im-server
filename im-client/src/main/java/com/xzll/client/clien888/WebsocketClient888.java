@@ -1,9 +1,8 @@
-package com.xzll.client.client111;
+package com.xzll.client.clien888;
 
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
-import com.xzll.client.client222.WebsocketClient222;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.pojo.base.ImBaseRequest;
@@ -39,7 +38,7 @@ import java.util.concurrent.TimeUnit;
  */
 
 @Slf4j
-public class WebsocketClient111 {
+public class WebsocketClient888 {
 
 
     public static final String VALUE = "1966479049087913984";
@@ -48,11 +47,11 @@ public class WebsocketClient111 {
     private String ip;
     private int port;
     private String uriStr;
-    private static WebsocketClientHandler111 handler;
+    private static WebsocketClientHandler888 handler;
 
     public static volatile boolean getMsgFlag = false;
 
-    public WebsocketClient111(String ip, int port) {
+    public WebsocketClient888(String ip, int port) {
         this.ip = ip;
         this.port = port;
         uriStr = "ws://" + ip + ":" + port + "/websocket";
@@ -73,7 +72,7 @@ public class WebsocketClient111 {
 
         WebSocketClientHandshaker webSocketClientHandshaker = WebSocketClientHandshakerFactory
                 .newHandshaker(wsUri, WebSocketVersion.V13, null, true, entries, 100 * 1024 * 1024);
-        handler = new WebsocketClientHandler111(webSocketClientHandshaker);
+        handler = new WebsocketClientHandler888(webSocketClientHandshaker);
 
         bootstrap.handler(new ChannelInitializer<Channel>() {
             @Override
@@ -109,7 +108,7 @@ public class WebsocketClient111 {
                     continue;
                 }
                 //如果没有获取 并且集合也为空 则获取（一般首次或者消息id用完了）
-                if (!getMsgFlag && CollectionUtils.isEmpty(WebsocketClientHandler111.msgIds)) {
+                if (!getMsgFlag && CollectionUtils.isEmpty(WebsocketClientHandler888.msgIds)) {
                     getMsgIds(channelFuture);
                     //标识正在获取消息id
                     getMsgFlag = true;
@@ -125,7 +124,7 @@ public class WebsocketClient111 {
                     e.printStackTrace();
                 }
                 if (StringUtils.isNotBlank(s)) {
-                    String msgId = WebsocketClientHandler111.msgIds.remove(0);
+                    String msgId = WebsocketClientHandler888.msgIds.remove(0);
                     Assert.isTrue(StringUtils.isNotBlank(msgId), "无msgId可用");
                     ImBaseRequest<C2CSendMsgAO> imBaseRequest = new ImBaseRequest<C2CSendMsgAO>();
                     imBaseRequest.setUrl(ImSourceUrlConstant.C2C.SEND);
@@ -133,7 +132,7 @@ public class WebsocketClient111 {
                     c2CMsgRequestDTO.setMsgId(msgId);
                     c2CMsgRequestDTO.setMsgContent(s);
                     c2CMsgRequestDTO.setChatId("999");
-                    c2CMsgRequestDTO.setToUserId(WebsocketClient222.VALUE);
+                    c2CMsgRequestDTO.setToUserId("1966369607918948352");
                     c2CMsgRequestDTO.setFromUserId(VALUE);
                     c2CMsgRequestDTO.setMsgCreateTime(System.currentTimeMillis());
                     imBaseRequest.setBody(c2CMsgRequestDTO);

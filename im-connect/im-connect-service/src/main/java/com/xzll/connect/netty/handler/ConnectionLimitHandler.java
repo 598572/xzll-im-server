@@ -35,7 +35,7 @@ public class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
     // ============= 配置参数 =============
     
     // 单个IP最大连接数
-    @Value("${im.netty.security.max-connections-per-ip:10}")
+    @Value("${im.netty.security.max-connections-per-ip:1000}")
     private int maxConnectionsPerIp;
     
     // 全局最大连接数
@@ -43,7 +43,7 @@ public class ConnectionLimitHandler extends ChannelInboundHandlerAdapter {
     private int maxTotalConnections;
     
     // 连接频率限制（每分钟）
-    @Value("${im.netty.security.max-connections-per-minute:60}")
+    @Value("${im.netty.security.max-connections-per-minute:6000}")
     private int maxConnectionsPerMinute;
     
     // 注入RedissonUtils，避免静态初始化问题

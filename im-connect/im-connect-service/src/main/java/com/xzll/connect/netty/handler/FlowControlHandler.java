@@ -36,7 +36,7 @@ public class FlowControlHandler extends ChannelInboundHandlerAdapter {
     // ============= 配置参数 =============
     
     // 每秒最大消息数
-    @Value("${im.netty.flow-control.max-messages-per-second:10}")
+    @Value("${im.netty.flow-control.max-messages-per-second:10000}")
     private int maxMessagesPerSecond;
     
     // 单条消息最大字节数

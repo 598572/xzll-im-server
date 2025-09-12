@@ -1,11 +1,9 @@
 package com.xzll.business.service.impl;
 
-import cn.hutool.core.lang.Assert;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.config.HBaseTableUtil;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
-import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
@@ -29,7 +27,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import java.util.ArrayList;
 import java.util.concurrent.*;
@@ -561,34 +558,35 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             for (Cell cell : result.rawCells()) {
                 String column = Bytes.toString(CellUtil.cloneQualifier(cell));
                 byte[] value = CellUtil.cloneValue(cell);
+                String stringValue = Bytes.toString(value);
                 
                 switch (column) {
                     case COLUMN_FROM_USER_ID:
-                        msgRecord.setFromUserId(Bytes.toString(value));
+                        msgRecord.setFromUserId(stringValue);
                         break;
                     case COLUMN_TO_USER_ID:
-                        msgRecord.setToUserId(Bytes.toString(value));
+                        msgRecord.setToUserId(stringValue);
                         break;
                     case COLUMN_MSG_ID:
-                        msgRecord.setMsgId(Bytes.toString(value));
+                        msgRecord.setMsgId(stringValue);
                         break;
                     case COLUMN_MSG_FORMAT:
-                        msgRecord.setMsgFormat(Integer.valueOf(Bytes.toString(value)));
+                        msgRecord.setMsgFormat(safeParseInteger(stringValue, 1)); // 默认文本格式
                         break;
                     case COLUMN_MSG_CONTENT:
-                        msgRecord.setMsgContent(Bytes.toString(value));
+                        msgRecord.setMsgContent(stringValue);
                         break;
                     case COLUMN_MSG_CREATE_TIME:
-                        msgRecord.setMsgCreateTime(Long.valueOf(Bytes.toString(value)));
+                        msgRecord.setMsgCreateTime(safeParseLong(stringValue, System.currentTimeMillis()));
                         break;
                     case COLUMN_RETRY_COUNT:
-                        msgRecord.setRetryCount(Integer.valueOf(Bytes.toString(value)));
+                        msgRecord.setRetryCount(safeParseInteger(stringValue, 0)); // 默认重试次数为0
                         break;
                     case COLUMN_MSG_STATUS:
-                        msgRecord.setMsgStatus(Integer.valueOf(Bytes.toString(value)));
+                        msgRecord.setMsgStatus(safeParseInteger(stringValue, 1)); // 默认消息状态为已发送
                         break;
                     case COLUMN_CHAT_ID:
-                        msgRecord.setChatId(Bytes.toString(value));
+                        msgRecord.setChatId(stringValue);
                         break;
                 }
             }
@@ -597,6 +595,36 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         } catch (Exception e) {
             log.error("转换HBase查询结果失败", e);
             return null;
+        }
+    }
+    
+    /**
+     * 安全地将字符串转换为Integer，处理null和"null"字符串
+     */
+    private Integer safeParseInteger(String value, Integer defaultValue) {
+        if (value == null || value.trim().isEmpty() || "null".equalsIgnoreCase(value.trim())) {
+            return defaultValue;
+        }
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("无法将字符串 '{}' 转换为Integer，使用默认值 {}", value, defaultValue);
+            return defaultValue;
+        }
+    }
+    
+    /**
+     * 安全地将字符串转换为Long，处理null和"null"字符串
+     */
+    private Long safeParseLong(String value, Long defaultValue) {
+        if (value == null || value.trim().isEmpty() || "null".equalsIgnoreCase(value.trim())) {
+            return defaultValue;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException e) {
+            log.warn("无法将字符串 '{}' 转换为Long，使用默认值 {}", value, defaultValue);
+            return defaultValue;
         }
     }
 
