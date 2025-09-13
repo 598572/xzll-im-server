@@ -21,7 +21,137 @@
 # 1、总体设计
 
 ## 1.1、架构设计
-正在编写&画图中......
+
+### 🏗️ 系统架构总览
+
+```mermaid
+graph TB
+    %% 客户端层
+    subgraph "客户端层"
+        WEB[Web客户端]
+        MOBILE[移动端客户端] 
+        PC[PC客户端]
+    end
+
+    %% 负载均衡层
+    subgraph "负载均衡层"
+        NGINX[Nginx<br/>负载均衡+反向代理<br/>80/443]
+    end
+
+    %% 网关层  
+    subgraph "网关层"
+        GW[Gateway网关<br/>8081<br/>Spring Cloud Gateway]
+    end
+
+    %% 业务服务层
+    subgraph "业务服务层 (Docker Compose)"
+        AUTH[认证服务<br/>im-auth:8082<br/>OAuth2+Spring Security]
+        CONNECT[长连接服务<br/>im-connect:10001<br/>Netty WebSocket]
+        BUSINESS[业务服务<br/>im-business:8083<br/>核心消息处理]
+        CONSOLE[控制台服务<br/>im-console:8084<br/>管理后台]
+        DATASYNC[数据同步服务<br/>im-data-sync:8085<br/>HBase→ES同步]
+    end
+
+    %% 中间件层
+    subgraph "注册中心/配置中心"
+        NACOS[Nacos<br/>服务发现+配置中心<br/>8848]
+        ZK[ZooKeeper<br/>Dubbo注册中心<br/>2181]
+    end
+
+    subgraph "消息队列"
+        RMQ[RocketMQ<br/>异步消息处理<br/>9876]
+    end
+
+    %% 存储层
+    subgraph "存储层"
+        MYSQL[(MySQL<br/>用户信息/会话数据<br/>3306)]
+        HBASE[(HBase<br/>消息存储<br/>集群部署)]
+        REDIS[(Redis<br/>缓存/分布式锁<br/>6379)]
+        ES[(Elasticsearch<br/>消息搜索<br/>9200)]
+    end
+
+    %% 监控层
+    subgraph "监控观测"
+        PROMETHEUS[Prometheus<br/>指标采集<br/>9090]
+        GRAFANA[Grafana<br/>监控面板<br/>3000]
+    end
+
+    %% CI/CD层
+    subgraph "CI/CD部署"
+        JENKINS[Jenkins<br/>持续集成<br/>Pipeline脚本]
+        DOCKER[Docker Compose<br/>容器编排部署]
+        GIT[Git仓库<br/>源码管理]
+    end
+
+    %% 连接关系
+    WEB --> NGINX
+    MOBILE --> NGINX
+    PC --> NGINX
+
+    NGINX --> GW
+    NGINX --> CONNECT
+
+    GW --> AUTH
+    GW --> BUSINESS
+    GW --> CONSOLE
+
+    %% 服务注册发现
+    AUTH --> NACOS
+    BUSINESS --> NACOS
+    CONSOLE --> NACOS
+    GW --> NACOS
+
+    %% Dubbo RPC
+    CONNECT --> ZK
+    BUSINESS --> ZK
+    CONNECT -.->|Dubbo RPC| BUSINESS
+
+    %% 数据存储
+    AUTH --> MYSQL
+    BUSINESS --> MYSQL
+    BUSINESS --> HBASE
+    CONNECT --> REDIS
+    BUSINESS --> REDIS
+
+    %% 消息队列
+    BUSINESS --> RMQ
+    DATASYNC --> RMQ
+    DATASYNC --> ES
+
+    %% 监控
+    CONNECT --> PROMETHEUS
+    PROMETHEUS --> GRAFANA
+
+    %% CI/CD流程
+    GIT --> JENKINS
+    JENKINS --> DOCKER
+    DOCKER --> AUTH
+    DOCKER --> CONNECT
+    DOCKER --> BUSINESS
+    DOCKER --> CONSOLE
+    DOCKER --> DATASYNC
+
+    %% 样式定义
+    classDef client fill:#e1f5fe
+    classDef proxy fill:#f8bbd9
+    classDef gateway fill:#f3e5f5
+    classDef service fill:#e8f5e8
+    classDef middleware fill:#fff3e0
+    classDef storage fill:#fce4ec
+    classDef monitor fill:#f1f8e9
+    classDef cicd fill:#e0f2f1
+
+    class WEB,MOBILE,PC client
+    class NGINX proxy
+    class GW gateway
+    class AUTH,CONNECT,BUSINESS,CONSOLE,DATASYNC service
+    class NACOS,ZK,RMQ middleware
+    class MYSQL,HBASE,REDIS,ES storage
+    class PROMETHEUS,GRAFANA monitor
+    class JENKINS,DOCKER,GIT cicd
+```
+
+> 📋 **详细架构说明**: [完整架构文档](系统架构图.md)
 
 ## 1.2、表设计
 
