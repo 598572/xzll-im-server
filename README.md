@@ -25,130 +25,125 @@
 ### 🏗️ 系统架构总览
 
 ```mermaid
-graph TB
+flowchart TD
     %% 客户端层
-    subgraph "客户端层"
-        WEB[Web客户端]
-        MOBILE[移动端客户端] 
-        PC[PC客户端]
+    subgraph CLIENT ["🖥️ 客户端层"]
+        WEB["Web客户端"]
+        MOBILE["移动端客户端"] 
+        PC["PC客户端"]
     end
 
     %% 负载均衡层
-    subgraph "负载均衡层"
-        NGINX[Nginx<br/>负载均衡+反向代理<br/>80/443]
+    subgraph PROXY ["⚖️ 负载均衡层"]
+        NGINX["Nginx<br/>负载均衡+反向代理<br/>:80/:443"]
     end
 
     %% 网关层  
-    subgraph "网关层"
-        GW[Gateway网关<br/>8081<br/>Spring Cloud Gateway]
+    subgraph GATEWAY ["🚪 网关层"]
+        GW["Gateway网关<br/>:8081<br/>Spring Cloud Gateway"]
     end
 
     %% 业务服务层
-    subgraph "业务服务层 (Docker Compose)"
-        AUTH[认证服务<br/>im-auth:8082<br/>OAuth2+Spring Security]
-        CONNECT[长连接服务<br/>im-connect:10001<br/>Netty WebSocket]
-        BUSINESS[业务服务<br/>im-business:8083<br/>核心消息处理]
-        CONSOLE[控制台服务<br/>im-console:8084<br/>管理后台]
-        DATASYNC[数据同步服务<br/>im-data-sync:8085<br/>HBase→ES同步]
+    subgraph SERVICES ["🔧 业务服务层 (Docker Compose)"]
+        AUTH["认证服务<br/>im-auth:8082<br/>OAuth2+Spring Security"]
+        CONNECT["长连接服务<br/>im-connect:10001<br/>Netty WebSocket"]
+        BUSINESS["业务服务<br/>im-business:8083<br/>核心消息处理"]
+        CONSOLE["控制台服务<br/>im-console:8084<br/>管理后台"]
+        DATASYNC["数据同步服务<br/>im-data-sync:8085<br/>HBase→ES同步"]
     end
 
     %% 中间件层
-    subgraph "注册中心/配置中心"
-        NACOS[Nacos<br/>服务发现+配置中心<br/>8848]
-        ZK[ZooKeeper<br/>Dubbo注册中心<br/>2181]
-    end
-
-    subgraph "消息队列"
-        RMQ[RocketMQ<br/>异步消息处理<br/>9876]
+    subgraph MIDDLEWARE ["⚙️ 中间件层"]
+        NACOS["Nacos<br/>服务发现+配置中心<br/>:8848"]
+        ZK["ZooKeeper<br/>Dubbo注册中心<br/>:2181"]
+        RMQ["RocketMQ<br/>异步消息处理<br/>:9876"]
     end
 
     %% 存储层
-    subgraph "存储层"
-        MYSQL[(MySQL<br/>用户信息/会话数据<br/>3306)]
-        HBASE[(HBase<br/>消息存储<br/>集群部署)]
-        REDIS[(Redis<br/>缓存/分布式锁<br/>6379)]
-        ES[(Elasticsearch<br/>消息搜索<br/>9200)]
+    subgraph STORAGE ["💾 存储层"]
+        MYSQL[("MySQL<br/>用户信息/会话数据<br/>:3306")]
+        HBASE[("HBase<br/>消息存储<br/>集群部署")]
+        REDIS[("Redis<br/>缓存/分布式锁<br/>:6379")]
+        ES[("Elasticsearch<br/>消息搜索<br/>:9200")]
     end
 
     %% 监控层
-    subgraph "监控观测"
-        PROMETHEUS[Prometheus<br/>指标采集<br/>9090]
-        GRAFANA[Grafana<br/>监控面板<br/>3000]
+    subgraph MONITOR ["📊 监控观测"]
+        PROMETHEUS["Prometheus<br/>指标采集<br/>:9090"]
+        GRAFANA["Grafana<br/>监控面板<br/>:3000"]
     end
 
     %% CI/CD层
-    subgraph "CI/CD部署"
-        JENKINS[Jenkins<br/>持续集成<br/>Pipeline脚本]
-        DOCKER[Docker Compose<br/>容器编排部署]
-        GIT[Git仓库<br/>源码管理]
+    subgraph CICD ["🚀 CI/CD部署"]
+        GIT["Git仓库<br/>源码管理"]
+        JENKINS["Jenkins<br/>持续集成<br/>Pipeline脚本"]
+        DOCKER["Docker Compose<br/>容器编排部署"]
     end
 
-    %% 连接关系
-    WEB --> NGINX
-    MOBILE --> NGINX
-    PC --> NGINX
+    %% 客户端连接
+    WEB --- NGINX
+    MOBILE --- NGINX
+    PC --- NGINX
 
-    NGINX --> GW
-    NGINX --> CONNECT
+    %% 网关连接
+    NGINX --- GW
+    NGINX --- CONNECT
 
-    GW --> AUTH
-    GW --> BUSINESS
-    GW --> CONSOLE
+    %% 服务连接
+    GW --- AUTH
+    GW --- BUSINESS
+    GW --- CONSOLE
 
     %% 服务注册发现
-    AUTH --> NACOS
-    BUSINESS --> NACOS
-    CONSOLE --> NACOS
-    GW --> NACOS
+    AUTH --- NACOS
+    BUSINESS --- NACOS
+    CONSOLE --- NACOS
+    GW --- NACOS
 
-    %% Dubbo RPC
-    CONNECT --> ZK
-    BUSINESS --> ZK
-    CONNECT -.->|Dubbo RPC| BUSINESS
+    %% RPC连接
+    CONNECT --- ZK
+    BUSINESS --- ZK
+    CONNECT -.- BUSINESS
 
-    %% 数据存储
-    AUTH --> MYSQL
-    BUSINESS --> MYSQL
-    BUSINESS --> HBASE
-    CONNECT --> REDIS
-    BUSINESS --> REDIS
+    %% 存储连接
+    AUTH --- MYSQL
+    BUSINESS --- MYSQL
+    BUSINESS --- HBASE
+    CONNECT --- REDIS
+    BUSINESS --- REDIS
 
     %% 消息队列
-    BUSINESS --> RMQ
-    DATASYNC --> RMQ
-    DATASYNC --> ES
+    BUSINESS --- RMQ
+    DATASYNC --- RMQ
+    DATASYNC --- ES
 
-    %% 监控
-    CONNECT --> PROMETHEUS
-    PROMETHEUS --> GRAFANA
+    %% 监控连接
+    CONNECT --- PROMETHEUS
+    PROMETHEUS --- GRAFANA
 
     %% CI/CD流程
-    GIT --> JENKINS
-    JENKINS --> DOCKER
-    DOCKER --> AUTH
-    DOCKER --> CONNECT
-    DOCKER --> BUSINESS
-    DOCKER --> CONSOLE
-    DOCKER --> DATASYNC
+    GIT --- JENKINS
+    JENKINS --- DOCKER
+    DOCKER --- SERVICES
 
     %% 样式定义
-    classDef client fill:#e1f5fe
-    classDef proxy fill:#f8bbd9
-    classDef gateway fill:#f3e5f5
-    classDef service fill:#e8f5e8
-    classDef middleware fill:#fff3e0
-    classDef storage fill:#fce4ec
-    classDef monitor fill:#f1f8e9
-    classDef cicd fill:#e0f2f1
+    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef proxyStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef gatewayStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef serviceStyle fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef middlewareStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef storageStyle fill:#fce4ec,stroke:#d81b60,stroke-width:2px
+    classDef monitorStyle fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef cicdStyle fill:#e0f2f1,stroke:#00796b,stroke-width:2px
 
-    class WEB,MOBILE,PC client
-    class NGINX proxy
-    class GW gateway
-    class AUTH,CONNECT,BUSINESS,CONSOLE,DATASYNC service
-    class NACOS,ZK,RMQ middleware
-    class MYSQL,HBASE,REDIS,ES storage
-    class PROMETHEUS,GRAFANA monitor
-    class JENKINS,DOCKER,GIT cicd
+    class CLIENT,WEB,MOBILE,PC clientStyle
+    class PROXY,NGINX proxyStyle
+    class GATEWAY,GW gatewayStyle
+    class SERVICES,AUTH,CONNECT,BUSINESS,CONSOLE,DATASYNC serviceStyle
+    class MIDDLEWARE,NACOS,ZK,RMQ middlewareStyle
+    class STORAGE,MYSQL,HBASE,REDIS,ES storageStyle
+    class MONITOR,PROMETHEUS,GRAFANA monitorStyle
+    class CICD,JENKINS,DOCKER,GIT cicdStyle
 ```
 
 > 📋 **详细架构说明**: [完整架构文档](系统架构图.md)
@@ -179,18 +174,19 @@ graph TB
 1. 在雪花算法基础上 生成含有业务信息的 msgId，长连接获取批量消息id ✅
 1. prometheus + grafana【服务监控✅】
 1. Jenkins 持续集成与持续交付 ✅
+2. docker + docker compose ✅ 
+3. nginx ✅
 
 - **待集成**
 
-1. 序列化协议：protobuf 
-1. Sentinel 【限流】
-1. docker ✅ +k8s【项目部署】
-1. SkyWalking 【链路追踪】
-1. Jmeter+python脚本【压测】
-2. redis集群部署
-3. elasticsearch集群部署
-4. canal 数据同步 mysql同步到es
-5. mysql分库分表 ✅(暂时只对消息记录表做了分库分表)
+1. 序列化协议：protobuf (目前是json后续要改造成protobuf)
+2. Sentinel 【限流】
+3. k8s【项目部署】
+4. SkyWalking 【链路追踪】
+5. Jmeter+python脚本【压测】
+6. redis集群部署
+7. elasticsearch集群部署
+8. canal 数据同步 mysql同步到es
 
 
 
@@ -208,8 +204,8 @@ graph TB
 
 | 功能 | 当前进度 |技术文档 |实现者 | 备注 |
 | ---  | --- | --- | --- | --- |
-| 注册 | 后端⬜，前端⬜| [登录&注册设计文档](doc/register&login/注册&登录设计文档.md) |   |   |
-| 登录 | 后端✅，前端⬜ | [登录&注册设计文档](doc/register&login/注册&登录设计文档.md)  | 后端（蝎子莱莱爱打怪），前端（）  |  在登录成功后，按照算法选取出某一个可用长连接服务 |
+| 注册 | 后端✅，前端✅| [登录&注册设计文档](doc/register&login/注册&登录设计文档.md) | 蝎子莱莱爱打怪  | 用户注册功能完整实现 |
+| 登录 | 后端✅，前端✅ | [登录&注册设计文档](doc/register&login/注册&登录设计文档.md)  | 蝎子莱莱爱打怪  |  在登录成功后，按照算法选取出某一个可用长连接服务 |
 
 
 ### 单聊相关
