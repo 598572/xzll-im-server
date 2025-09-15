@@ -12,7 +12,7 @@
 |------|--------|------------|------|
 | **🖥️ 服务端** | Java + Spring Cloud + Dubbo + Netty | [xzll-im-server](https://github.com/598572/xzll-im-server) | 分布式IM后端服务 |
 | **📱 客户端** | Flutter + Dart | [xzll-im-flutter-client](https://github.com/598572/xzll-im-flutter-client) | 跨平台移动客户端 |
-| **📱 后台管理前端页面** | - | - | 暂时没开发 |
+| **🖥️ 后台管理前端页面** | - | - | 暂时没开发 |
 
 
 与im结缘是在2022年，因为此类系统有足够大的挑战性，所以我对此如痴如醉，之前做过架构以及细节方面的设计，但是一直没有落地。不落地的设计不是好设计。所以有了这个项目。
