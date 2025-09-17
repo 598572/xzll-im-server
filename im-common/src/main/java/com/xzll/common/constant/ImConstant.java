@@ -132,6 +132,10 @@ public interface ImConstant {
         public static final int C2C_CLIENT_WITHDRAW_MSG = 40;
         //数据同步消息
         public static final int C2C_DATA_SYNC = 50;
+        //好友申请推送
+        public static final int FRIEND_REQUEST_PUSH = 60;
+        //好友申请处理结果推送
+        public static final int FRIEND_REQUEST_HANDLE_PUSH = 70;
     }
 
 

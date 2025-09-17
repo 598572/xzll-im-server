@@ -35,4 +35,12 @@ public interface RpcSendMsg2ClientApi {
      * @return
      */
     public WebBaseResponse sendWithdrawMsg2Client(CommonMsgVO packet);
+
+    /**
+     * 发送好友申请推送消息
+     *
+     * @param packet
+     * @return
+     */
+    public WebBaseResponse sendFriendRequestPush2Client(CommonMsgVO packet);
 }

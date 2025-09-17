@@ -12,6 +12,7 @@ import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
+import com.xzll.common.pojo.response.FriendRequestPushVO;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,22 @@ public class RpcSendMsg2ClientImpl implements RpcSendMsg2ClientApi {
         ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getUrl(), withdrawMsgVo);
         Channel targetChannel = LocalChannelManager.getChannelByUserId(withdrawMsgVo.getToUserId());
         boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+        AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
+        return WebBaseResponse.setResult(resultAnswer);
+    }
+
+    @Override
+    public WebBaseResponse sendFriendRequestPush2Client(CommonMsgVO packet) {
+        Assert.isTrue(Objects.nonNull(packet), "参数错误");
+        FriendRequestPushVO friendRequestPushVO = (FriendRequestPushVO) packet;
+        Assert.isTrue(Objects.nonNull(friendRequestPushVO) && StringUtils.isNotBlank(friendRequestPushVO.getToUserId()), 
+                "发送好友申请推送时缺少必填参数");
+        
+        //构建推送消息
+        ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(friendRequestPushVO.getUrl(), friendRequestPushVO);
+        Channel targetChannel = LocalChannelManager.getChannelByUserId(friendRequestPushVO.getToUserId());
+        boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+        
         AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
         return WebBaseResponse.setResult(resultAnswer);
     }

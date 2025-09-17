@@ -44,5 +44,17 @@ public interface ImSourceUrlConstant {
      */
     public static final String LAST_CHAT_LIST = BASE_URL + "/last/chat/list";
 
+    /**
+     * 好友相关
+     */
+    public static interface Friend {
+        String FRIEND_BASE = BASE_URL + "/friend";
+
+        //好友申请推送
+        public static final String FRIEND_REQUEST_PUSH = FRIEND_BASE + "/request/push";
+        //好友申请处理结果推送
+        public static final String FRIEND_REQUEST_HANDLE_PUSH = FRIEND_BASE + "/request/handle/push";
+    }
+
 
 }
