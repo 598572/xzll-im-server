@@ -10,7 +10,7 @@
 ### 📱 项目仓库
 | 端侧 | 技术栈 | GitHub地址 | 描述 |
 |------|--------|------------|------|
-| **🖥️ 服务端** | Java + Spring Cloud + Dubbo + Netty | [xzll-im-server](https://github.com/598572/xzll-im-server) | 分布式IM后端服务 |
+| **🖥️ 服务端** | Java + Spring Cloud + gRPC + Netty | [xzll-im-server](https://github.com/598572/xzll-im-server) | 分布式IM后端服务 |
 | **📱 客户端** | Flutter + Dart | [xzll-im-flutter-client](https://github.com/598572/xzll-im-flutter-client) | 跨平台移动客户端 |
 | **🖥️ 后台管理前端页面** | - | - | 暂时没开发 |
 
@@ -109,13 +109,13 @@ flowchart LR
     L --> M[DataSync批量写入ES]
     J --> N[增加未读计数Redis]
     K --> N
-    N --> O[Dubbo RPC发送Server ACK]
+    N --> O[gRPC发送Server ACK]
     O --> P[推送ACK给发送方]
     
     %% 实时消息路由分支
     F --> Q{接收方状态判断}
     Q -->|在线且在本机| R[直接推送WebSocket消息]
-    Q -->|在线但在其他机器| S[Dubbo RPC转发到目标机器]
+    Q -->|在线但在其他机器| S[gRPC转发到目标机器]
     Q -->|离线| T[发送离线消息事件]
     
     S --> U[目标机器推送消息]
@@ -132,7 +132,7 @@ flowchart LR
     BB --> CC[更新HBase消息状态]
     CC --> DD[触发状态更新ES同步]
     CC --> EE[清零未读计数if已读]
-    EE --> FF[Dubbo发送ACK给发送方]
+    EE --> FF[gRPC发送ACK给发送方]
     FF --> GG[推送ACK确认]
     
     %% 样式定义
@@ -182,14 +182,14 @@ sequenceDiagram
             DS->>ES: 批量写入搜索引擎
         end
         BIZ->>R: 增加接收方未读计数
-        BIZ->>CON: Dubbo RPC发送Server ACK
+        BIZ->>CON: gRPC发送Server ACK
         CON->>C1: 推送Server ACK确认
     and 实时消息推送流程
         CON->>R: 查询接收方在线状态
         alt 接收方在线且在本机
             CON->>C2: 直接推送消息(WebSocket)
         else 接收方在线但在其他机器
-            CON->>CON: Dubbo RPC转发到目标机器
+            CON->>CON: gRPC转发到目标机器
             CON->>C2: 推送消息(WebSocket)
         else 接收方离线
             CON->>MQ: 发送离线消息事件
@@ -211,7 +211,7 @@ sequenceDiagram
     H->>BIZ: 更新成功确认
     BIZ->>MQ: 发送状态更新同步消息
     BIZ->>R: 清零未读计数(如果已读)
-    BIZ->>CON: Dubbo RPC发送ACK给发送方
+    BIZ->>CON: gRPC发送ACK给发送方
     CON->>C1: 推送ACK确认
 ```
 
@@ -235,9 +235,9 @@ sequenceDiagram
 | **🌐 接入层** | Nginx | ✅ | 负载均衡、反向代理、HTTPS终结 |
 | **🚪 网关层** | Spring Cloud Gateway | ✅ | 统一API网关、路由分发、限流熔断 |
 | **🔧 业务层** | Spring Boot + Spring Cloud | ✅ | 微服务应用框架、服务治理 |
-| **🔗 通信层** | Netty + WebSocket + Dubbo | ✅ | 长连接通信、RPC服务调用 |
+| **🔗 通信层** | Netty + WebSocket + gRPC | ✅ | 长连接通信、高性能RPC服务调用 |
 | **🔐 安全层** | OAuth2 + Spring Security + JWT | ✅ | 身份认证、权限控制、令牌管理 |
-| **⚙️ 中间件层** | Nacos + ZooKeeper + RocketMQ | ✅ | 服务注册发现、消息队列、配置管理 |
+| **⚙️ 中间件层** | Nacos + RocketMQ | ✅ | 服务注册发现、消息队列、配置管理 |
 | **💾 存储层** | MySQL + HBase + Redis + ES | ✅ | 关系数据、大数据、缓存、搜索 |
 | **📊 监控层** | Prometheus + Grafana + Skywalking | ✅/⏳ | 性能监控、链路追踪、可视化 |
 | **🚀 部署层** | Jenkins + Docker Compose | ✅ | CI/CD流水线、容器编排部署 |
@@ -256,14 +256,14 @@ sequenceDiagram
 | **📱 前端** | **Image Picker** | 0.8.6      | ✅ | 图片选择器 |
 | **📱 前端** | **Flutter Sound** | 9.2.13     | ✅ | 音频录制播放 |
 | **📱 前端** | **Permission Handler** | 10.2.0     | ✅ | 权限管理 |
-| **🖥️ 后端** | **Java** | 11         | ✅ | 核心编程语言 |
+| **🖥️ 后端** | **Java** | 17         | ✅ | 核心编程语言 |
 | **🖥️ 后端** | **Spring Boot** | 2.7.0      | ✅ | 应用开发框架 |
 | **🖥️ 后端** | **Spring Cloud** | 2021.0.3   | ✅ | 微服务治理框架 |
 | **🖥️ 后端** | **Spring Cloud Alibaba** | 2021.0.1.0 | ✅ | 阿里云微服务套件 |
 | **🖥️ 后端** | **Spring Security** | 5.7.x      | ✅ | 安全认证框架 |
 | **🖥️ 后端** | **OAuth2** | 2.2.5      | ✅ | 认证授权协议 |
 | **🖥️ 后端** | **Netty** | 4.1.75     | ✅ | 高性能网络通信框架 |
-| **🖥️ 后端** | **Dubbo** | 3.0.7      | ✅ | 高性能RPC框架 |
+| **🖥️ 后端** | **gRPC** | 1.58.0     | ✅ | 高性能RPC框架，HTTP/2基础 |
 | **🖥️ 后端** | **MyBatis Plus** | 3.5.0      | ✅ | 持久层ORM框架 |
 | **🖥️ 后端** | **ShardingSphere** | 5.2.1      | ✅ | 分库分表中间件 |
 | **🖥️ 后端** | **Druid** | 1.2.8      | ✅ | 数据库连接池 |
@@ -271,7 +271,7 @@ sequenceDiagram
 | **🖥️ 后端** | **Lombok** | 1.18.20    | ✅ | 代码生成工具 |
 | **🖥️ 后端** | **FastJSON** | 1.2.46     | ✅ | JSON解析库 |
 | **⚙️ 中间件** | **Nacos** | 2.0.3      | ✅ | 微服务注册中心、配置中心、服务发现 |
-| **⚙️ 中间件** | **ZooKeeper** | 3.5.1      | ✅ | 分布式协调服务、Dubbo专用注册中心 |
+| **🖥️ 后端** | **Protocol Buffers** | 3.25.1     | ✅ | 高效序列化协议，gRPC消息格式 |
 | **⚙️ 中间件** | **RocketMQ** | 5.3.0      | ✅ | 分布式消息队列、削峰填谷 |
 | **⚙️ 中间件** | **Nginx** | 1.24.0     | ✅ | 负载均衡、反向代理 |
 | **💾 存储** | **MySQL** | 8.0.23     | ✅ | 关系型数据库、主从复制 |
@@ -301,7 +301,6 @@ sequenceDiagram
 
 | 技术 | 优先级 | 说明                |
 |------|--------|-------------------|
-| **Protocol Buffers** | 高 | 高效序列化协议，替换JSON    |
 | **Sentinel** | 高 | 流量控制、熔断降级         |
 | **Skywalking** | 中 | 完善APM链路追踪         |
 | **JMeter** | 中 | 压力测试工具            |
@@ -311,7 +310,44 @@ sequenceDiagram
 
 
 
-## 2.2、核心功能概览
+## 2.2、🚀 架构升级：从 Dubbo 迁移到 gRPC
+
+### 🔄 **迁移背景**
+为了提升系统性能和简化架构复杂度，我们将微服务间通信从 Dubbo 迁移到了 gRPC：
+
+| 对比维度 | Dubbo 3.x | gRPC 1.58 | 迁移收益 |
+|---------|-----------|-----------|----------|
+| **协议基础** | TCP + 自定义协议 | HTTP/2 | 更好的网络穿透性 |
+| **注册中心** | 依赖 ZooKeeper | 无需注册中心 | 架构简化，减少中间件依赖 |
+| **序列化** | Hessian/FastJSON | Protocol Buffers | 更高效的序列化性能 |
+| **连接管理** | 复杂的连接池配置 | 自动连接复用 | 配置简化 |
+| **跨语言支持** | Java生态为主 | 原生多语言支持 | 更好的扩展性 |
+| **流式调用** | 不支持 | 原生支持 | 支持实时数据流 |
+| **版本兼容** | 版本升级复杂 | 向后兼容性好 | 更平滑的升级体验 |
+
+### 📊 **迁移效果**
+- ✅ **性能提升**: HTTP/2 多路复用，降低延迟
+- ✅ **架构简化**: 移除 ZooKeeper 依赖，减少运维复杂度  
+- ✅ **开发效率**: Protocol Buffers 强类型定义，减少接口错误
+- ✅ **系统稳定性**: 避免 Dubbo 版本冲突问题
+
+### 🛠️ **核心实现**
+采用智能连接管理器 `SmartGrpcClientManager`：
+- **连接复用**: 按 IP:Port 缓存 gRPC Channel
+- **自动路由**: 从 Redis 路由表自动获取用户所在服务器
+- **健康检查**: 定期检测连接状态，自动清理过期连接
+- **批量操作**: 支持批量用户的服务器分组调用
+
+```java
+// 简单易用的 API
+GrpcStubWrapper stub = grpcClientManager.getStub(userId);
+MessageResponse response = MessageServiceGrpc.newBlockingStub(stub.getChannelInfo().getChannel())
+    .sendMessage(request);
+```
+
+---
+
+## 2.3、核心功能概览
 
 ### ✅ **已实现功能**
 - 🔐 **用户认证**: 注册、登录（OAuth2 + JWT）
