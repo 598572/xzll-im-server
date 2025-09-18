@@ -41,6 +41,23 @@ public interface ImConstant {
     }
 
 
+
+    // 数据同步相关常量
+    public static final String DATA_TYPE_C2C_MSG_RECORD = "C2C_MSG_RECORD";
+    public static final String OPERATION_TYPE_SAVE = "SAVE";
+    public static final String OPERATION_TYPE_UPDATE_STATUS = "UPDATE_STATUS";
+    public static final String OPERATION_TYPE_UPDATE_WITHDRAW = "UPDATE_WITHDRAW";
+
+    /**
+     * 表名/索引名常量
+     */
+    public static class TableConstant {
+        /**
+         * C2C消息记录表名/索引名（用于 MySQL、HBase、ES）
+         */
+        public static final String IM_C2C_MSG_RECORD = "im_c2c_msg_record";
+    }
+
     /**
      * 会话类型
      */
@@ -63,6 +80,7 @@ public interface ImConstant {
      */
     public static class TopicConstant {
         public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
+        public static final String XZLL_DATA_SYNC_TOPIC = "im_c2cmsg-sync-es-topic";
     }
 
     public static class RedisKeyConstant {
@@ -112,6 +130,12 @@ public interface ImConstant {
         public static final int C2C_CLIENT_RECEIVED_ACK_MSG = 30;
         //撤回消息
         public static final int C2C_CLIENT_WITHDRAW_MSG = 40;
+        //数据同步消息
+        public static final int C2C_DATA_SYNC = 50;
+        //好友申请推送
+        public static final int FRIEND_REQUEST_PUSH = 60;
+        //好友申请处理结果推送
+        public static final int FRIEND_REQUEST_HANDLE_PUSH = 70;
     }
 
 

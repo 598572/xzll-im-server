@@ -1,0 +1,34 @@
+## JDK 17 兼容性 JVM 参数
+## 复制以下参数到你的启动脚本或 IDE 运行配置中
+
+# HBase 兼容性
+--add-opens java.base/java.nio=ALL-UNNAMED
+--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+--add-opens java.base/java.lang=ALL-UNNAMED
+--add-opens java.base/java.lang.reflect=ALL-UNNAMED
+--add-opens java.base/java.util=ALL-UNNAMED
+
+# JAXB 兼容性
+--add-opens java.base/java.lang.reflect=ALL-UNNAMED
+--add-opens java.base/java.security=ALL-UNNAMED
+--add-opens java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
+--add-opens java.xml/javax.xml.bind=ALL-UNNAMED
+--add-opens java.xml/com.sun.xml.bind=ALL-UNNAMED
+--add-opens java.xml/com.sun.xml.bind.v2=ALL-UNNAMED
+--add-opens java.xml/com.sun.xml.bind.v2.runtime=ALL-UNNAMED
+--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect=ALL-UNNAMED
+--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect.opt=ALL-UNNAMED
+--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+
+# Netty 兼容性
+--add-opens java.base/jdk.internal.misc=ALL-UNNAMED
+
+# Spring Boot 兼容性
+--add-opens java.base/java.time=ALL-UNNAMED
+
+## 使用方法示例：
+# java --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar your-app.jar
+
+## IDE 配置：
+# IntelliJ IDEA: Run Configuration > VM options 中添加上述参数
+# Eclipse: Run Configuration > Arguments > VM arguments 中添加上述参数

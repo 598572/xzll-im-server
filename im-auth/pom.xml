@@ -127,6 +127,23 @@
 					<!-- 指定该Main Class为全局的唯一入口 -->
 					<mainClass>com.xzll.auth.IMAuthServiceApplication</mainClass>
 					<layout>ZIP</layout>
+					<!-- JDK 17 兼容性 JVM 参数 -->
+					<jvmArguments>
+						--add-opens java.base/java.nio=ALL-UNNAMED
+						--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+						--add-opens java.base/java.lang=ALL-UNNAMED
+						--add-opens java.base/java.lang.reflect=ALL-UNNAMED
+						--add-opens java.base/jdk.internal.misc=ALL-UNNAMED
+						--add-opens java.base/java.time=ALL-UNNAMED
+						--add-opens java.base/java.security=ALL-UNNAMED
+						--add-opens java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
+						--add-opens java.xml/javax.xml.bind=ALL-UNNAMED
+						--add-opens java.xml/com.sun.xml.bind=ALL-UNNAMED
+						--add-opens java.xml/com.sun.xml.bind.v2=ALL-UNNAMED
+						--add-opens java.xml/com.sun.xml.bind.v2.runtime=ALL-UNNAMED
+						--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect=ALL-UNNAMED
+						--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect.opt=ALL-UNNAMED
+					</jvmArguments>
 				</configuration>
 			</plugin>
 		</plugins>

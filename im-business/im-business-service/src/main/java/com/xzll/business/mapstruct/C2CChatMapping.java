@@ -24,8 +24,6 @@ public interface C2CChatMapping extends Converter<C2CSendMsgAO, ImChat> {
      */
     @Override
     @Mapping(target = "chatType",constant = "1")
-    @Mapping(target = "lastMsgId", source = "msgId")
-    @Mapping(target = "lastMsgTime", source = "msgCreateTime")
     ImChat convert(C2CSendMsgAO dto);
 
 

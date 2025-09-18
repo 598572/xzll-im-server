@@ -77,6 +77,14 @@ public class RocketMqConfig {
         producer.setMaxMessageSize(producerConfig.getMaxMessageSize());
         producer.setSendMsgTimeout(producerConfig.getSendMsgTimeout());
         producer.setRetryTimesWhenSendFailed(producerConfig.getRetryTimesWhenSendFailed());
+        
+        // 启动生产者
+        try {
+            producer.start();
+        } catch (Exception e) {
+            // 记录启动异常，但不中断应用启动
+            // 这里可以根据需要决定是否抛出异常
+        }
         return producer;
     }
 

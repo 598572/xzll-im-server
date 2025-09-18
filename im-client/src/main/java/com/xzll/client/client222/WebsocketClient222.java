@@ -42,7 +42,7 @@ public class WebsocketClient222 {
 
 
     private static EventLoopGroup group = new NioEventLoopGroup();
-    public static final String VALUE = "222";
+    public static final String VALUE = "1966369607918948352";
     private String ip;
     private int port;
     private String uriStr;
@@ -51,7 +51,7 @@ public class WebsocketClient222 {
     public WebsocketClient222(String ip, int port) {
         this.ip = ip;
         this.port = port;
-        uriStr = "ws://" + ip + ":" + port + "/websocket";
+        uriStr = "ws://" + ip + ":" + port + "/websocket?userId="+VALUE;
     }
 
     public static volatile boolean getMsgFlag = false;
@@ -61,7 +61,7 @@ public class WebsocketClient222 {
         URI wsUri = new URI(uriStr);
 
         DefaultHttpHeaders entries = new DefaultHttpHeaders();
-        entries.set("token", "t_value");
+        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoaGhiYmIiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxOTY2MzY5NjA3OTE4OTQ4MzUyLCJleHAiOjE3NTgxODAwMTQsImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6IjRlYmJkY2Y4LWFhMDUtNDQ1Mi04Mjk4LTdlMTJhOTVhZDQwMyIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.K5SrLh91xdLvVKLzq-wsYIkW1tSkZkWJaPCFnYtkigml6yW6MzKQsB3m_4vjmvnpLoXxelfCPaI9ajBdskyC7vghjcCU59DAxH0wjY-M7Rs5aQNZ5NDjdeQ_zKXs7AK3QDSiVRh8OUJ5Gd6h_pbgXlbEiv35u_ddVEbvFeiFz-WFBz6EZX5fgcSFU0kt2FKL_WhHvcCquvoF7OgSHqNBe_nKa92erUVLDVTTpNesWs_8YAW3UXRfZnRDph9zmRmxcPdfcxWek01K7hgHWxDYCrcpYFR79ZNfG7SdczJIYh4YXuwKZ_Ku5VLKp5CXtr2uY86WPSqhj99YTjGotCq5AA");
         entries.set("uid", VALUE);
 
         // 设置Bootstrap

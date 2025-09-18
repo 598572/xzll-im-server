@@ -1,11 +1,25 @@
 # connect的  Dockerfile 内容
 # jdk镜像
-FROM openjdk:11-jre-slim
+FROM openjdk:17-jdk
 # 挂载
 VOLUME /tmp
 COPY im-connect-service.jar im-connect-service.jar
-# 启动命令
-ENTRYPOINT ["java", "-jar", "/im-connect-service.jar"]
+# 启动命令 - 添加JDK17模块开放参数（包含JAXB支持）
+ENTRYPOINT ["java", \
+    "--add-opens", "java.base/java.nio=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.lang=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.util=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED", \
+    "--add-opens", "java.base/java.text=ALL-UNNAMED", \
+    "--add-opens", "java.desktop/java.awt.font=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.annotation=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.util=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.helpers=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.annotation.adapters=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.attachment=ALL-UNNAMED", \
+    "--add-opens", "java.xml/javax.xml.bind.spi=ALL-UNNAMED", \
+    "-jar", "/im-connect-service.jar"]
 
 # 暴露netty端口
 EXPOSE 10001

@@ -10,8 +10,13 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,11 +24,20 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 import java.net.InetSocketAddress;
 
 
 /**
+ * Netty服务器启动类
+ * 优化内容：
+ * 1. 支持Epoll/NIO自适应选择
+ * 2. 优化EventLoopGroup线程配置
+ * 3. 完善TCP参数配置
+ * 4. 增强异常处理和优雅关闭
+ * 5. 简化IP获取逻辑
+ * 
  * @Author: hzz
  * @Date: 2024/6/1 10:19:34
  * @Description:
@@ -32,16 +46,21 @@ import java.net.InetSocketAddress;
 @Component
 public class NettyServer implements ApplicationRunner {
 
-
     @Resource
     private IMConnectServerConfig imConnectServerConfig;
     @Resource
     private RedissonUtils redissonUtils;
+    
     /**
-     * 本机mac 取en0，  虚拟机centos7 取 enp0s3 ，docker 部署的话 取得就是容器的ip 直接使用 NetUtils.getRealIp()就行。应该是靠宿主机进行了桥接。所以无需手动指定了
+     * 本机mac 取en0，虚拟机centos7 取 enp0s3 ，docker 部署的话 取得就是容器的ip 直接使用 NetUtils.getRealIp()就行。应该是靠宿主机进行了桥接。所以无需手动指定了
      */
     @Value("${dubbo.network.interface.preferred:en0}")
     private String dubboPreferred;
+
+    // EventLoopGroup实例，用于优雅关闭
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private Channel serverChannel;
 
     /**
      * 此逻辑最好在springboot项目都启动之后再启动，防止影响启动流程。 此前，我曾 在@PostConstruct、CommandLineRunner阶段启动此逻辑，将会遇到一些莫名问题
@@ -50,55 +69,200 @@ public class NettyServer implements ApplicationRunner {
      */
     @Override
     public void run(ApplicationArguments args) {
-
         log.info("[NettyServer]_正在启动websocket服务器");
-        NioEventLoopGroup boss = new NioEventLoopGroup();
-        NioEventLoopGroup work = new NioEventLoopGroup();
-        Channel channel = null;
+        
         try {
+            // 根据系统环境选择最优的EventLoopGroup实现
+            initEventLoopGroups();
+            
             ServerBootstrap bootstrap = new ServerBootstrap();
-            bootstrap.group(boss, work);
-            bootstrap.channel(NioServerSocketChannel.class);
-            //TCP Keepalive 机制，实现 TCP 层级的心跳保活功能 用于保持长连接
-            bootstrap.childOption(ChannelOption.SO_KEEPALIVE, true);
-            //服务端 accept 队列的大小
-            bootstrap.option(ChannelOption.SO_BACKLOG, imConnectServerConfig.getSoBackLog());
-            bootstrap.childHandler(new WebSocketChannelInitializer());
-
-            String hostAddress = cn.hutool.core.net.NetUtil.getLocalhost().getHostAddress();
-            String machineIpAddr = NetUtils.getMachineIpAddr();
-            String realIp = NetUtils.getRealIp();
-
-            //获取指定ip
-            String dubboPreferredResult = NetUtils.getSpecificInterfaceIp(dubboPreferred);
-
-            log.info("获取到的ip信息 hostAddress:{},machineIpAddr:{},realIp:{},enp0s3:{}", hostAddress, machineIpAddr, realIp,dubboPreferredResult);
-//            int usableLocalPort = NetUtil.getUsableLocalPort();//测试时： 因为目前只有一台机器如果部署多个实例 需要放开此注释 即使用随机端口 保证端口不冲突
-            int usableLocalPort = imConnectServerConfig.getNettyPort();
-
-            String realUseIp = StringUtils.isBlank(dubboPreferredResult) ? realIp : dubboPreferredResult;
-            //将来 每一个服务的ip和端口 是要注册到zk中 以便客户请求连接时进行路由
-            redissonUtils.setHash(ImConstant.RedisKeyConstant.NETTY_IP_PORT, realUseIp, String.valueOf(usableLocalPort));
-            //存储到本地，登录时 每一个用户对应一个机器的信息 <c1,s1> 保存到redis 使用 map存储
-            NettyAttrUtil.setIpPort(realUseIp, usableLocalPort);
-            channel = bootstrap.bind(new InetSocketAddress(usableLocalPort)).sync().channel();
-            log.info("[NettyServer]_webSocket服务器启动成功：{}", channel);
-
-            //注意此处最好不要这么写，因为这样写的话线程到这里是阻塞了，在整合nacos的时候，因为nacos是在项目启动成功后进行监听配置中心的
-            //而如果在这里阻塞 将走不到nacos的注册监听逻辑。所以在finally中异步并注册channle关闭监听器，从而做连接关闭后的收尾动作
-            //channel.closeFuture().sync();
+            configureServerBootstrap(bootstrap);
+            
+            // 获取绑定IP和端口
+            String bindIp = getBindIp();
+            int bindPort = imConnectServerConfig.getNettyPort();
+            
+            // 注册服务器信息到Redis
+            registerServerInfo(bindIp, bindPort);
+            
+            // 启动服务器
+            serverChannel = bootstrap.bind(new InetSocketAddress(bindPort)).sync().channel();
+            log.info("[NettyServer]_WebSocket服务器启动成功：{}:{}", bindIp, bindPort);
+            
+            // 注册关闭监听器
+            registerShutdownHook();
 
         } catch (Exception e) {
-            log.error("[NettyServer]_运行出错：", e);
-        } finally {
-            // 开启channel监听器， 监听关闭动作
-            assert channel != null;
-            //连接关闭进行收尾工作
-            channel.closeFuture().addListener((ChannelFutureListener) channelFuture -> {
-                boss.shutdownGracefully();
-                work.shutdownGracefully();
-                log.info("[NettyServer]_websocket服务器已关闭");
+            log.error("[NettyServer]_启动失败：", e);
+            shutdownGracefully();
+        }
+    }
+
+    /**
+     * 初始化EventLoopGroup，根据系统特性选择最优实现
+     */
+    private void initEventLoopGroups() {
+        // 计算线程数量
+        int bossThreads = 1; // Boss线程通常1个就够，用于接受连接
+        int workerThreads = Math.max(4, Runtime.getRuntime().availableProcessors() * 2); // Worker线程数量
+        
+        log.info("[NettyServer]_EventLoopGroup配置: Boss线程={}, Worker线程={}", bossThreads, workerThreads);
+        
+        // 在Linux环境下优先使用Epoll，性能更好
+        if (Epoll.isAvailable()) {
+            log.info("[NettyServer]_使用Epoll EventLoopGroup (Linux优化)");
+            bossGroup = new EpollEventLoopGroup(bossThreads, 
+                new DefaultThreadFactory("netty-boss", Thread.MAX_PRIORITY));
+            workerGroup = new EpollEventLoopGroup(workerThreads, 
+                new DefaultThreadFactory("netty-worker", Thread.NORM_PRIORITY));
+        } else {
+            log.info("[NettyServer]_使用NIO EventLoopGroup");
+            bossGroup = new NioEventLoopGroup(bossThreads, 
+                new DefaultThreadFactory("netty-boss", Thread.MAX_PRIORITY));
+            workerGroup = new NioEventLoopGroup(workerThreads, 
+                new DefaultThreadFactory("netty-worker", Thread.NORM_PRIORITY));
+        }
+    }
+
+    /**
+     * 配置ServerBootstrap
+     */
+    private void configureServerBootstrap(ServerBootstrap bootstrap) {
+        bootstrap.group(bossGroup, workerGroup);
+        
+        // 根据EventLoopGroup类型选择对应的Channel实现
+        if (Epoll.isAvailable()) {
+            bootstrap.channel(EpollServerSocketChannel.class);
+        } else {
+            bootstrap.channel(NioServerSocketChannel.class);
+        }
+        
+        // 配置ServerSocket选项
+        bootstrap.option(ChannelOption.SO_BACKLOG, imConnectServerConfig.getSoBackLog())
+                .option(ChannelOption.SO_REUSEADDR, true)  // 允许重用地址
+                .option(ChannelOption.SO_RCVBUF, 32 * 1024) // 设置接收缓冲区大小32KB
+                .option(ChannelOption.SO_SNDBUF, 32 * 1024); // 设置发送缓冲区大小32KB
+        
+        // 配置ChildChannel选项 (针对每个客户端连接)
+        bootstrap.childOption(ChannelOption.SO_KEEPALIVE, true)  // TCP Keepalive
+                .childOption(ChannelOption.TCP_NODELAY, true)    // 禁用Nagle算法，适合实时通信
+                .childOption(ChannelOption.SO_RCVBUF, 64 * 1024) // 客户端连接接收缓冲区64KB
+                .childOption(ChannelOption.SO_SNDBUF, 64 * 1024) // 客户端连接发送缓冲区64KB
+                .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, 
+                    new io.netty.channel.WriteBufferWaterMark(8 * 1024, 32 * 1024)) // 写缓冲区水位线
+                .childOption(ChannelOption.SO_LINGER, 0);        // 关闭时立即释放端口
+        
+        // 设置Pipeline处理器
+        bootstrap.childHandler(new WebSocketChannelInitializer());
+        
+        log.info("[NettyServer]_ServerBootstrap配置完成");
+    }
+
+    /**
+     * 获取绑定IP地址
+     */
+    private String getBindIp() {
+        // 简化IP获取逻辑，优先使用指定网卡，然后使用真实IP
+        String specificIp = NetUtils.getSpecificInterfaceIp(dubboPreferred);
+        String realIp = NetUtils.getRealIp();
+        
+        String bindIp = StringUtils.isNotBlank(specificIp) ? specificIp : realIp;
+        log.info("[NettyServer]_获取到绑定IP: {} (指定网卡IP: {}, 真实IP: {})", bindIp, specificIp, realIp);
+        
+        return bindIp;
+    }
+
+    /**
+     * 注册服务器信息到Redis
+     */
+    private void registerServerInfo(String ip, int port) {
+        try {
+            // 将服务器IP和端口注册到Redis，用于负载均衡
+            redissonUtils.setHash(ImConstant.RedisKeyConstant.NETTY_IP_PORT, ip, String.valueOf(port));
+            
+            // 存储到本地工具类，用于其他组件获取
+            NettyAttrUtil.setIpPort(ip, port);
+            
+            log.info("[NettyServer]_服务器信息已注册到Redis: {}:{}", ip, port);
+        } catch (Exception e) {
+            log.error("[NettyServer]_注册服务器信息到Redis失败", e);
+        }
+    }
+
+    /**
+     * 注册关闭钩子，确保优雅关闭
+     */
+    private void registerShutdownHook() {
+        if (serverChannel != null) {
+            serverChannel.closeFuture().addListener((ChannelFutureListener) channelFuture -> {
+                log.info("[NettyServer]_服务器通道关闭，开始优雅关闭");
+                shutdownGracefully();
             });
         }
+        
+        // 注册JVM关闭钩子
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("[NettyServer]_接收到关闭信号，开始优雅关闭");
+            shutdownGracefully();
+        }, "netty-shutdown-hook"));
+    }
+
+    /**
+     * 优雅关闭Netty服务器
+     */
+    @PreDestroy
+    public void shutdownGracefully() {
+        log.info("[NettyServer]_开始优雅关闭WebSocket服务器");
+        
+        try {
+            // 关闭服务器通道
+            if (serverChannel != null && serverChannel.isActive()) {
+                serverChannel.close().sync();
+                log.info("[NettyServer]_服务器通道已关闭");
+            }
+        } catch (InterruptedException e) {
+            log.warn("[NettyServer]_关闭服务器通道被中断", e);
+            Thread.currentThread().interrupt();
+        }
+        
+        // 优雅关闭EventLoopGroup
+        if (bossGroup != null) {
+            bossGroup.shutdownGracefully().addListener(future -> {
+                if (future.isSuccess()) {
+                    log.info("[NettyServer]_Boss EventLoopGroup已关闭");
+                } else {
+                    log.error("[NettyServer]_Boss EventLoopGroup关闭失败", future.cause());
+                }
+            });
+        }
+        
+        if (workerGroup != null) {
+            workerGroup.shutdownGracefully().addListener(future -> {
+                if (future.isSuccess()) {
+                    log.info("[NettyServer]_Worker EventLoopGroup已关闭");
+                } else {
+                    log.error("[NettyServer]_Worker EventLoopGroup关闭失败", future.cause());
+                }
+            });
+        }
+        
+        log.info("[NettyServer]_WebSocket服务器优雅关闭完成");
+    }
+
+    /**
+     * 获取服务器运行状态
+     */
+    public boolean isRunning() {
+        return serverChannel != null && serverChannel.isActive();
+    }
+
+    /**
+     * 获取当前绑定的端口
+     */
+    public int getPort() {
+        if (serverChannel != null && serverChannel.localAddress() instanceof InetSocketAddress) {
+            return ((InetSocketAddress) serverChannel.localAddress()).getPort();
+        }
+        return -1;
     }
 }

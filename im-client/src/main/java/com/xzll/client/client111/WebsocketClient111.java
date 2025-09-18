@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class WebsocketClient111 {
 
 
-    public static final String VALUE = "111";
+    public static final String VALUE = "1966479049087913984";
     private static EventLoopGroup group = new NioEventLoopGroup();
 
     private String ip;
@@ -62,7 +62,7 @@ public class WebsocketClient111 {
         // 主要是为handler(自己写的类)服务，用于初始化EasyWsHandle
         URI wsUri = new URI(uriStr);
         DefaultHttpHeaders entries = new DefaultHttpHeaders();
-        entries.set("token", "t_value");
+        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJ3eXEwMSIsInNjb3BlIjpbImFsbCJdLCJkZXZpY2VfdHlwZSI6MSwiaWQiOjE5NjY0NzkwNDkwODc5MTM5ODQsImV4cCI6MTc1NzY4Mzc1MSwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiNTExNGJiYmYtOThmNy00ZjI5LTgxYzktZmExZmFkOWM2ODI4IiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.oINtCWMHD17n8u-vT7z0MNEL9zPydciAZJl5xyQUHE67et6mKn1chkTtYUB2dsg_zxoNjrpqOAVd3IM1K18qC-qVgMKH04h30Ta5zwQ7mFC7-XoZCWmB7A7RqI0xEK6Le6UFntaMmdkMVXrnuSECOBu9F-NKp5qvge_bgqqP6ZoQByHktdqEzxgf0S5hwoVjKZD8Emr8hqm7wae05LGNOCha9y6GiI5Ze_3lFoRAPdGzFiQh-BHiPoF4NF9ECoa8bz-ZprY6--Wrsj7CwljMcl072yDC5hMNPNPQC58zH8F9Zle6LeTBaj4d1icicUdKJgVyRGfCHkb5r2Gd_W2dNg");
         entries.set("uid", VALUE);
 
 

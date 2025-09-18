@@ -17,17 +17,18 @@
     <description>开源im项目</description>
 
     <modules>
+        <module>im-common</module>
         <module>im-gateway</module>
         <module>im-auth</module>
         <module>im-connect</module>
         <module>im-business</module>
         <module>im-console</module>
-        <module>im-common</module>
+        <module>im-data-sync</module>
     </modules>
 
 
     <properties>
-        <java.version>11</java.version>
+        <java.version>17</java.version>
 
         <!--老版本-->
         <!--        <spring.cloud.version>Greenwich.SR6</spring.cloud.version>-->
@@ -53,8 +54,8 @@
 
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
         <fastjson.version>1.2.46</fastjson.version>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <redisson.version>3.14.0</redisson.version>
         <mapstruct.version>1.4.2.Final</mapstruct.version>
         <mapstruct.extensions.spring.version>0.1.1</mapstruct.extensions.spring.version>
@@ -255,7 +256,7 @@
             <!--ZooKeeper客户端-->
 
 
-            
+
             <!-- gRPC dependencies -->
             <dependency>
                 <groupId>io.grpc</groupId>
@@ -536,6 +537,15 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <!-- JDK 17 兼容性配置 -->
+                    <compilerArgs>
+                        <arg>--add-opens</arg>
+                        <arg>java.base/java.nio=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg>
+                        <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-opens</arg>
+                        <arg>java.base/java.lang=ALL-UNNAMED</arg>
+                    </compilerArgs>
                     <!--指定注解处理器的路径和依赖项, 告诉  编译器插件应该使用哪些注解处理器来生成代码 或  执行其他编译时的任务-->
                     <annotationProcessorPaths>
                         <!--使用mapstruct的话 必须有这一步 因为其是在编译期间进行代码生成的的-->
@@ -563,7 +573,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            
+
             <!-- Protobuf编译插件（生成Java与gRPC存根） -->
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
@@ -595,7 +605,7 @@
                     </execution>
                 </executions>
             </plugin>
-            
+
             <!-- 检测OS（供上面插件的classifier使用） -->
             <plugin>
                 <groupId>kr.motd.maven</groupId>
@@ -640,10 +650,11 @@
             <activation>
             </activation>
             <properties>
-                <!--模拟test环境  vm06-->
+                <!--模拟test环境  内网 zk RocketMQ hbase hadoop都已集群部署， redis es 暂时单机-->
 
                 <!--替换bootstrap.properties中的 ${nacos.serverAddr}变量-->
-                <nacos.serverAddr>192.168.122.136:8848</nacos.serverAddr>
+                <!--test对应内网环境 各个服务都部署在内网，所以nacos也配内网地址-->
+                <nacos.serverAddr>192.168.1.150:8848</nacos.serverAddr>
                 <!--根据test的命名空间 填写此处的命名空间ID-->
                 <nacos.config.namespace>test_id</nacos.config.namespace>
                 <boot.profile>test</boot.profile>
@@ -651,6 +662,8 @@
             </properties>
         </profile>
         <profile>
+
+            <!--暂时没用到-->
             <id>prod</id>
             <activation>
             </activation>

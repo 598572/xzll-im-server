@@ -30,7 +30,17 @@ public class ResourceServiceImpl {
         resourceRolesMap = new TreeMap<>();
         //暂时在代码中只配一个 后期读库
         resourceRolesMap.put("/xzll/im/login", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/chat/lastChatList", CollUtil.toList("ADMIN"));
         resourceRolesMap.put("/im-auth/oauth/logout", CollUtil.toList("ADMIN"));
+        
+        // 好友功能相关接口权限配置
+        resourceRolesMap.put("/im-business/api/user/search", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/request/send", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/request/handle", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/request/list", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/list", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/delete", CollUtil.toList("ADMIN"));
+        resourceRolesMap.put("/im-business/api/friend/block", CollUtil.toList("ADMIN"));
 
         // 将Map<String, List<String>>转换为Map<String, String>存储
         Map<String, String> stringMap = new TreeMap<>();

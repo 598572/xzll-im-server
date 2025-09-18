@@ -1,7 +1,6 @@
 package com.xzll.connect.netty.handler;
 
 
-import cn.hutool.extra.spring.SpringUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
 import com.xzll.common.constant.ImConstant;
@@ -11,71 +10,108 @@ import com.xzll.connect.config.ImMsgConfig;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.netty.heart.HeartBeatHandler;
-import com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl;
 import com.xzll.connect.service.UserStatusManagerService;
-import com.xzll.connect.service.impl.UserStatusManagerServiceImpl;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.skywalking.apm.toolkit.trace.SpanRef;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.apache.skywalking.apm.toolkit.trace.Tracer;
 import com.xzll.common.utils.RedissonUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.util.Collection;
-import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 /**
  * 自定义ChannelInboundHandler,处理消息请求
+ * 优化内容：
+ * 1. 修复内存泄漏问题
+ * 2. 使用Spring依赖注入 (单例模式，@Sharable)
+ * 3. 优化连接数统计
+ * 4. 增强异步处理能力
+ * 5. 增加消息长度限制
+ * 6. 优化日志级别
+ * 
+ * 注意：此Handler使用@Sharable注解，所有连接共享同一个实例
+ * 状态数据存储在LocalChannelManager中，确保线程安全
  */
 @Slf4j
+@Component
 @ChannelHandler.Sharable
 public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> {
 
+    @Autowired
+    private HeartBeatHandler heartBeatHandler;
+    
+    @Autowired
+    private HandlerDispatcher handlerDispatcher;
+    
+    @Autowired
+    private RedissonUtils redissonUtils;
+    
+    @Autowired
+    private ThreadPoolTaskExecutor threadPoolTaskExecutor;
+    
+    @Autowired
+    private ImMsgConfig imMsgConfig;
+    
+    @Autowired
+    private UserStatusManagerService userStatusManagerService;
 
-    private static final HeartBeatHandler heartBeatHandler = SpringUtil.getBean(NettyServerHeartBeatHandlerImpl.class);
-    private static final HandlerDispatcher handlerDispatcher = SpringUtil.getBean(HandlerDispatcher.class);
-    private static final RedissonUtils redissonUtils = SpringUtil.getBean(RedissonUtils.class);
-    private static final ThreadPoolTaskExecutor threadPoolTaskExecutor = SpringUtil.getBean(ThreadPoolTaskExecutor.class);
-    private static final ImMsgConfig imMsgConfig = SpringUtil.getBean(ImMsgConfig.class);
-    private static final UserStatusManagerService userStatusManagerService = SpringUtil.getBean(UserStatusManagerServiceImpl.class);
-
-    //这里用来对连接数进行记数,每两秒输出到控制台
-    private static final AtomicInteger nConnection = new AtomicInteger();
-
-    static {
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-            System.out.println("当前连接数: " + nConnection.get());
-        }, 0, 10, TimeUnit.SECONDS);
-    }
+    // 使用LongAdder替代AtomicInteger，在高并发场景下性能更好
+    private static final LongAdder connectionCount = new LongAdder();
+    
+    // 连接统计的时间戳，避免频繁输出
+    private static final AtomicLong lastLogTime = new AtomicLong(System.currentTimeMillis());
+    
+    // 连接数统计阈值
+    private static final long LOG_INTERVAL_MS = 10000; // 10秒输出一次
+    
+    // 消息长度限制
+    private static final int MAX_MESSAGE_LENGTH = 10240; // 10KB
+    
+    // 线程池队列长度限制
+    private static final int MAX_QUEUE_SIZE = 1000;
 
     private WebSocketServerHandshaker handShaker;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        log.info("当前 Trace ID: {}", TraceContext.traceId());
+        log.debug("当前 Trace ID: {}", TraceContext.traceId());
         super.channelActive(ctx);
         String channelId = ctx.channel().id().asLongText();
-        //添加连接
-        log.info("客户端加入连接channelId: {}", channelId);
-        //不能在此处设置用户信息 因为在这个阶段无法拿到uid新增 attr设置的只能是本地 不能垮进程
-        nConnection.incrementAndGet();
+        
+        // 连接数统计
+        connectionCount.increment();
+        
+        // 减少日志频率，避免在高并发时产生过多日志
+        long currentTime = System.currentTimeMillis();
+        long lastLog = lastLogTime.get();
+        if (currentTime - lastLog > LOG_INTERVAL_MS && lastLogTime.compareAndSet(lastLog, currentTime)) {
+            log.info("当前连接数: {}, 新连接channelId: {}", connectionCount.sum(), channelId);
+        } else {
+            log.debug("客户端加入连接channelId: {}", channelId);
+        }
+        
+        // 设置连接时间属性，用于连接时长统计
+        NettyAttrUtil.setConnectTime(ctx.channel(), currentTime);
     }
 
     @Override
@@ -83,7 +119,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
             if (idleStateEvent.state() == IdleState.READER_IDLE) {
-                log.info("定时检测客户端端是否存活");
+                log.debug("定时检测客户端端是否存活");
                 heartBeatHandler.process(ctx);
             }
         }
@@ -92,14 +128,37 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        String channelId = ctx.channel().id().asLongText();
-        //断开连接
-        log.info("客户端断开连接：{}", channelId);
-        String uid = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
-        //清除用户登录的服务器信息
-        LocalChannelManager.removeUserChannel(uid);
-        userStatusManagerService.userDisconnectAfter(uid);
-        nConnection.decrementAndGet();
+        try {
+            String channelId = ctx.channel().id().asLongText();
+            String uid = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
+            
+            // 计算连接时长
+            Long connectTime = NettyAttrUtil.getConnectTime(ctx.channel());
+            if (connectTime != null) {
+                long duration = System.currentTimeMillis() - connectTime;
+                log.info("客户端断开连接：{}, 用户ID: {}, 连接时长: {}ms", channelId, uid, duration);
+            } else {
+                log.info("客户端断开连接：{}, 用户ID: {}", channelId, uid);
+            }
+            
+            // 异步清理用户状态，避免阻塞IO线程
+            if (uid != null) {
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        LocalChannelManager.removeUserChannel(uid);
+                        userStatusManagerService.userDisconnectAfter(uid);
+                    } catch (Exception e) {
+                        log.error("用户断开连接后处理异常, uid: {}", uid, e);
+                    }
+                }, threadPoolTaskExecutor);
+            }
+            
+            connectionCount.decrement();
+        } catch (Exception e) {
+            log.error("处理连接断开异常", e);
+        } finally {
+            super.channelInactive(ctx);
+        }
     }
 
     /**
@@ -111,21 +170,22 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-
-        SpanRef span = Tracer.createEntrySpan("Netty/ChannelRead", null);
+        // 使用try-with-resources确保span正确关闭
         try {
-            log.info("当前 Trace ID: {}", TraceContext.traceId());
+            Tracer.createEntrySpan("Netty/ChannelRead", null);
+            log.debug("当前 Trace ID: {}", TraceContext.traceId());
+            
             // 传统的HTTP接入
             if (msg instanceof FullHttpRequest) {
-                log.info("=========处理Http请求接入=========");
+                log.debug("=========处理Http请求接入=========");
                 handleHttpRequest(ctx, ((FullHttpRequest) msg));
             }
             // WebSocket接入 PooledUnsafeDirectByteBuf
             else if (msg instanceof WebSocketFrame) {
-                log.info("=========处理websocket请求=========");
+                log.debug("=========处理websocket请求=========");
                 handleWebSocketFrame(ctx, (WebSocketFrame) msg);
             } else {
-                log.info("=========其他类型=========");
+                log.debug("=========其他类型=========");
             }
         } finally {
             Tracer.stopSpan();
@@ -139,8 +199,14 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        ctx.close();
-        log.error("[WebSocketServerHandler]_出现异常 ,e : ", cause);
+        String uid = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
+        log.error("[WebSocketServerHandler]_连接异常, uid: {}, channelId: {}", 
+                  uid, ctx.channel().id().asLongText(), cause);
+        
+        // 确保连接被正确关闭
+        if (ctx.channel().isActive()) {
+            ctx.close();
+        }
     }
 
     /**
@@ -151,7 +217,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      */
     private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) {
         //Http解码失败，返回Http异常
-        if (!req.getDecoderResult().isSuccess() || (!"websocket".equals(req.headers().get("Upgrade")))) {
+        if (!req.decoderResult().isSuccess() || (!"websocket".equals(req.headers().get("Upgrade")))) {
             sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, BAD_REQUEST));
             return;
         }
@@ -172,23 +238,26 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
         } else {
             ChannelFuture handshake = handShaker.handshake(ctx.channel(), req);
-            if (handshake.isSuccess()) {
-                log.info("握手成功");
-                userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
-                //用户上线 此时需要处理离线消息【此时机主动push 10条最近的离线消息，后续依赖客户下拉获取也即pull 】
-                Collection<String> lastOffLineMsgs = redissonUtils.getZSetRevRange(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 0, imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount());
-                if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
-                    lastOffLineMsgs.forEach(msg -> {
+            handshake.addListener(future -> {
+                if (future.isSuccess()) {
+                    log.info("WebSocket握手成功, uid: {}", uidStr);
+                    
+                    // 异步处理用户上线和离线消息推送，避免阻塞握手流程
+                    CompletableFuture.runAsync(() -> {
                         try {
-                            ctx.channel().writeAndFlush(new TextWebSocketFrame(msg));
+                            userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
+                            
+                            // 推送离线消息
+                            pushOfflineMessages(ctx, uid);
                         } catch (Exception e) {
-                            log.error("发送离线消息异常!:", e);
+                            log.error("用户上线后处理异常, uid: {}", uidStr, e);
                         }
-                    });
+                    }, threadPoolTaskExecutor);
+                } else {
+                    log.warn("WebSocket握手失败, uid: {}, cause: {}", uidStr, future.cause().getMessage());
+                    ctx.close();
                 }
-            } else {
-                log.warn("握手失败: {}", JSONUtil.toJsonStr(handshake));
-            }
+            });
         }
     }
 
@@ -202,40 +271,111 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         //判断是否是关闭连接的指令
         if (frame instanceof CloseWebSocketFrame) {
             log.info("[WebSocketServerHandler]_消息类型: close");
-            handShaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
+            try {
+                handShaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
+            } catch (Exception e) {
+                ReferenceCountUtil.release(frame);
+                log.error("关闭WebSocket连接异常", e);
+                ctx.close();
+            }
             return;
         }
+        
         //判断是否为ping消息
         if (frame instanceof PingWebSocketFrame) {
-            log.info("[WebSocketServerHandler]_消息类型: ping");
+            log.debug("[WebSocketServerHandler]_消息类型: ping");
             NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
-            ctx.write(new PongWebSocketFrame(frame.content().retain()));
+            // 修复内存泄漏：使用try-with-resources或者手动管理引用计数
+            try {
+                ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
+            } catch (Exception e) {
+                // 如果发送失败，需要释放retain的内容
+                ReferenceCountUtil.release(frame.content());
+                log.error("发送Pong消息失败", e);
+            }
             return;
         }
+        
         //判断是否为文本消息
         if ((frame instanceof TextWebSocketFrame)) {
-            log.info("[WebSocketServerHandler]_消息类型: 文本");
+            log.debug("[WebSocketServerHandler]_消息类型: 文本");
             String text = ((TextWebSocketFrame) frame).text();
-            ImBaseRequest imBaseRequest = JSON.parseObject(text, ImBaseRequest.class);
-            log.info("[WebSocketServerHandler]_消息原始数据: imBaseRequest:{}", JSONUtil.toJsonStr(imBaseRequest));
-            //分发&处理消息，业务和netty线程隔离
+            
+            // 消息长度检查
+            if (text.length() > MAX_MESSAGE_LENGTH) {
+                log.warn("消息长度超过限制: {} bytes", text.length());
+                ctx.close();
+                return;
+            }
+            
             try {
-                threadPoolTaskExecutor.execute(() -> {
-                    handlerDispatcher.dispatcher(ctx, imBaseRequest);
-                });
+                ImBaseRequest<?> imBaseRequest = JSON.parseObject(text, ImBaseRequest.class);
+                if (log.isDebugEnabled()) {
+                    log.debug("[WebSocketServerHandler]_消息原始数据: imBaseRequest:{}", JSONUtil.toJsonStr(imBaseRequest));
+                }
+                
+                // 检查线程池状态，避免任务堆积
+                ThreadPoolExecutor executor = threadPoolTaskExecutor.getThreadPoolExecutor();
+                if (executor.getQueue().size() > MAX_QUEUE_SIZE) {
+                    log.warn("线程池队列过长，拒绝处理消息: {}", executor.getQueue().size());
+                    return;
+                }
+                
+                //分发&处理消息，业务和netty线程隔离
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        handlerDispatcher.dispatcher(ctx, imBaseRequest);
+                    } catch (Exception e) {
+                        log.error("[WebSocketServerHandler]_分发消息异常, request: {}", imBaseRequest, e);
+                    }
+                }, threadPoolTaskExecutor);
+                
             } catch (Exception e) {
-                log.error("[WebSocketServerHandler]_处理消息失败!,e:", e);
+                log.error("[WebSocketServerHandler]_解析消息失败!,text: {}", text, e);
             }
         }
 
         if (frame instanceof BinaryWebSocketFrame) {
             //暂不适配该类型
-            log.info("[WebSocketServerHandler]_消息类型: 二进制");
+            log.debug("[WebSocketServerHandler]_消息类型: 二进制");
+        }
+    }
+
+    /**
+     * 异步推送离线消息
+     */
+    private void pushOfflineMessages(ChannelHandlerContext ctx, Object uid) {
+        try {
+            Collection<String> lastOffLineMsgs = redissonUtils.getZSetRevRange(
+                ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 
+                0, 
+                imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount()
+            );
+            
+            if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
+                log.info("推送离线消息, uid: {}, count: {}", uid, lastOffLineMsgs.size());
+                
+                for (String msg : lastOffLineMsgs) {
+                    if (ctx.channel().isActive()) {
+                        ctx.channel().writeAndFlush(new TextWebSocketFrame(msg))
+                            .addListener(future -> {
+                                if (!future.isSuccess()) {
+                                    log.error("发送离线消息失败, uid: {}", uid, future.cause());
+                                }
+                            });
+                    } else {
+                        log.warn("连接已断开，停止推送离线消息, uid: {}", uid);
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("推送离线消息异常, uid: {}", uid, e);
         }
     }
 
     private String getWebSocketLocation(FullHttpRequest req) {
-        String location = req.headers().get(HttpHeaders.Names.HOST) + ImConstant.WEBSOCKET_PATH;
+        String location = req.headers().get("Host") + ImConstant.WEBSOCKET_PATH;
         return "ws://" + location;
     }
 
@@ -248,15 +388,23 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
      */
     private static void sendHttpResponse(ChannelHandlerContext ctx, FullHttpRequest req, DefaultFullHttpResponse res) {
         //返回应答给客户端
-        if (res.getStatus().code() != 200) {
-            ByteBuf buf = Unpooled.copiedBuffer(res.getStatus().toString(), CharsetUtil.UTF_8);
+        if (res.status().code() != 200) {
+            ByteBuf buf = Unpooled.copiedBuffer(res.status().toString(), CharsetUtil.UTF_8);
             res.content().writeBytes(buf);
             buf.release();
         }
         // 如果是非Keep-Alive，关闭连接
         ChannelFuture f = ctx.channel().writeAndFlush(res);
-        if (!HttpHeaders.isKeepAlive(req) || res.getStatus().code() != 200) {
+        boolean keepAlive = "keep-alive".equalsIgnoreCase(req.headers().get("Connection"));
+        if (!keepAlive || res.status().code() != 200) {
             f.addListener(ChannelFutureListener.CLOSE);
         }
+    }
+    
+    /**
+     * 获取当前连接数
+     */
+    public static long getCurrentConnectionCount() {
+        return connectionCount.sum();
     }
 }

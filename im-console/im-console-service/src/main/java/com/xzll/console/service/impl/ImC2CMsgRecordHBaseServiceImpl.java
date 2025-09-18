@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
+
 /**
  * @Author: hzz
  * @Date: 2024/12/20
@@ -25,7 +27,7 @@ import java.util.List;
 public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseService {
 
     // HBase表名
-    private static final String TABLE_NAME = "im_c2c_msg_record";
+    private static final String TABLE_NAME = IM_C2C_MSG_RECORD;
     // 列族名
     private static final String COLUMN_FAMILY = "info";
     // 列名

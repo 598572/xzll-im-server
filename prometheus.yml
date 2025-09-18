@@ -30,6 +30,10 @@ scrape_configs:
     static_configs:
       - targets: [ 'im-console:8084' ]
     metrics_path: /actuator/prometheus
+  - job_name: 'im-data-sync'
+    static_configs:
+      - targets: [ 'im-data-sync:8085' ]
+    metrics_path: /actuator/prometheus
 
   # 使用 prometheus 客户端采集netty服务的指标数据给 prometheus
   - job_name: 'im-connect'

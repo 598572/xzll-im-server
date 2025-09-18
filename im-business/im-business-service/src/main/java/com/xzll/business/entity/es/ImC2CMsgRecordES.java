@@ -8,13 +8,15 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.time.LocalDateTime;
 
+import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
+
 /**
  * @Author: hzz
  * @Date: 2024/12/20
  * @Description: 单聊消息ES存储实体类
  */
 @Data
-@Document(indexName = "im_c2c_msg_record")
+@Document(indexName = IM_C2C_MSG_RECORD)
 public class ImC2CMsgRecordES {
 
     @Id
