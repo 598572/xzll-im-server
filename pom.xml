@@ -41,7 +41,7 @@
         <spring.cloud.version>2021.0.3</spring.cloud.version>
         <alibaba.cloud.version>2021.0.1.0</alibaba.cloud.version>
         <springboot.version>2.7.0</springboot.version>
-        <dubbo.version>3.0.7</dubbo.version>
+        <dubbo.version>3.2.0</dubbo.version>
         <curator.version>4.3.0</curator.version>
         <netty.version>4.1.75.Final</netty.version>
 

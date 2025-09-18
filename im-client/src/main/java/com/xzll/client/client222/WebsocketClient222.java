@@ -51,7 +51,7 @@ public class WebsocketClient222 {
     public WebsocketClient222(String ip, int port) {
         this.ip = ip;
         this.port = port;
-        uriStr = "ws://" + ip + ":" + port + "/websocket";
+        uriStr = "ws://" + ip + ":" + port + "/websocket?userId="+VALUE;
     }
 
     public static volatile boolean getMsgFlag = false;
@@ -61,7 +61,7 @@ public class WebsocketClient222 {
         URI wsUri = new URI(uriStr);
 
         DefaultHttpHeaders entries = new DefaultHttpHeaders();
-        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJ4emxsYWRnMDIiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxOTY1Njg3MDczOTEyNTI0ODAwLCJleHAiOjE3NTc1MTQwMTAsImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6Ijc2OGYzNmM0LTk1YjEtNDgyNi1iNThiLWZkZmMzNWE1OTU1MiIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.hEhq5q0dKb1TV-nDqOre57e9-4KiSnDdGWdvYxNAdlnIFoYr2wJqMuydPl13XDmUuJZjN1WXE2Hk6UtCIV_4w7c8PwU8qcWlrElKGSt9ivtidSdH3ZRX3cHNa32_jhLpVkBDJA1bU1MCHQwq8nuxFv3sAI-AgKW8P_ZQAMCmuVtyNiT7Pqzd8xYkyJlQmCzOztSMs4vd1YEVxc9CYpp2RSxtVPqH6gshlEMUlvceGIrysX2gQOvLsPMkLhDoAeRazdzXnekt02BpwV5QYg3jJ8VrLQ0M8nTq0pZP5UM7DPDjRiv7_7F3ylLC21iAZk8vgtkhKNns1C0OHaFDUjUH6Q");
+        entries.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoaGhiYmIiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxOTY2MzY5NjA3OTE4OTQ4MzUyLCJleHAiOjE3NTgxODAwMTQsImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6IjRlYmJkY2Y4LWFhMDUtNDQ1Mi04Mjk4LTdlMTJhOTVhZDQwMyIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.K5SrLh91xdLvVKLzq-wsYIkW1tSkZkWJaPCFnYtkigml6yW6MzKQsB3m_4vjmvnpLoXxelfCPaI9ajBdskyC7vghjcCU59DAxH0wjY-M7Rs5aQNZ5NDjdeQ_zKXs7AK3QDSiVRh8OUJ5Gd6h_pbgXlbEiv35u_ddVEbvFeiFz-WFBz6EZX5fgcSFU0kt2FKL_WhHvcCquvoF7OgSHqNBe_nKa92erUVLDVTTpNesWs_8YAW3UXRfZnRDph9zmRmxcPdfcxWek01K7hgHWxDYCrcpYFR79ZNfG7SdczJIYh4YXuwKZ_Ku5VLKp5CXtr2uY86WPSqhj99YTjGotCq5AA");
         entries.set("uid", VALUE);
 
         // 设置Bootstrap
