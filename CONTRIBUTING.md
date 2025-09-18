@@ -119,29 +119,29 @@ cd xzll-im-server
 # File -> Project Structure -> Project -> Project SDK: 选择JDK 11+
 ```
 
-##### 🚀 微服务启动顺序
+##### 🚀 微服务启动（无顺序，可在idea全选中，一键启动）
 
-**重要**: 必须按以下顺序启动，确保服务依赖关系正确：
 
-1. **im-auth (认证服务)** - 端口:8082
-   - 位置: `im-auth/src/main/java/com/xzll/auth/AuthApplication.java`
-   - 作用: 用户认证、JWT令牌生成
+1.  **im-auth (认证服务)** - 端口:8082
+    *   位置: `im-auth/src/main/java/com/xzll/auth/IMAuthServiceApplication.java`
+    *   作用: 用户认证、JWT令牌生成
 
-2. **im-connect (长连接服务)** - 端口:10001  
-   - 位置: `im-connect/im-connect-service/src/main/java/com/xzll/connect/ConnectApplication.java`
-   - 作用: WebSocket连接管理、实时消息推送
+2.  **im-connect (长连接服务)** - 端口:10001
+    *   位置: `im-connect/im-connect-service/src/main/java/com/xzll/connect/IMConnectServiceApplication.java`
+    *   作用: WebSocket连接管理、实时消息推送
 
-3. **im-business (业务服务)** - 端口:8083
-   - 位置: `im-business/im-business-service/src/main/java/com/xzll/business/BusinessApplication.java`
-   - 作用: 核心业务逻辑、消息处理
+3.  **im-business (业务服务)** - 端口:8083
+    *   位置: `im-business/im-business-service/src/main/java/com/xzll/business/IMBusinessServiceApplication.java`
+    *   作用: 核心业务逻辑、消息处理
 
-4. **im-console (控制台服务)** - 端口:8084
-   - 位置: `im-console/src/main/java/com/xzll/console/ConsoleApplication.java`
-   - 作用: 管理后台接口
+4.  **im-console (控制台服务)** - 端口:8084
+    *   位置: `im-console/im-console-service/src/main/java/com/xzll/console/IMConsoleServiceImplApplication.java`
+    *   作用: 管理后台接口
 
-5. **im-data-sync (数据同步服务)** - 端口:8085
-   - 位置: `im-data-sync/src/main/java/com/xzll/sync/DataSyncApplication.java`
-   - 作用: HBase到Elasticsearch数据同步
+5.  **im-data-sync (数据同步服务)** - 端口:8085
+    *   位置: `im-data-sync/src/main/java/com/xzll/datasync/IMDataSyncApplication.java`
+    *   作用: HBase到Elasticsearch数据同步
+
 
 ##### 🔍 启动验证
 
