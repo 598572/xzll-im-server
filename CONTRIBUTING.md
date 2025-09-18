@@ -4,7 +4,6 @@
 
 ## 📋 目录
 
-- [🎯 项目概述](#-项目概述)
 - [🚀 快速开始](#-快速开始)
 - [💻 开发环境搭建](#-开发环境搭建)
   - [详细启动指南](#%E8%AF%A6%E7%BB%86%E5%90%AF%E5%8A%A8%E6%8C%87%E5%8D%97)
@@ -16,25 +15,6 @@
 - [🐛 问题反馈](#-问题反馈)
 - [💬 交流方式](#-交流方式)
 - [📋 功能开发进度表](#%E5%8A%9F%E8%83%BD%E5%BC%80%E5%8F%91%E8%BF%9B%E5%BA%A6%E8%A1%A8)
-
----
-
-## 🎯 项目概述
-
-**xzll-im** 是一个基于现代微服务架构的分布式即时通讯系统：
-
-### 🏗️ 技术架构
-- **服务端**: Java 11 + Spring Cloud + Dubbo + Netty + RocketMQ
-- **客户端**: Flutter + Dart 跨平台移动应用
-- **存储**: MySQL + HBase + Redis + Elasticsearch
-- **部署**: Jenkins + Docker Compose + Nginx
-
-### 🎯 项目目标
-- ✅ **高并发**: 支持万级并发用户
-- ✅ **高可用**: 99.9% 系统可用性
-- ✅ **高性能**: 毫秒级消息延迟
-- ✅ **可扩展**: 水平扩展支持
-- ✅ **可观测**: 完整监控体系
 
 ---
 
@@ -83,7 +63,7 @@ git clone https://github.com/YOUR_USERNAME/xzll-im-flutter-client.git
 #### 必需软件
 ```bash
 # Java开发环境
-- JDK 11+
+- JDK 17
 - Maven 3.6+
 - IntelliJ IDEA 2024.x
 
@@ -93,14 +73,7 @@ git clone https://github.com/YOUR_USERNAME/xzll-im-flutter-client.git
 ```
 
 #### 依赖中间件
-项目已提供**线上测试环境**，无需本地搭建：
-- ✅ Nacos 2.0.3 (配置中心/服务注册)
-- ✅ ZooKeeper 3.5.1 (Dubbo注册中心)
-- ✅ RocketMQ 5.3.0 (消息队列)
-- ✅ MySQL 8.0.23 (关系数据库)
-- ✅ Redis 6.2.6 (缓存数据库)
-- ✅ HBase 2.6.1 (消息存储)
-- ✅ Elasticsearch 7.17.5 (搜索引擎)
+项目已提供，公网可流畅访问（作者个人的ESXI服务器36C/128GB/4TB），无需本地搭建。
 
 #### 详细启动指南
 
@@ -115,9 +88,16 @@ cd xzll-im-server
 # 打开IntelliJ IDEA，选择"Open"，选择项目根目录
 # 等待Maven依赖下载完成（首次可能需要5-10分钟）
 
-# 3. 配置JDK
-# File -> Project Structure -> Project -> Project SDK: 选择JDK 11+
 ```
+
+
+3. 配置JDK
+![img_plugin.png](doc/images/img_jdk.png)
+
+
+
+4. 搜索并添加markdown和mermaid插件
+![img_plugin.png](doc/images/img_plugin.png)
 
 ##### 🚀 微服务启动（无顺序，可在idea全选中，一键启动）
 
@@ -195,15 +175,6 @@ mvn clean install -U
 mvn spring-boot:run -Dmaven.test.skip=true
 ```
 
-###### 端口冲突问题
-```bash
-# 查看端口占用
-lsof -i :8082
-lsof -i :8083
-
-# 终止占用进程
-kill -9 <PID>
-```
 
 ###### Flutter环境问题
 ```bash
@@ -215,43 +186,6 @@ flutter pub get
 flutter build apk --debug
 ```
 
-###### 网络连接问题
-- 确保能访问线上Nacos: `ping nacos-server-ip`
-- 检查防火墙设置
-- 确认VPN连接状态
-
-##### 📊 开发工具推荐配置
-
-###### IntelliJ IDEA插件
-- **Lombok**: 自动生成getter/setter
-- **MyBatisX**: MyBatis增强工具
-- **Rainbow Brackets**: 彩色括号
-- **GitToolBox**: Git增强工具
-- **Alibaba Java Coding Guidelines**: 阿里代码规范
-
-###### Android Studio配置
-- **Flutter Inspector**: Flutter调试工具
-- **Dart**: Dart语言支持
-- **Flutter Intl**: 国际化支持
-
-##### 🔄 热重载开发
-
-###### 服务端热重载
-```xml
-<!-- pom.xml中添加 -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-devtools</artifactId>
-    <optional>true</optional>
-</dependency>
-```
-
-###### 客户端热重载
-```bash
-# Flutter支持原生热重载
-# 修改代码后按 'r' 重载
-# 重启应用按 'R'
-```
 
 ### 📱 客户端环境
 
@@ -331,8 +265,8 @@ docs/api-documentation      # API文档编写
 ### 3. 💻 开发实现
 ```bash
 # 保持代码同步
-git fetch upstream
-git rebase upstream/main
+git fetch 
+git merge main
 
 # 提交代码
 git add .
