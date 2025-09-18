@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-gateway:latest
 
     hostname: im-gateway
@@ -24,7 +24,7 @@ services:
       dockerfile: Dockerfile
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-auth:latest
 
     hostname: im-auth
@@ -43,7 +43,7 @@ services:
       dockerfile: Dockerfile # 指定名称
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-business:latest # 指定生成镜像的 名称
 
     # 也可以直接指定镜像名 但是要确保镜像存在 （如果在docker仓库, 则不需要再本地存在镜像 会自动pull）
@@ -75,7 +75,7 @@ services:
       dockerfile: Dockerfile
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-connect:latest
     hostname: im-connect
     container_name: im-connect
@@ -94,7 +94,7 @@ services:
       dockerfile: Dockerfile
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-console:latest
     hostname: im-console
     container_name: im-console
@@ -113,7 +113,7 @@ services:
       dockerfile: Dockerfile
       # 添加此配置确保使用本地镜像
       cache_from:
-        - openjdk:11-jdk
+        - openjdk:17-jdk
     image: im-data-sync:latest
     hostname: im-data-sync
     container_name: im-data-sync

@@ -1,6 +1,6 @@
 # business 的  Dockerfile 内容
 # jdk镜像
-FROM openjdk:11-jre-slim
+FROM openjdk:17-jdk
 # 挂载
 VOLUME /tmp
 COPY im-gateway.jar im-gateway.jar
