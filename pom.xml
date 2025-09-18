@@ -41,8 +41,8 @@
         <spring.cloud.version>2021.0.3</spring.cloud.version>
         <alibaba.cloud.version>2021.0.1.0</alibaba.cloud.version>
         <springboot.version>2.7.0</springboot.version>
-        <dubbo.version>3.2.0</dubbo.version>
-        <curator.version>4.3.0</curator.version>
+        <dubbo.version>3.3.0</dubbo.version>
+        <curator.version>5.5.0</curator.version>
         <netty.version>4.1.75.Final</netty.version>
 
         <!--暂时不用新版本es客户端-->
@@ -258,6 +258,12 @@
                 <groupId>org.apache.dubbo</groupId>
                 <artifactId>dubbo-spring-boot-starter</artifactId>
                 <version>${dubbo.version}</version>
+<!--                <exclusions>-->
+<!--                    <exclusion>-->
+<!--                        <artifactId>dubbo</artifactId>-->
+<!--                        <groupId>org.apache.dubbo</groupId>-->
+<!--                    </exclusion>-->
+<!--                </exclusions>-->
             </dependency>
             <!--ZooKeeper客户端-->
             <dependency>
@@ -286,6 +292,12 @@
                 <groupId>org.apache.dubbo.extensions</groupId>
                 <artifactId>dubbo-cluster-specify-address-dubbo3</artifactId>
                 <version>1.0.0</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>dubbo</artifactId>
+                        <groupId>org.apache.dubbo</groupId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!--此客户端较新，暂时不使用 先试用elasticsearch-rest-high-level-client  因为 elasticsearch-rest-high-level-client 更稳定 虽然他标识为 ：已过时的 -->
