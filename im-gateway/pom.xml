@@ -143,6 +143,12 @@
             <artifactId>mysql-connector-java</artifactId>
         </dependency>
 
+        <!-- 添加Gson依赖，解决Dubbo升级后（3.0.7升级到3.2）Gson依赖丢失问题 -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
+
 
 
     </dependencies>
