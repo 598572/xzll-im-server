@@ -310,44 +310,9 @@ sequenceDiagram
 
 
 
-## 2.2、🚀 架构升级：从 Dubbo 迁移到 gRPC
-
-### 🔄 **迁移背景**
-为了提升系统性能和简化架构复杂度，我们将微服务间通信从 Dubbo 迁移到了 gRPC：
-
-| 对比维度 | Dubbo 3.x | gRPC 1.58 | 迁移收益 |
-|---------|-----------|-----------|----------|
-| **协议基础** | TCP + 自定义协议 | HTTP/2 | 更好的网络穿透性 |
-| **注册中心** | 依赖 ZooKeeper | 无需注册中心 | 架构简化，减少中间件依赖 |
-| **序列化** | Hessian/FastJSON | Protocol Buffers | 更高效的序列化性能 |
-| **连接管理** | 复杂的连接池配置 | 自动连接复用 | 配置简化 |
-| **跨语言支持** | Java生态为主 | 原生多语言支持 | 更好的扩展性 |
-| **流式调用** | 不支持 | 原生支持 | 支持实时数据流 |
-| **版本兼容** | 版本升级复杂 | 向后兼容性好 | 更平滑的升级体验 |
-
-### 📊 **迁移效果**
-- ✅ **性能提升**: HTTP/2 多路复用，降低延迟
-- ✅ **架构简化**: 移除 ZooKeeper 依赖，减少运维复杂度  
-- ✅ **开发效率**: Protocol Buffers 强类型定义，减少接口错误
-- ✅ **系统稳定性**: 避免 Dubbo 版本冲突问题
-
-### 🛠️ **核心实现**
-采用智能连接管理器 `SmartGrpcClientManager`：
-- **连接复用**: 按 IP:Port 缓存 gRPC Channel
-- **自动路由**: 从 Redis 路由表自动获取用户所在服务器
-- **健康检查**: 定期检测连接状态，自动清理过期连接
-- **批量操作**: 支持批量用户的服务器分组调用
-
-```java
-// 简单易用的 API
-GrpcStubWrapper stub = grpcClientManager.getStub(userId);
-MessageResponse response = MessageServiceGrpc.newBlockingStub(stub.getChannelInfo().getChannel())
-    .sendMessage(request);
-```
-
 ---
 
-## 2.3、核心功能概览
+## 2.2、核心功能概览
 
 ### ✅ **已实现功能**
 - 🔐 **用户认证**: 注册、登录（OAuth2 + JWT）
