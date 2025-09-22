@@ -200,26 +200,26 @@ public class SnowflakeIdService {
 
 
     public static void main(String[] args) {
-//        MsgIdUtilsService generator = new MsgIdUtilsService(2L, "xzll-im");
-//
-//        //批量生成
-//        List<String> strings = generator.generateBatchMessageId(11L, false);
-//        System.out.println(strings);
+        SnowflakeIdService generator = new SnowflakeIdService(2L, "xzll-im");
 
-        //单个生成
-//        for (int i = 0; i < 10; i++) {
-//            String msgId = generator.generateMessageId(12345, false);
-//            System.out.println("生成的msgId:" + msgId);
-//            MsgIdUtilsService parser = new MsgIdUtilsService();
-//            Long snowflakeId = getSnowflakeId(msgId);
-//            parser.parseId(snowflakeId);
-//            System.out.println("\n");
-//        }
+        //批量生成
+        List<String> strings = generator.generateBatchMessageId(11L, false);
+        System.out.println(strings);
 
-//        MsgIdUtilsService msgIdUtilsService = new MsgIdUtilsService();
-//        for (int i = 0; i <100; i++) {
-//            System.out.println(msgIdUtilsService.nextId());
-//        }
+//        单个生成
+        for (int i = 0; i < 10; i++) {
+            String msgId = generator.generateMessageId(12345, false);
+            System.out.println("生成的msgId:" + msgId);
+            SnowflakeIdService parser = new SnowflakeIdService();
+            Long snowflakeId = getSnowflakeId(msgId);
+            parser.parseId(snowflakeId);
+            System.out.println("\n");
+        }
+
+        SnowflakeIdService msgIdUtilsService = new SnowflakeIdService();
+        for (int i = 0; i <100; i++) {
+            System.out.println(msgIdUtilsService.nextId());
+        }
 
 
     }

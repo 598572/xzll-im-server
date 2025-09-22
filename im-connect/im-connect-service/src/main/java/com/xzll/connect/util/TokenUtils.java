@@ -193,6 +193,13 @@ public class TokenUtils {
         return null;
     }
 
+    public static void main(String[] args) {
+        TokenInfo tokenInfo = TokenUtils.parseTokenInfo("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiIxMjM0Iiwic2NvcGUiOlsiYWxsIl0sImlkIjoxOTY5NjEwNjUwMjk0NTU0NjI0LCJleHAiOjE3NTg0NDU1NDksImF1dGhvcml0aWVzIjpbIkFETUlOIl0sImp0aSI6IjE3YWVjMDRkLTE0MTktNDgzYy04ZmZkLTJiYTUxMTk1MTA4MSIsImNsaWVudF9pZCI6ImNsaWVudC1hcHAifQ.XFnTyday2UNbtbKlh5Efz1F3UJ2pmnSkcZPtUwHpnGV4911bVFF0upb83HQu2yig7rN-B9FlgEjdgE-SXOsAeEFFSoNlFs51eGGfrqIxbChkX_qxDMSIwwgNmDDAxr9S0PFJw0IwvpgDI4Qc2vHRa5vXwbfqOXRwe0aT5HMfEJH9UAfY2aTbtVceeYIeQE3L_OXsRsixXX4YUH-GWOLOp094vPCEy0KDnlWm3ulqqLJDQzFF3tx8PdOOsPFpp8K_QVMGGrQpFcgQxGMuVElvs28qPhihCeE9gEySelY80JYkvrghKom_LLFCtVG_vBiH4uWTzoByoKkRLWrq0d395g");
+        System.out.println(tokenInfo);
+
+
+    }
+
     /**
      * Token信息封装类
      */
