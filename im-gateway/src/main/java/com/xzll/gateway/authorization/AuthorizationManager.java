@@ -186,6 +186,7 @@ public class AuthorizationManager implements ReactiveAuthorizationManager<Author
                 // 兼容模式：查找所有设备类型
                 return checkTokenInRedisCompatibleMode(jwt, userId);
             }
+
             
             ImTerminalType deviceType = ImTerminalType.fromCode(deviceTypeCode);
             if (deviceType == null || (deviceType != ImTerminalType.ANDROID && deviceType != ImTerminalType.IOS && 
