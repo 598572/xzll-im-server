@@ -174,7 +174,7 @@ public class AuthController {
 
             // 第四步：存储映射关系：key -> 用户ID，并设置过期时间
             redissonUtils.setString(redisKey, uid, oauth2Config.getTokenTimeOut(), TimeUnit.SECONDS);
-            log.debug("Token已保存到Redis，key: {}, deviceType: {}, tokenMd5: {}", redisKey, deviceType.getDescription(), tokenMd5);
+            log.info("Token已保存到Redis，key: {}, deviceType: {}, tokenMd5: {}", redisKey, deviceType.getCode(), tokenMd5);
 
         } catch (InterruptedException e) {
             log.error("获取分布式锁被中断", e);
