@@ -236,8 +236,10 @@ public class AuthController {
             parameters.put("refresh_token", refreshTokenRequest.getRefreshToken());
             parameters.put("client_id", oauth2Config.getClientId());
             parameters.put("client_secret", oauth2Config.getPassword());
+            // 添加设备类型参数，确保JwtTokenEnhancer能获取到
+            parameters.put("device_type", String.valueOf(refreshTokenRequest.getDeviceType().getCode()));
 
-            // 创建客户端认证信息
+            // 创建客户端认证信息 - OAuth2框架会使用这个认证信息进行客户端验证
             UsernamePasswordAuthenticationToken clientAuth = new UsernamePasswordAuthenticationToken(
                     oauth2Config.getClientId(),
                     oauth2Config.getPassword(),
