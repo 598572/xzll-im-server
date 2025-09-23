@@ -4,6 +4,7 @@ import com.xzll.auth.constant.AuthConstant;
 import com.xzll.auth.domain.SecurityUser;
 import com.xzll.common.constant.enums.ImTerminalType;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
@@ -42,6 +43,9 @@ public class JwtTokenEnhancer implements TokenEnhancer {
         try {
             Map<String, String> requestParameters = authentication.getOAuth2Request().getRequestParameters();
             String deviceTypeStr = requestParameters.get("device_type");
+            if (StringUtils.isBlank(deviceTypeStr)) {
+                deviceTypeStr = requestParameters.get("deviceType");
+            }
             if (deviceTypeStr != null) {
                 Integer deviceTypeCode = Integer.valueOf(deviceTypeStr);
                 ImTerminalType deviceType = ImTerminalType.fromCode(deviceTypeCode);
