@@ -2,6 +2,7 @@ package com.xzll.auth.component;
 
 import com.xzll.auth.constant.AuthConstant;
 import com.xzll.auth.domain.SecurityUser;
+import com.xzll.auth.util.DeviceTypeContext;
 import com.xzll.common.constant.enums.ImTerminalType;
 import com.xzll.common.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -40,29 +41,48 @@ public class JwtTokenEnhancer implements TokenEnhancer {
         // 把用户ID设置到JWT中
         info.put(AuthConstant.JWT_USER_ID_KEY, securityUser.getId());
         
-        // 从OAuth2认证请求参数中获取设备类型
+        // 从多个地方尝试获取设备类型信息
+        Integer deviceTypeCode = null;
+        
         try {
-            Map<String, String> requestParameters = authentication.getOAuth2Request().getRequestParameters();
-            log.info("JwtTokenEnhancer请求参数:{}", JsonUtils.toJsonStr(requestParameters));
-            String deviceTypeStr = requestParameters.get("device_type");
-            if (StringUtils.isBlank(deviceTypeStr)) {
-                deviceTypeStr = requestParameters.get("deviceType");
+            // 方法1：从ThreadLocal中获取（刷新token时使用）
+            ImTerminalType deviceTypeFromContext = DeviceTypeContext.getDeviceType();
+            if (deviceTypeFromContext != null) {
+                deviceTypeCode = deviceTypeFromContext.getCode();
+                log.info("从ThreadLocal中获取到设备类型: {}", deviceTypeFromContext.getDescription());
             }
-            if (deviceTypeStr != null) {
-                Integer deviceTypeCode = Integer.valueOf(deviceTypeStr);
+            
+            // 方法2：如果ThreadLocal中没有，从OAuth2请求参数中获取（登录时使用）
+            if (deviceTypeCode == null) {
+                Map<String, String> requestParameters = authentication.getOAuth2Request().getRequestParameters();
+                log.info("JwtTokenEnhancer请求参数:{}", JsonUtils.toJsonStr(requestParameters));
+                
+                String deviceTypeStr = requestParameters.get("device_type");
+                if (StringUtils.isBlank(deviceTypeStr)) {
+                    deviceTypeStr = requestParameters.get("deviceType");
+                }
+                
+                if (deviceTypeStr != null) {
+                    deviceTypeCode = Integer.valueOf(deviceTypeStr);
+                    log.debug("从请求参数中获取到设备类型: {}", deviceTypeCode);
+                }
+            }
+            
+            // 设置设备类型到JWT中
+            if (deviceTypeCode != null) {
                 ImTerminalType deviceType = ImTerminalType.fromCode(deviceTypeCode);
                 if (deviceType != null && deviceType != ImTerminalType.UNKNOWN) {
                     // 把设备类型设置到JWT中
                     info.put(AuthConstant.JWT_DEVICE_TYPE_KEY, deviceTypeCode);
-                    log.debug("将设备类型添加到JWT中: userId={}, deviceType={}", securityUser.getId(), deviceType.getDescription());
+                    log.info("将设备类型添加到JWT中: userId={}, deviceType={}", securityUser.getId(), deviceType.getDescription());
                 } else {
-                    log.warn("无效的设备类型: {}", deviceTypeStr);
+                    log.warn("无效的设备类型: {}", deviceTypeCode);
                 }
             } else {
-                log.warn("OAuth2请求参数中未找到device_type");
+                log.warn("未找到设备类型信息");
             }
         } catch (Exception e) {
-            log.warn("从OAuth2请求参数中获取设备类型失败", e);
+            log.warn("获取设备类型失败", e);
         }
         
         ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(info);

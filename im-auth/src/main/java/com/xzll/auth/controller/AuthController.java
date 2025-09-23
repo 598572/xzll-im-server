@@ -7,6 +7,7 @@ import com.xzll.auth.domain.TokenRequest;
 import com.xzll.auth.domain.LogoutRequest;
 import com.xzll.auth.domain.BatchLogoutRequest;
 import com.xzll.auth.domain.RefreshTokenRequest;
+import com.xzll.auth.util.DeviceTypeContext;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.common.constant.enums.ImTerminalType;
@@ -231,13 +232,14 @@ public class AuthController {
             }
 
             // 第二步：使用OAuth2标准流程刷新token
+            // 构建OAuth2标准参数，让框架自然处理
             Map<String, String> parameters = new HashMap<>();
             parameters.put("grant_type", "refresh_token");
             parameters.put("refresh_token", refreshTokenRequest.getRefreshToken());
-            parameters.put("client_id", oauth2Config.getClientId());
-            parameters.put("client_secret", oauth2Config.getPassword());
-            // 添加设备类型参数，确保JwtTokenEnhancer能获取到
-            parameters.put("device_type", String.valueOf(refreshTokenRequest.getDeviceType().getCode()));
+            // 注意：client_id 和 client_secret 不应该放在parameters中，应该通过认证头传递
+
+            // 将设备类型存储到ThreadLocal中，供JwtTokenEnhancer使用
+            DeviceTypeContext.setDeviceType(refreshTokenRequest.getDeviceType());
 
             // 创建客户端认证信息 - OAuth2框架会使用这个认证信息进行客户端验证
             UsernamePasswordAuthenticationToken clientAuth = new UsernamePasswordAuthenticationToken(
@@ -246,8 +248,15 @@ public class AuthController {
                     null
             );
 
-            // 调用OAuth2的token端点进行刷新，传入客户端认证信息
-            OAuth2AccessToken newAccessToken = tokenEndpoint.postAccessToken(clientAuth, parameters).getBody();
+            OAuth2AccessToken newAccessToken;
+            try {
+                // 调用OAuth2的token端点进行刷新，传入客户端认证信息
+                newAccessToken = tokenEndpoint.postAccessToken(clientAuth, parameters).getBody();
+            } finally {
+                // 无论成功还是失败，都要清除ThreadLocal
+                DeviceTypeContext.clear();
+            }
+            
             if (newAccessToken == null) {
                 log.error("刷新token失败，无法获取新的访问令牌");
                 return WebBaseResponse.returnResultError("刷新token失败");
