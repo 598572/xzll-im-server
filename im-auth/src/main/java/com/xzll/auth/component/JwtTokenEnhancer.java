@@ -3,6 +3,7 @@ package com.xzll.auth.component;
 import com.xzll.auth.constant.AuthConstant;
 import com.xzll.auth.domain.SecurityUser;
 import com.xzll.common.constant.enums.ImTerminalType;
+import com.xzll.common.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
@@ -42,6 +43,7 @@ public class JwtTokenEnhancer implements TokenEnhancer {
         // 从OAuth2认证请求参数中获取设备类型
         try {
             Map<String, String> requestParameters = authentication.getOAuth2Request().getRequestParameters();
+            log.info("JwtTokenEnhancer请求参数:{}", JsonUtils.toJsonStr(requestParameters));
             String deviceTypeStr = requestParameters.get("device_type");
             if (StringUtils.isBlank(deviceTypeStr)) {
                 deviceTypeStr = requestParameters.get("deviceType");
