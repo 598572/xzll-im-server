@@ -65,7 +65,7 @@ public class LocalChannelManager {
 
     /**
      * 添加用户连接
-     * 支持单用户多连接场景（多设备登录）
+     * 注意：多设备登录检查已在AuthHandler中处理，此方法只负责添加连接
      */
     public static boolean addUserChannel(String userId, Channel channel) {
         if (userId == null || channel == null) {
@@ -84,12 +84,12 @@ public class LocalChannelManager {
             return false;
         }
         
-        // 如果该用户已有连接，移除旧连接（单设备登录模式）
-        Channel oldChannel = userIdChannelMap.get(userId);
-        if (oldChannel != null && oldChannel.isActive()) {
-            log.info("用户{}重新连接，关闭旧连接：{}", userId, oldChannel.id().asLongText());
-            removeUserChannel(userId);
-            oldChannel.close();
+        // 检查是否已有该用户的连接（防御性检查）
+        Channel existingChannel = userIdChannelMap.get(userId);
+        if (existingChannel != null && existingChannel.isActive()) {
+            log.warn("用户{}已有活跃连接：{}，但仍尝试添加新连接：{}，可能存在并发问题", 
+                userId, existingChannel.id().asLongText(), channelId);
+            // 不再自动关闭旧连接，由调用方（AuthHandler）处理
         }
         
         // 添加新连接
