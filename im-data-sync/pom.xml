@@ -43,11 +43,6 @@
             <artifactId>spring-cloud-starter-bootstrap</artifactId>
         </dependency>
 
-        <!-- Spring Boot Starter -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
         <!-- Nacos Config - 配置中心 -->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>

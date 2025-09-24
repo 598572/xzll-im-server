@@ -11,7 +11,7 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 import com.xzll.common.pojo.response.base.CommonMsgVO;
-import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.connect.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;

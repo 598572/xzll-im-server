@@ -11,8 +11,7 @@
 		<Console name="Console" target="SYSTEM_OUT">
 <!--			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{im_trace_id}] - %msg%n" />-->
 			<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%traceId] [%logger{50}.%M:%L] - %msg%n" />
-
-			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+			<!-- 移除ThresholdFilter，让Spring Boot配置控制日志级别 -->
 		</Console>
 
 		<RollingRandomAccessFile name="File"
@@ -26,7 +25,7 @@
 			</Policies>
 
 			<DefaultRolloverStrategy max="40" />
-			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+			<!-- 移除ThresholdFilter，让Spring Boot配置控制日志级别 -->
 		</RollingRandomAccessFile>
 
 		<!--使用grpc来将日志上报给sw-->
@@ -39,7 +38,8 @@
 	</Appenders>
 
 	<Loggers>
-		<Root level="info">
+		<!-- 使用系统属性，允许Spring Boot配置覆盖，默认INFO级别 -->
+		<Root level="${sys:logging.level.root:-INFO}">
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="File" />
 			<!-- 将日志发送到 SkyWalking -->
@@ -79,5 +79,6 @@
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="File" />
 		</logger>
+
 	</Loggers>
 </Configuration>

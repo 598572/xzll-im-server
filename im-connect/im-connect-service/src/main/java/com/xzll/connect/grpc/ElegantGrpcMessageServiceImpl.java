@@ -1,6 +1,7 @@
-package com.xzll.common.grpc;
+package com.xzll.connect.grpc;
 
-import com.xzll.common.config.GrpcClientConfig;
+import com.xzll.connect.config.GrpcClientConfig;
+import com.xzll.connect.grpc.GrpcMessageService;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
@@ -239,4 +240,4 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         public String getServerKey() { return serverKey; }
         public List<UserResult> getResults() { return results; }
     }
-} 
+}

@@ -1,9 +1,10 @@
-package com.xzll.common.grpc;
+package com.xzll.connect.grpc;
 
-import com.xzll.common.pojo.response.base.CommonMsgVO;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
+import com.xzll.common.pojo.response.base.CommonMsgVO;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -11,37 +12,37 @@ import java.util.concurrent.CompletableFuture;
 /**
  * @Author: hzz
  * @Date: 2024/12/19
- * @Description: gRPC消息服务接口 - 优雅的API设计
+ * @Description: gRPC消息服务接口 - 供外部调用
  */
 public interface GrpcMessageService {
     
     /**
-     * 发送服务端ACK到客户端
+     * 发送服务端ACK消息
      */
-    CompletableFuture<Boolean> sendServerAck(C2CServerReceivedMsgAckVO ackVO);
+    CompletableFuture<Boolean> sendServerAck(C2CServerReceivedMsgAckVO ackVo);
     
     /**
-     * 发送客户端ACK到客户端
+     * 发送客户端ACK消息
      */
-    CompletableFuture<Boolean> sendClientAck(C2CClientReceivedMsgAckVO ackVO);
+    CompletableFuture<Boolean> sendClientAck(C2CClientReceivedMsgAckVO ackVo);
     
     /**
-     * 发送撤回消息到客户端
+     * 发送撤回消息
      */
-    CompletableFuture<Boolean> sendWithdrawMsg(C2CWithdrawMsgVO withdrawMsgVO);
+    CompletableFuture<Boolean> sendWithdrawMsg(C2CWithdrawMsgVO withdrawMsgVo);
     
     /**
-     * 批量发送消息到多个用户
+     * 批量发送消息给多个用户
      */
     CompletableFuture<BatchSendResult> batchSendToUsers(List<String> userIds, CommonMsgVO message, String messageType);
     
     /**
-     * 发送消息到指定用户（同步方式）
+     * 同步发送消息给单个用户
      */
     boolean sendToUserSync(String userId, CommonMsgVO message, String messageType);
     
     /**
-     * 发送消息到指定用户（异步方式）
+     * 异步发送消息给单个用户
      */
     CompletableFuture<Boolean> sendToUserAsync(String userId, CommonMsgVO message, String messageType);
     
@@ -57,26 +58,24 @@ public interface GrpcMessageService {
         private final int totalCount;
         private final int successCount;
         private final int failureCount;
-        private final List<UserResult> userResults;
+        private final List<UserResult> results;
         
-        public BatchSendResult(int totalCount, int successCount, int failureCount, List<UserResult> userResults) {
+        public BatchSendResult(int totalCount, int successCount, int failureCount, List<UserResult> results) {
             this.totalCount = totalCount;
             this.successCount = successCount;
             this.failureCount = failureCount;
-            this.userResults = userResults;
+            this.results = results;
         }
         
+        // getters
         public int getTotalCount() { return totalCount; }
         public int getSuccessCount() { return successCount; }
         public int getFailureCount() { return failureCount; }
-        public List<UserResult> getUserResults() { return userResults; }
-        public double getSuccessRate() { 
-            return totalCount > 0 ? (double) successCount / totalCount : 0.0; 
-        }
+        public List<UserResult> getResults() { return results; }
     }
     
     /**
-     * 单个用户发送结果
+     * 用户发送结果
      */
     class UserResult {
         private final String userId;
@@ -91,6 +90,7 @@ public interface GrpcMessageService {
             this.error = error;
         }
         
+        // getters
         public String getUserId() { return userId; }
         public boolean isSuccess() { return success; }
         public String getMessage() { return message; }
@@ -118,6 +118,7 @@ public interface GrpcMessageService {
             this.averageResponseTime = averageResponseTime;
         }
         
+        // getters
         public long getTotalRequests() { return totalRequests; }
         public long getSuccessRequests() { return successRequests; }
         public long getFailureRequests() { return failureRequests; }
@@ -125,4 +126,4 @@ public interface GrpcMessageService {
         public double getSuccessRate() { return successRate; }
         public long getAverageResponseTime() { return averageResponseTime; }
     }
-} 
+}

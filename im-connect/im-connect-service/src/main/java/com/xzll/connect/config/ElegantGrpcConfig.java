@@ -21,7 +21,7 @@ import java.io.IOException;
  */
 @Slf4j
 @Configuration
-@Profile("!test") // 测试环境不启动gRPC服务器
+//@Profile("!test") // 测试环境不启动gRPC服务器
 @ConfigurationProperties(prefix = "grpc.server")
 @Data
 public class ElegantGrpcConfig {

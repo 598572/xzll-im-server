@@ -1,9 +1,9 @@
-package com.xzll.common.grpc;
+package com.xzll.connect.grpc;
 
 import com.xzll.common.utils.RedissonUtils;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.config.GrpcClientConfig;
+import com.xzll.connect.config.GrpcClientConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -314,4 +314,4 @@ public class SmartGrpcClientManager {
             manager.closeChannel(channelInfo.getIp() + ":" + channelInfo.getPort());
         }
     }
-} 
+}

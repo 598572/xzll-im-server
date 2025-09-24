@@ -8,8 +8,7 @@ import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
-import com.xzll.common.grpc.SmartGrpcClientManager;
-import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.connect.grpc.GrpcMessageService;
 import com.xzll.common.utils.RedissonUtils;
 import com.xzll.common.util.NettyAttrUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +31,6 @@ public class C2CClientReceivedAckMsgHandler {
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     @Resource
     private RedissonUtils redissonUtils;
-    @Resource
-    private SmartGrpcClientManager grpcClientManager;
     @Resource
     private GrpcMessageService grpcMessageService;
     @Resource

@@ -76,4 +76,4 @@ message WebBaseResponse {
   string message = 2;
   string data = 3;
   bool success = 4;
-} 
+}

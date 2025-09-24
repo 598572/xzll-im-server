@@ -8,7 +8,7 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
 import com.xzll.common.util.NettyAttrUtil;
-import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.connect.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;

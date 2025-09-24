@@ -10,7 +10,7 @@
 	<Appenders>
 		<Console name="Console" target="SYSTEM_OUT">
 			<PatternLayout pattern="%date{yyyy-MM-dd HH:mm:ss.SSS} %level [%thread][%file:%M:%line] [%X{im_trace_id}] - %msg%n" />
-			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+<!--			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />-->
 		</Console>
 
 
@@ -24,13 +24,13 @@
 			</Policies>
 
 			<DefaultRolloverStrategy max="40" />
-			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+<!--			<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />-->
 		</RollingRandomAccessFile>
 
 	</Appenders>
 
 	<Loggers>
-		<Root level="info">
+		<Root level="${sys:logging.level.root:-INFO}">
 			<AppenderRef ref="Console" />
 			<AppenderRef ref="File" />
 		</Root>

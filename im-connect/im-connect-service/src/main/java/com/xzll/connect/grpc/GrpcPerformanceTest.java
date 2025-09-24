@@ -1,6 +1,6 @@
 package com.xzll.connect.grpc;
 
-import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.connect.grpc.GrpcMessageService;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

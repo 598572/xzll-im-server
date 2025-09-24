@@ -1,4 +1,4 @@
-package com.xzll.common.config;
+package com.xzll.connect.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -43,4 +43,4 @@ public class GrpcClientConfig {
      * 是否允许无调用时保活
      */
     private boolean permitKeepAliveWithoutCalls = true;
-} 
+}
