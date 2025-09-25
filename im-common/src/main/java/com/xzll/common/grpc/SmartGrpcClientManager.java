@@ -6,10 +6,7 @@ import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.config.GrpcClientConfig;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -27,7 +24,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @Description: 智能gRPC客户端管理器 - 连接复用、自动重连、负载均衡
  */
 @Slf4j
-@Component
 public class SmartGrpcClientManager {
     
     @Resource

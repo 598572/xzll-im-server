@@ -10,7 +10,6 @@ import com.xzll.grpc.CommonMsgRequest;
 import com.xzll.grpc.BatchSendRequest;
 import com.xzll.grpc.BatchSendResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -24,7 +23,6 @@ import java.util.stream.Collectors;
  * @Description: 优雅的gRPC消息服务实现
  */
 @Slf4j
-@Service
 public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
 
     @Resource
