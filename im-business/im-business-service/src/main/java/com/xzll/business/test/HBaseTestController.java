@@ -1,4 +1,4 @@
-package com.xzll.business.controller;
+package com.xzll.business.test;
 
 import cn.hutool.core.util.RandomUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

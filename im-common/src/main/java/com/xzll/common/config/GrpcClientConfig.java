@@ -2,7 +2,6 @@ package com.xzll.common.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * @Author: hzz
@@ -10,7 +9,6 @@ import org.springframework.stereotype.Component;
  * @Description: gRPC客户端配置
  */
 @Data
-@Component
 @ConfigurationProperties(prefix = "grpc.client")
 public class GrpcClientConfig {
     

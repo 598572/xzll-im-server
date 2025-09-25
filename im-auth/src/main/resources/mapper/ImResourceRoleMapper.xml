@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xzll.auth.mapper.ImResourceRoleMapper">
+
+    <resultMap id="BaseResultMap" type="com.xzll.auth.entity.ImResourceRole">
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="resource_path" jdbcType="VARCHAR" property="resourcePath"/>
+        <result column="resource_name" jdbcType="VARCHAR" property="resourceName"/>
+        <result column="roles" jdbcType="VARCHAR" property="roles"/>
+        <result column="description" jdbcType="VARCHAR" property="description"/>
+        <result column="status" jdbcType="TINYINT" property="status"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, resource_path, resource_name, roles, description, status, create_time, update_time
+    </sql>
+
+    <select id="selectEnabledResources" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM im_resource_role
+        WHERE status = 1
+        ORDER BY resource_path
+    </select>
+
+</mapper>
