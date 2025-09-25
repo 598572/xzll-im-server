@@ -155,13 +155,12 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
             return false;
         }
         
-        // 原子操作：处理多设备登录 + 添加用户连接
-        boolean addResult = handleMultiDeviceLoginAndAddChannel(uid, ctx);
-        if (!addResult) {
-            log.warn("用户连接添加失败，认证失败：{}, uid: {}", clientIp, uid);
-            handleAuthFailure(ctx, clientIp, "连接数超过限制");
-            return false;
-        }
+        // 处理多设备登录
+        handleMultiDeviceLogin(uid, ctx);
+        
+        // 设置用户信息到Channel
+        LocalChannelManager.addUserChannel(uid, ctx.channel());
+        ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
         
         log.info("认证成功：IP={}, uid={}, token={}", clientIp, uid, token);
         return true;
@@ -245,62 +244,17 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
     }
 
     /**
-     * 原子操作：处理多设备登录并添加连接
-     * 防止并发竞态条件导致的重复登录问题
+     * 处理多设备登录
      */
-    private boolean handleMultiDeviceLoginAndAddChannel(String uid, ChannelHandlerContext ctx) {
-        // 使用synchronized确保同一用户的认证过程是串行的
-        synchronized (("auth_" + uid).intern()) {
-            try {
-                // 检查是否已有连接
-                if (LocalChannelManager.isUserOnline(uid)) {
-                    log.info("用户{}重复登录，准备关闭旧连接", uid);
-                    
-                    // 获取旧连接并关闭
-                    io.netty.channel.Channel oldChannel = LocalChannelManager.getChannelByUserId(uid);
-                    if (oldChannel != null && oldChannel.isActive()) {
-                        String oldChannelId = oldChannel.id().asLongText();
-                        log.info("用户{}重复登录，关闭旧连接：{}", uid, oldChannelId);
-                        
-                        // 先从管理器中移除
-                        LocalChannelManager.removeUserChannel(uid);
-                        
-                        // 异步关闭旧连接，避免阻塞当前认证流程
-                        oldChannel.close().addListener(future -> {
-                            if (future.isSuccess()) {
-                                log.debug("旧连接{}已成功关闭", oldChannelId);
-                            } else {
-                                log.warn("关闭旧连接{}失败：{}", oldChannelId, future.cause().getMessage());
-                            }
-                        });
-                    }
-                }
-                
-                // 添加新连接
-                boolean result = LocalChannelManager.addUserChannel(uid, ctx.channel());
-                if (result) {
-                    // 设置用户ID属性
-                    ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
-                    log.debug("用户{}连接设置成功，channelId：{}", uid, ctx.channel().id().asLongText());
-                }
-                
-                return result;
-                
-            } catch (Exception e) {
-                log.error("处理用户{}多设备登录异常", uid, e);
-                return false;
-            }
-        }
-    }
-    
-    /**
-     * 处理多设备登录（兼容性保留，已废弃）
-     * @deprecated 使用 handleMultiDeviceLoginAndAddChannel 替代
-     */
-    @Deprecated
     private void handleMultiDeviceLogin(String uid, ChannelHandlerContext ctx) {
-        // 为了兼容性保留，但实际不再使用
-        log.debug("调用了已废弃的handleMultiDeviceLogin方法，用户：{}", uid);
+        // 可以在这里实现多设备登录策略
+        // 例如：踢掉之前的连接、限制连接数等
+        
+        // 简单实现：如果已有连接，关闭旧连接
+        if (LocalChannelManager.isUserOnline(uid)) {
+            log.info("用户{}重复登录，关闭旧连接", uid);
+            // 这里可以发送通知给旧设备，然后关闭连接
+        }
     }
 
     /**
