@@ -1,17 +1,18 @@
 package com.xzll.business.service.impl;
 
 import cn.hutool.core.util.IdUtil;
-import cn.hutool.json.JSONUtil;
 import com.xzll.business.entity.mysql.ImFriendRequest;
 import com.xzll.business.service.FriendRequestPushService;
 import com.xzll.common.constant.ImSourceUrlConstant;
+import com.xzll.common.grpc.GrpcMessageService;
 import com.xzll.common.pojo.entity.ImUserDO;
 import com.xzll.common.pojo.response.FriendRequestPushVO;
-//import com.xzll.connect.rpcapi.RpcSendMsg2ClientApi;
 import lombok.extern.slf4j.Slf4j;
-//import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.Resource;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @Author: hzz
@@ -22,8 +23,8 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class FriendRequestPushServiceImpl implements FriendRequestPushService {
 
-//    @DubboReference
-//    private RpcSendMsg2ClientApi rpcSendMsg2ClientApi;
+    @Resource
+    private GrpcMessageService grpcMessageService;
 
     @Override
     public void pushFriendRequest(ImFriendRequest friendRequest, ImUserDO fromUser) {
@@ -57,10 +58,22 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
             pushVO.setPushTitle("好友申请");
             pushVO.setPushContent(fromUserName + " 请求添加您为好友");
 
-            // 发送推送
-//            rpcSendMsg2ClientApi.sendFriendRequestPush2Client(pushVO);
+            // 使用gRPC发送推送
+            CompletableFuture<Boolean> future = grpcMessageService.sendToUserAsync(
+                friendRequest.getToUserId(), pushVO, "FRIEND_REQUEST");
             
-            log.info("推送新的好友申请成功，申请ID:{}", friendRequest.getRequestId());
+            // 异步处理结果
+            future.whenComplete((success, throwable) -> {
+                if (throwable != null) {
+                    log.error("推送新的好友申请失败，申请ID:{}, 错误:{}", 
+                            friendRequest.getRequestId(), throwable.getMessage(), throwable);
+                } else if (success) {
+                    log.info("推送新的好友申请成功，申请ID:{}", friendRequest.getRequestId());
+                } else {
+                    log.warn("推送新的好友申请失败，申请ID:{}, gRPC返回false", 
+                            friendRequest.getRequestId());
+                }
+            });
 
         } catch (Exception e) {
             log.error("推送新的好友申请失败，申请ID:{}", friendRequest.getRequestId(), e);
@@ -108,10 +121,22 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                 pushVO.setPushContent("您的好友申请状态已更新");
             }
 
-            // 发送推送给申请人
-//            rpcSendMsg2ClientApi.sendFriendRequestPush2Client(pushVO);
+            // 使用gRPC发送推送给申请人
+            CompletableFuture<Boolean> future = grpcMessageService.sendToUserAsync(
+                friendRequest.getFromUserId(), pushVO, "FRIEND_REQUEST_RESULT");
             
-            log.info("推送好友申请处理结果成功，申请ID:{}", friendRequest.getRequestId());
+            // 异步处理结果
+            future.whenComplete((success, throwable) -> {
+                if (throwable != null) {
+                    log.error("推送好友申请处理结果失败，申请ID:{}, 错误:{}", 
+                            friendRequest.getRequestId(), throwable.getMessage(), throwable);
+                } else if (success) {
+                    log.info("推送好友申请处理结果成功，申请ID:{}", friendRequest.getRequestId());
+                } else {
+                    log.warn("推送好友申请处理结果失败，申请ID:{}, gRPC返回false", 
+                            friendRequest.getRequestId());
+                }
+            });
 
         } catch (Exception e) {
             log.error("推送好友申请处理结果失败，申请ID:{}", friendRequest.getRequestId(), e);

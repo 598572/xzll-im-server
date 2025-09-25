@@ -4,6 +4,7 @@ import com.xzll.common.config.GrpcClientConfig;
 import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
 import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
+import com.xzll.common.pojo.response.FriendRequestPushVO;
 import com.xzll.common.pojo.response.base.CommonMsgVO;
 import com.xzll.grpc.MessageServiceGrpc;
 import com.xzll.grpc.CommonMsgRequest;
@@ -119,6 +120,12 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
                 case "WITHDRAW":
                     success = stub.sendWithdrawMsg2Client(req).getSuccess();
                     break;
+                case "FRIEND_REQUEST":
+                case "FRIEND_REQUEST_RESULT":
+                    // 好友申请相关消息，使用通用消息发送接口
+                    success = stub.responseServerAck2Client(req).getSuccess();
+                    log.info("发送好友申请消息，类型: {}, 目标用户: {}", messageType, userId);
+                    break;
                 default:
                     log.warn("未识别的消息类型: {}，默认按SERVER_ACK处理", messageType);
                     success = stub.responseServerAck2Client(req).getSuccess();
@@ -140,6 +147,8 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
             return ((C2CClientReceivedMsgAckVO) message).getToUserId();
         } else if (message instanceof C2CWithdrawMsgVO) {
             return ((C2CWithdrawMsgVO) message).getToUserId();
+        } else if (message instanceof FriendRequestPushVO) {
+            return ((FriendRequestPushVO) message).getToUserId();
         }
         return null;
     }
@@ -169,6 +178,14 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
             if (m.getFromUserId() != null) b.setFromUserId(m.getFromUserId());
             if (m.getToUserId() != null) b.setToUserId(m.getToUserId());
             if (m.getWithdrawFlag() != null) b.setMsgStatus(m.getWithdrawFlag());
+        } else if (message instanceof FriendRequestPushVO) {
+            FriendRequestPushVO m = (FriendRequestPushVO) message;
+            if (m.getFromUserId() != null) b.setFromUserId(m.getFromUserId());
+            if (m.getToUserId() != null) b.setToUserId(m.getToUserId());
+            if (m.getRequestId() != null) b.setChatId(m.getRequestId()); // 使用requestId作为chatId
+            if (m.getPushContent() != null) b.setAckTextDesc(m.getPushContent()); // 推送内容
+            if (m.getStatus() != null) b.setMsgReceivedStatus(m.getStatus());
+            if (m.getPushType() != null) b.setMsgStatus(m.getPushType()); // 推送类型
         }
         return b.build();
     }
