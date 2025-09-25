@@ -15,3 +15,7 @@ spring:
           data-id: global.yaml
           group: DEFAULT_GROUP
           refresh: true
+        shared-configs[1]:
+          data-id: log-config.yaml
+          group: @nacos.group.name@
+          refresh: true
