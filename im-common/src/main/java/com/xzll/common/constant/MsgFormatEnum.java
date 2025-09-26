@@ -10,7 +10,8 @@ public enum MsgFormatEnum {
 
     TEXT_MSG(1, "文本消息"),
     VOICE_MSG(2, "语音条消息"),
-    LOCATION_MSG(3, "地理位置消息");
+    LOCATION_MSG(3, "地理位置消息"),
+    IMAGE_MSG(4, "图片消息");
 
     private int code;
     private String desc;
