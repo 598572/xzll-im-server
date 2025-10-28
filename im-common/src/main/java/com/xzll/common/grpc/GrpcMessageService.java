@@ -1,9 +1,10 @@
 package com.xzll.common.grpc;
 
-import com.xzll.common.pojo.response.FriendRequestPushVO;
 import com.xzll.grpc.ServerAckPush;
 import com.xzll.grpc.ClientAckPush;
 import com.xzll.grpc.WithdrawPush;
+import com.xzll.grpc.FriendRequestPush;
+import com.xzll.grpc.FriendResponsePush;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -31,9 +32,14 @@ public interface GrpcMessageService {
     CompletableFuture<Boolean> sendWithdrawMsg(WithdrawPush push);
 
     /**
-     * 发送好友请求推送（兼容旧逻辑）
+     * 发送好友请求推送到客户端（下行推送）
      */
-    CompletableFuture<Boolean> sendToUserAsync(String userId, FriendRequestPushVO message, String messageType);
+    CompletableFuture<Boolean> pushFriendRequest(FriendRequestPush push);
+    
+    /**
+     * 发送好友响应推送到客户端（下行推送）
+     */
+    CompletableFuture<Boolean> pushFriendResponse(FriendResponsePush push);
     
     /**
      * 获取服务统计信息

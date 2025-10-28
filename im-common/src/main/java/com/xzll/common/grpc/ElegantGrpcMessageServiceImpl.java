@@ -2,9 +2,7 @@ package com.xzll.common.grpc;
 
 import com.xzll.common.config.GrpcClientConfig;
 import com.xzll.grpc.MessageServiceGrpc;
-import com.xzll.grpc.FriendRequestPush;
 import lombok.extern.slf4j.Slf4j;
-import com.xzll.common.pojo.response.FriendRequestPushVO;
 
 import javax.annotation.Resource;
 import java.util.concurrent.CompletableFuture;
@@ -96,26 +94,44 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
     }
 
     @Override
-    public CompletableFuture<Boolean> sendToUserAsync(String userId, FriendRequestPushVO message, String messageType) {
+    public CompletableFuture<Boolean> pushFriendRequest(com.xzll.grpc.FriendRequestPush push) {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                // 将 VO 转换为 Protobuf Push
-                FriendRequestPush push = FriendRequestPush.newBuilder()
-                        .setFromUserId(message.getFromUserId() != null ? message.getFromUserId() : "")
-                        .setToUserId(message.getToUserId() != null ? message.getToUserId() : "")
-                        .setRequestMessage(message.getPushContent() != null ? message.getPushContent() : "")
-                        .setRequestTime(message.getMsgCreateTime() != null ? message.getMsgCreateTime() : System.currentTimeMillis())
-                        .build();
-
-                // TODO: 实现好友推送的 gRPC 调用（暂未实现，需要在 proto 中添加对应的 rpc 方法）
-                log.warn("好友推送功能暂未实现 gRPC 接口，userId={}, messageType={}", userId, messageType);
-                
-                successRequests.incrementAndGet();
-                return true;
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
+                boolean success = stub.pushFriendRequest2Client(push).getSuccess();
+                if (success) {
+                    successRequests.incrementAndGet();
+                } else {
+                    failureRequests.incrementAndGet();
+                }
+                return success;
             } catch (Exception e) {
                 failureRequests.incrementAndGet();
-                log.error("发送好友推送失败: {}", e.getMessage(), e);
+                log.error("发送好友请求推送失败: {}", e.getMessage(), e);
+                return false;
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> pushFriendResponse(com.xzll.grpc.FriendResponsePush push) {
+        return CompletableFuture.supplyAsync(() -> {
+            totalRequests.incrementAndGet();
+            try {
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
+                boolean success = stub.pushFriendResponse2Client(push).getSuccess();
+                if (success) {
+                    successRequests.incrementAndGet();
+                } else {
+                    failureRequests.incrementAndGet();
+                }
+                return success;
+            } catch (Exception e) {
+                failureRequests.incrementAndGet();
+                log.error("发送好友响应推送失败: {}", e.getMessage(), e);
                 return false;
             }
         });

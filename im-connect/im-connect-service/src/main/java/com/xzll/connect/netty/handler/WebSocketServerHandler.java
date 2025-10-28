@@ -246,6 +246,12 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                             
                             // 推送离线消息
                             pushOfflineMessages(ctx, uid);
+                            
+                            // 推送离线好友请求
+                            pushOfflineFriendRequests(ctx, uid);
+                            
+                            // 推送离线好友响应
+                            pushOfflineFriendResponses(ctx, uid);
                         } catch (Exception e) {
                             log.error("用户上线后处理异常, uid: {}", uidStr, e);
                         }
@@ -375,6 +381,102 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             }
         } catch (Exception e) {
             log.error("推送离线消息异常, uid: {}", uid, e);
+        }
+    }
+    
+    /**
+     * 推送离线好友请求
+     */
+    private void pushOfflineFriendRequests(ChannelHandlerContext ctx, Object uid) {
+        try {
+            String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_REQUEST_KEY + uid;
+            Collection<String> offlineFriendRequests = redissonUtils.getZSetRevRange(offlineKey, 0, -1);
+            
+            if (!CollectionUtils.isEmpty(offlineFriendRequests)) {
+                log.info("推送离线好友请求, uid: {}, count: {}", uid, offlineFriendRequests.size());
+                
+                int successCount = 0;
+                for (String encodedMsg : offlineFriendRequests) {
+                    if (ctx.channel().isActive()) {
+                        try {
+                            // Base64 解码
+                            byte[] bytes = java.util.Base64.getDecoder().decode(encodedMsg);
+                            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+                            
+                            ctx.channel().writeAndFlush(new BinaryWebSocketFrame(buf))
+                                .addListener(future -> {
+                                    if (future.isSuccess()) {
+                                        log.debug("离线好友请求推送成功, uid: {}", uid);
+                                    } else {
+                                        log.error("发送离线好友请求失败, uid: {}", uid, future.cause());
+                                    }
+                                });
+                            successCount++;
+                        } catch (Exception e) {
+                            log.error("解析离线好友请求失败, uid: {}", uid, e);
+                        }
+                    } else {
+                        log.warn("连接已断开，停止推送离线好友请求, uid: {}", uid);
+                        break;
+                    }
+                }
+                
+                // 推送完成后删除整个 ZSet
+                if (successCount > 0) {
+                    redissonUtils.delete(offlineKey);
+                    log.info("离线好友请求推送完成，已清理Redis缓存, uid: {}, successCount: {}", uid, successCount);
+                }
+            }
+        } catch (Exception e) {
+            log.error("推送离线好友请求异常, uid: {}", uid, e);
+        }
+    }
+    
+    /**
+     * 推送离线好友响应
+     */
+    private void pushOfflineFriendResponses(ChannelHandlerContext ctx, Object uid) {
+        try {
+            String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_RESPONSE_KEY + uid;
+            Collection<String> offlineFriendResponses = redissonUtils.getZSetRevRange(offlineKey, 0, -1);
+            
+            if (!CollectionUtils.isEmpty(offlineFriendResponses)) {
+                log.info("推送离线好友响应, uid: {}, count: {}", uid, offlineFriendResponses.size());
+                
+                int successCount = 0;
+                for (String encodedMsg : offlineFriendResponses) {
+                    if (ctx.channel().isActive()) {
+                        try {
+                            // Base64 解码
+                            byte[] bytes = java.util.Base64.getDecoder().decode(encodedMsg);
+                            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+                            
+                            ctx.channel().writeAndFlush(new BinaryWebSocketFrame(buf))
+                                .addListener(future -> {
+                                    if (future.isSuccess()) {
+                                        log.debug("离线好友响应推送成功, uid: {}", uid);
+                                    } else {
+                                        log.error("发送离线好友响应失败, uid: {}", uid, future.cause());
+                                    }
+                                });
+                            successCount++;
+                        } catch (Exception e) {
+                            log.error("解析离线好友响应失败, uid: {}", uid, e);
+                        }
+                    } else {
+                        log.warn("连接已断开，停止推送离线好友响应, uid: {}", uid);
+                        break;
+                    }
+                }
+                
+                // 推送完成后删除整个 ZSet
+                if (successCount > 0) {
+                    redissonUtils.delete(offlineKey);
+                    log.info("离线好友响应推送完成，已清理Redis缓存, uid: {}, successCount: {}", uid, successCount);
+                }
+            }
+        } catch (Exception e) {
+            log.error("推送离线好友响应异常, uid: {}", uid, e);
         }
     }
 

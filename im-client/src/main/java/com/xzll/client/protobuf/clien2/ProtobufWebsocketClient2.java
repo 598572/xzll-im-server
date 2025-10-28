@@ -40,7 +40,8 @@ public class ProtobufWebsocketClient2 {
     public ProtobufWebsocketClient2(String ip, int port) {
         this.ip = ip;
         this.port = port;
-        uriStr = "ws://" + ip + ":" + port + "/websocket";
+        // 添加 userId 参数以满足 Nginx 的一致性哈希要求
+        uriStr = "ws://" + ip + ":" + port + "/websocket?userId=" + VALUE;
     }
 
     public void run() throws InterruptedException, URISyntaxException {

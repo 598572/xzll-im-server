@@ -1,8 +1,10 @@
 package com.xzll.connect.grpc;
 
 import cn.hutool.core.lang.Assert;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.utils.RedissonUtils;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.service.TransferC2CMsgService;
 import io.grpc.stub.StreamObserver;
@@ -33,6 +35,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
 
     @Resource
     private TransferC2CMsgService transferC2CMsgService;
+    
+    @Resource
+    private RedissonUtils redissonUtils;
 
     @Override
     public void responseServerAck2Client(com.xzll.grpc.ServerAckPush request, 
@@ -222,6 +227,160 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     }
 
     /**
+     * 推送好友请求到客户端
+     */
+    @Override
+    public void pushFriendRequest2Client(com.xzll.grpc.FriendRequestPush request,
+                                         StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
+        try {
+            log.info("gRPC接收好友请求推送: toUserId={}, fromUserId={}, requestId={}", 
+                    request.getToUserId(), request.getFromUserId(), request.getRequestId());
+
+            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
+            
+            // 检查用户是否在线
+            if (targetChannel == null) {
+                log.warn("目标用户不在线，将好友请求保存为离线推送: toUserId={}, requestId={}", 
+                        request.getToUserId(), request.getRequestId());
+                
+                // 将好友请求保存到 Redis，待用户上线后推送
+                try {
+                    String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_REQUEST_KEY + request.getToUserId();
+                    
+                    // 构建 ImProtoResponse 并序列化为字节数组
+                    ImProtoResponse response = ImProtoResponse.newBuilder()
+                            .setType(MsgType.C2C_ACK)  // 临时使用
+                            .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                            .setCode(0)
+                            .build();
+                    
+                    // 使用 ZSet 存储，score 使用时间戳，便于排序
+                    redissonUtils.addZSet(
+                            offlineKey, 
+                            java.util.Base64.getEncoder().encodeToString(response.toByteArray()),
+                            System.currentTimeMillis()
+                    );
+                    
+                    log.info("好友请求已保存为离线推送: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId());
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+                } catch (Exception e) {
+                    log.error("保存离线好友请求失败: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId(), e);
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+                }
+                responseObserver.onCompleted();
+                return;
+            }
+
+            // 用户在线，直接推送
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.C2C_ACK)  // 临时使用
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                    .setCode(0)
+                    .build();
+
+            boolean success = sendProtoToClient(targetChannel, response);
+            
+            if (success) {
+                log.info("好友请求推送成功: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+            } else {
+                log.error("好友请求推送失败: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+            }
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            log.error("gRPC推送好友请求异常:", e);
+            com.xzll.grpc.WebBaseResponse errorResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
+                    .setCode(AnswerCode.ERROR.getCode())
+                    .setMessage("处理失败: " + e.getMessage())
+                    .setSuccess(false)
+                    .build();
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
+        }
+    }
+
+    /**
+     * 推送好友响应到客户端
+     */
+    @Override
+    public void pushFriendResponse2Client(com.xzll.grpc.FriendResponsePush request,
+                                          StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
+        try {
+            log.info("gRPC接收好友响应推送: toUserId={}, fromUserId={}, requestId={}, status={}", 
+                    request.getToUserId(), request.getFromUserId(), request.getRequestId(), request.getStatus());
+
+            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
+            
+            // 检查用户是否在线
+            if (targetChannel == null) {
+                log.warn("目标用户不在线，将好友响应保存为离线推送: toUserId={}, requestId={}", 
+                        request.getToUserId(), request.getRequestId());
+                
+                // 将好友响应保存到 Redis，待用户上线后推送
+                try {
+                    String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_RESPONSE_KEY + request.getToUserId();
+                    
+                    // 构建 ImProtoResponse 并序列化为字节数组
+                    ImProtoResponse response = ImProtoResponse.newBuilder()
+                            .setType(MsgType.C2C_ACK)  // 临时使用
+                            .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                            .setCode(0)
+                            .build();
+                    
+                    // 使用 ZSet 存储，score 使用时间戳，便于排序
+                    redissonUtils.addZSet(
+                            offlineKey, 
+                            java.util.Base64.getEncoder().encodeToString(response.toByteArray()),
+                            System.currentTimeMillis()
+                    );
+                    
+                    log.info("好友响应已保存为离线推送: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId());
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+                } catch (Exception e) {
+                    log.error("保存离线好友响应失败: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId(), e);
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+                }
+                responseObserver.onCompleted();
+                return;
+            }
+
+            // 用户在线，直接推送
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.C2C_ACK)  // 临时使用
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                    .setCode(0)
+                    .build();
+
+            boolean success = sendProtoToClient(targetChannel, response);
+            
+            if (success) {
+                log.info("好友响应推送成功: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+            } else {
+                log.error("好友响应推送失败: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+            }
+            responseObserver.onCompleted();
+            
+        } catch (Exception e) {
+            log.error("gRPC推送好友响应异常:", e);
+            com.xzll.grpc.WebBaseResponse errorResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
+                    .setCode(AnswerCode.ERROR.getCode())
+                    .setMessage("处理失败: " + e.getMessage())
+                    .setSuccess(false)
+                    .build();
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
+        }
+    }
+
+    /**
      * 构建gRPC响应
      */
     private com.xzll.grpc.WebBaseResponse buildGrpcResponse(AnswerCode answerCode) {
@@ -231,7 +390,5 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
                 .setSuccess(answerCode == AnswerCode.SUCCESS)
                 .build();
     }
-
-
 
 } 

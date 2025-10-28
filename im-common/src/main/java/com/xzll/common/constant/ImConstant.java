@@ -117,6 +117,16 @@ public interface ImConstant {
          * 离线消息缓存key
          */
         public static final String OFF_LINE_MSG_KEY = "offLine:msgKey:";
+        
+        /**
+         * 离线好友请求推送缓存key
+         */
+        public static final String OFF_LINE_FRIEND_REQUEST_KEY = "offLine:friendRequest:";
+        
+        /**
+         * 离线好友响应推送缓存key
+         */
+        public static final String OFF_LINE_FRIEND_RESPONSE_KEY = "offLine:friendResponse:";
 
 
     }

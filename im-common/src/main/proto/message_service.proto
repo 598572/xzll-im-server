@@ -17,6 +17,12 @@ service MessageService {
   // 推送撤回消息到客户端（下行）
   rpc SendWithdrawMsg2Client (WithdrawPush) returns (WebBaseResponse) {}
   
+  // 推送好友请求到客户端（下行）
+  rpc PushFriendRequest2Client (FriendRequestPush) returns (WebBaseResponse) {}
+  
+  // 推送好友响应到客户端（下行）
+  rpc PushFriendResponse2Client (FriendResponsePush) returns (WebBaseResponse) {}
+  
   // 跨服务器转发 Protobuf 消息（上行转发）
   rpc TransferC2CMsg (ImProtoRequest) returns (WebBaseResponse) {}
 }
@@ -154,10 +160,29 @@ message WithdrawPush {
 
 // 好友请求推送 - 下行（gRPC专用）
 message FriendRequestPush {
-  string fromUserId = 1;
-  string toUserId = 2;
-  string requestMessage = 3;
-  int64 requestTime = 4;
+  string toUserId = 1;              // 接收人ID
+  string requestId = 2;             // 请求ID
+  string fromUserId = 3;            // 申请人ID
+  string fromUserName = 4;          // 申请人昵称
+  string fromUserAvatar = 5;        // 申请人头像
+  string requestMessage = 6;        // 申请消息
+  int32 status = 7;                 // 状态：0=待处理, 1=已同意, 2=已拒绝
+  int64 createTime = 8;             // 创建时间（毫秒）
+  string pushTitle = 9;             // 推送标题
+  string pushContent = 10;          // 推送内容
+}
+
+// 好友响应推送 - 下行（gRPC专用，用于通知申请人结果）
+message FriendResponsePush {
+  string toUserId = 1;              // 接收人ID（原申请人）
+  string requestId = 2;             // 请求ID
+  string fromUserId = 3;            // 响应人ID（原接收人）
+  string fromUserName = 4;          // 响应人昵称
+  string fromUserAvatar = 5;        // 响应人头像
+  int32 status = 6;                 // 状态：1=已同意, 2=已拒绝
+  int64 responseTime = 7;           // 响应时间（毫秒）
+  string pushTitle = 8;             // 推送标题
+  string pushContent = 9;           // 推送内容
 }
 
 // ================= 群聊相关消息（预留，暂未实现业务逻辑） =================
