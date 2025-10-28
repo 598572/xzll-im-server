@@ -9,8 +9,6 @@ import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
-import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
-import com.xzll.common.pojo.response.base.CommonMsgVO;
 import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
 import com.xzll.common.utils.RedissonUtils;
@@ -62,11 +60,18 @@ public class C2CSendMsgHandler {
                 // 这里不抛异常，避免影响消息发送的主流程
             }
             
-            //发送server_ack消息 告诉发送方此消息服务端已收到（想要可靠，必须落库后在ack）
-            C2CServerReceivedMsgAckVO ackVo = getServerReceivedMsgAckVO(dto);
-            
-            // 使用gRPC发送ACK - 优雅的异步方式
-            CompletableFuture<Boolean> future = grpcMessageService.sendServerAck(ackVo);
+            // 发送server_ack
+            com.xzll.grpc.ServerAckPush ackPush = com.xzll.grpc.ServerAckPush.newBuilder()
+                    .setMsgId(dto.getMsgId())
+                    .setChatId(dto.getChatId())
+                    //此时toUser是消息发送方 所以这里是fromUserId
+                    .setToUserId(dto.getFromUserId())
+                    .setAckTextDesc("SERVER_RECEIVED")
+                    .setMsgReceivedStatus(com.xzll.common.constant.MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())
+                    .setReceiveTime(System.currentTimeMillis())
+                    .build();
+            // 使用gRPC发送ACK - 异步方式
+            CompletableFuture<Boolean> future = grpcMessageService.sendServerAck(ackPush);
             
             // 异步处理结果
             future.thenAccept(success -> {
@@ -85,22 +90,4 @@ public class C2CSendMsgHandler {
         }
     }
 
-    /**
-     * 构建响应给客户端的服务端ack
-     *
-     * @param packet
-     * @return
-     */
-    public static C2CServerReceivedMsgAckVO getServerReceivedMsgAckVO(C2CSendMsgAO packet) {
-        C2CServerReceivedMsgAckVO c2CServerReceivedMsgAckVO = new C2CServerReceivedMsgAckVO();
-        c2CServerReceivedMsgAckVO.setAckTextDesc(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getDesc())
-                .setMsgReceivedStatus(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())
-                .setReceiveTime(System.currentTimeMillis())
-                .setChatId(packet.getChatId())
-                //toUser是目标客户端也就是 发送方：fromUserId
-                .setToUserId(packet.getFromUserId())
-                .setUrl(ImSourceUrlConstant.C2C.SERVER_RECEIVE_ACK);
-        c2CServerReceivedMsgAckVO.setMsgId(packet.getMsgId());
-        return c2CServerReceivedMsgAckVO;
-    }
 }

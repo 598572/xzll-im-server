@@ -5,10 +5,12 @@ import cn.hutool.extra.spring.SpringUtil;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.connect.netty.channel.LocalChannelManager;
 import com.xzll.connect.pojo.dto.ReceiveUserDataDTO;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.xzll.common.utils.RedissonUtils;
@@ -18,9 +20,9 @@ import java.util.Optional;
 /**
  * @Author: hzz
  * @Date: 2022/1/20 18:25:30
- * @Description: 消息处理公共封装
+ * @Description: 消息处理公共封装（仅用于 Protobuf）
  */
-public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
+public abstract class MsgHandlerCommonAbstract {
 
     public static Logger log = LoggerFactory.getLogger(MsgHandlerCommonAbstract.class);
 
@@ -58,17 +60,17 @@ public abstract class MsgHandlerCommonAbstract implements MsgHandlerStrategy {
 
 
     /**
-     * 消息发送common
+     * Protobuf 消息发送
      *
-     * @param tag
-     * @param targetChannel
-     * @param packet
-     * @param
+     * @param tag          日志标签
+     * @param targetChannel 目标通道
+     * @param protoBytes    Protobuf 序列化后的字节数组
      */
-    protected void msgSendTemplate(String tag, Channel targetChannel, String packet) {
-        ChannelFuture future = targetChannel.writeAndFlush(new TextWebSocketFrame(packet));
+    protected void sendProtoMsg(String tag, Channel targetChannel, byte[] protoBytes) {
+        ByteBuf buf = Unpooled.wrappedBuffer(protoBytes);
+        ChannelFuture future = targetChannel.writeAndFlush(new BinaryWebSocketFrame(buf));
         future.addListener((ChannelFutureListener) channelFuture ->
-                log.info((tag + "接收者在线直接发送,消息结果:{}"), channelFuture.isDone()));
+                log.info((tag + "Protobuf消息发送结果:{}"), channelFuture.isDone()));
     }
 
 }

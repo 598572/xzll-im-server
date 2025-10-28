@@ -1,9 +1,10 @@
 package com.xzll.common.grpc;
 
-import com.xzll.common.pojo.response.base.CommonMsgVO;
-import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
-import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
-import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
+import com.xzll.grpc.ServerAckPush;
+import com.xzll.grpc.ClientAckPush;
+import com.xzll.grpc.WithdrawPush;
+import com.xzll.grpc.FriendRequestPush;
+import com.xzll.grpc.FriendResponsePush;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -11,39 +12,34 @@ import java.util.concurrent.CompletableFuture;
 /**
  * @Author: hzz
  * @Date: 2024/12/19
- * @Description: gRPC消息服务接口 - 优雅的API设计
+ * @Description: gRPC消息服务接口 - 类型化Push设计
  */
 public interface GrpcMessageService {
     
     /**
-     * 发送服务端ACK到客户端
+     * 发送服务端ACK到客户端（下行推送）
      */
-    CompletableFuture<Boolean> sendServerAck(C2CServerReceivedMsgAckVO ackVO);
+    CompletableFuture<Boolean> sendServerAck(ServerAckPush push);
     
     /**
-     * 发送客户端ACK到客户端
+     * 发送客户端ACK到客户端（下行推送）
      */
-    CompletableFuture<Boolean> sendClientAck(C2CClientReceivedMsgAckVO ackVO);
+    CompletableFuture<Boolean> sendClientAck(ClientAckPush push);
     
     /**
-     * 发送撤回消息到客户端
+     * 发送撤回消息到客户端（下行推送）
      */
-    CompletableFuture<Boolean> sendWithdrawMsg(C2CWithdrawMsgVO withdrawMsgVO);
+    CompletableFuture<Boolean> sendWithdrawMsg(WithdrawPush push);
+
+    /**
+     * 发送好友请求推送到客户端（下行推送）
+     */
+    CompletableFuture<Boolean> pushFriendRequest(FriendRequestPush push);
     
     /**
-     * 批量发送消息到多个用户
+     * 发送好友响应推送到客户端（下行推送）
      */
-    CompletableFuture<BatchSendResult> batchSendToUsers(List<String> userIds, CommonMsgVO message, String messageType);
-    
-    /**
-     * 发送消息到指定用户（同步方式）
-     */
-    boolean sendToUserSync(String userId, CommonMsgVO message, String messageType);
-    
-    /**
-     * 发送消息到指定用户（异步方式）
-     */
-    CompletableFuture<Boolean> sendToUserAsync(String userId, CommonMsgVO message, String messageType);
+    CompletableFuture<Boolean> pushFriendResponse(FriendResponsePush push);
     
     /**
      * 获取服务统计信息

@@ -1,12 +1,11 @@
 package com.xzll.business.service.impl;
 
-import cn.hutool.core.util.IdUtil;
 import com.xzll.business.entity.mysql.ImFriendRequest;
 import com.xzll.business.service.FriendRequestPushService;
-import com.xzll.common.constant.ImSourceUrlConstant;
 import com.xzll.common.grpc.GrpcMessageService;
 import com.xzll.common.pojo.entity.ImUserDO;
-import com.xzll.common.pojo.response.FriendRequestPushVO;
+import com.xzll.grpc.FriendRequestPush;
+import com.xzll.grpc.FriendResponsePush;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,35 +31,29 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                 friendRequest.getRequestId(), friendRequest.getFromUserId(), friendRequest.getToUserId());
 
         try {
-            // 构建推送消息
-            FriendRequestPushVO pushVO = new FriendRequestPushVO();
-            pushVO.setPushType(1); // 新的好友申请
-            pushVO.setRequestId(friendRequest.getRequestId());
-            pushVO.setFromUserId(friendRequest.getFromUserId());
-            pushVO.setToUserId(friendRequest.getToUserId());
-            pushVO.setRequestMessage(friendRequest.getRequestMessage());
-            pushVO.setStatus(friendRequest.getStatus());
-            pushVO.setStatusText(getStatusText(friendRequest.getStatus()));
-            pushVO.setCreateTime(friendRequest.getCreateTime());
-            pushVO.setUrl(ImSourceUrlConstant.Friend.FRIEND_REQUEST_PUSH);
-            pushVO.setMsgId(IdUtil.simpleUUID());
-            pushVO.setMsgCreateTime(System.currentTimeMillis());
-
-            // 设置申请人信息
-            if (fromUser != null) {
-                pushVO.setFromUserName(fromUser.getUserFullName());
-                pushVO.setFromUserAvatar(fromUser.getHeadImage());
-            }
-
-            // 设置推送内容
-            String fromUserName = StringUtils.hasText(pushVO.getFromUserName()) ? 
-                    pushVO.getFromUserName() : pushVO.getFromUserId();
-            pushVO.setPushTitle("好友申请");
-            pushVO.setPushContent(fromUserName + " 请求添加您为好友");
+            // 构建申请人信息
+            String fromUserName = fromUser != null && StringUtils.hasText(fromUser.getUserFullName()) ?
+                    fromUser.getUserFullName() : friendRequest.getFromUserId();
+            String fromUserAvatar = fromUser != null ? fromUser.getHeadImage() : "";
+            
+            // 构建 Protobuf Push 消息
+            FriendRequestPush push = FriendRequestPush.newBuilder()
+                    .setToUserId(friendRequest.getToUserId())
+                    .setRequestId(friendRequest.getRequestId())
+                    .setFromUserId(friendRequest.getFromUserId())
+                    .setFromUserName(fromUserName)
+                    .setFromUserAvatar(fromUserAvatar)
+                    .setRequestMessage(friendRequest.getRequestMessage() != null ? friendRequest.getRequestMessage() : "")
+                    .setStatus(friendRequest.getStatus())
+                    .setCreateTime(friendRequest.getCreateTime() != null ? 
+                            friendRequest.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() 
+                            : System.currentTimeMillis())
+                    .setPushTitle("好友申请")
+                    .setPushContent(fromUserName + " 请求添加您为好友")
+                    .build();
 
             // 使用gRPC发送推送
-            CompletableFuture<Boolean> future = grpcMessageService.sendToUserAsync(
-                friendRequest.getToUserId(), pushVO, "FRIEND_REQUEST");
+            CompletableFuture<Boolean> future = grpcMessageService.pushFriendRequest(push);
             
             // 异步处理结果
             future.whenComplete((success, throwable) -> {
@@ -87,43 +80,38 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                 friendRequest.getToUserId(), friendRequest.getStatus());
 
         try {
-            // 构建推送消息 - 推送给申请人
-            FriendRequestPushVO pushVO = new FriendRequestPushVO();
-            pushVO.setPushType(2); // 好友申请处理结果
-            pushVO.setRequestId(friendRequest.getRequestId());
-            pushVO.setFromUserId(friendRequest.getFromUserId());
-            pushVO.setToUserId(friendRequest.getToUserId());
-            pushVO.setRequestMessage(friendRequest.getRequestMessage());
-            pushVO.setStatus(friendRequest.getStatus());
-            pushVO.setStatusText(getStatusText(friendRequest.getStatus()));
-            pushVO.setHandleTime(friendRequest.getHandleTime());
-            pushVO.setCreateTime(friendRequest.getCreateTime());
-            pushVO.setUrl(ImSourceUrlConstant.Friend.FRIEND_REQUEST_HANDLE_PUSH);
-            pushVO.setMsgId(IdUtil.simpleUUID());
-            pushVO.setMsgCreateTime(System.currentTimeMillis());
-
-            // 设置用户信息
-            if (fromUser != null) {
-                pushVO.setFromUserName(fromUser.getUserFullName());
-                pushVO.setFromUserAvatar(fromUser.getHeadImage());
-            }
-
-            // 设置推送内容
-            String toUserName = (toUser != null && StringUtils.hasText(toUser.getUserFullName())) ? 
+            // 构建响应人信息（处理申请的人）
+            String toUserName = (toUser != null && StringUtils.hasText(toUser.getUserFullName())) ?
                     toUser.getUserFullName() : friendRequest.getToUserId();
+            String toUserAvatar = toUser != null ? toUser.getHeadImage() : "";
             
-            pushVO.setPushTitle("好友申请结果");
+            // 构建推送内容
+            String pushContent;
             if (friendRequest.getStatus() == 1) {
-                pushVO.setPushContent(toUserName + " 同意了您的好友申请");
+                pushContent = toUserName + " 同意了您的好友申请";
             } else if (friendRequest.getStatus() == 2) {
-                pushVO.setPushContent(toUserName + " 拒绝了您的好友申请");
+                pushContent = toUserName + " 拒绝了您的好友申请";
             } else {
-                pushVO.setPushContent("您的好友申请状态已更新");
+                pushContent = "您的好友申请状态已更新";
             }
+            
+            // 构建 Protobuf Push 消息（推送给申请人）
+            FriendResponsePush push = FriendResponsePush.newBuilder()
+                    .setToUserId(friendRequest.getFromUserId())  // 接收人是原申请人
+                    .setRequestId(friendRequest.getRequestId())
+                    .setFromUserId(friendRequest.getToUserId())  // 响应人是原接收人
+                    .setFromUserName(toUserName)
+                    .setFromUserAvatar(toUserAvatar)
+                    .setStatus(friendRequest.getStatus())
+                    .setResponseTime(friendRequest.getHandleTime() != null ? 
+                            friendRequest.getHandleTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() 
+                            : System.currentTimeMillis())
+                    .setPushTitle("好友申请结果")
+                    .setPushContent(pushContent)
+                    .build();
 
             // 使用gRPC发送推送给申请人
-            CompletableFuture<Boolean> future = grpcMessageService.sendToUserAsync(
-                friendRequest.getFromUserId(), pushVO, "FRIEND_REQUEST_RESULT");
+            CompletableFuture<Boolean> future = grpcMessageService.pushFriendResponse(push);
             
             // 异步处理结果
             future.whenComplete((success, throwable) -> {
