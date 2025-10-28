@@ -6,69 +6,23 @@ option java_multiple_files = true;
 option java_package = "com.xzll.grpc";
 option java_outer_classname = "MessageServiceProto";
 
-// 消息转发服务
+// 消息转发服务（gRPC - 服务间调用）
 service MessageService {
-  // 响应服务端ack到客户端
-  rpc ResponseServerAck2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  // 推送服务端ACK到客户端（下行）
+  rpc ResponseServerAck2Client (ServerAckPush) returns (WebBaseResponse) {}
   
-  // 响应客户端ack到客户端
-  rpc ResponseClientAck2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  // 推送客户端ACK到客户端（下行）
+  rpc ResponseClientAck2Client (ClientAckPush) returns (WebBaseResponse) {}
   
-  // 发送撤回消息到客户端
-  rpc SendWithdrawMsg2Client (CommonMsgRequest) returns (WebBaseResponse) {}
+  // 推送撤回消息到客户端（下行）
+  rpc SendWithdrawMsg2Client (WithdrawPush) returns (WebBaseResponse) {}
   
-  // 转发C2C消息
-  rpc TransferC2CMsg (ImBaseRequest) returns (WebBaseResponse) {}
-  
-  // 批量发送消息到多个用户
-  rpc BatchSendToUsers (BatchSendRequest) returns (BatchSendResponse) {}
+  // 跨服务器转发 Protobuf 消息（上行转发）
+  rpc TransferC2CMsg (ImProtoRequest) returns (WebBaseResponse) {}
 }
 
-// 通用消息请求
-message CommonMsgRequest {
-  string url = 1;
-  string msgId = 2;
-  string chatId = 3;
-  string fromUserId = 4;
-  string toUserId = 5;
-  string msgContent = 6;
-  string msgFormat = 7;
-  int64 msgCreateTime = 8;
-  int32 msgStatus = 9;
-  string ackTextDesc = 10;
-  int32 msgReceivedStatus = 11;
-  int64 receiveTime = 12;
-}
 
-// IM基础请求
-message ImBaseRequest {
-  string url = 1;
-  bytes body = 2;
-  map<string, string> headers = 3;
-}
-
-// 批量发送请求
-message BatchSendRequest {
-  repeated string userIds = 1;
-  CommonMsgRequest message = 2;
-  string messageType = 3; // ACK, WITHDRAW, etc.
-}
-
-// 批量发送响应
-message BatchSendResponse {
-  repeated UserSendResult results = 1;
-  int32 totalCount = 2;
-  int32 successCount = 3;
-  int32 failureCount = 4;
-}
-
-// 用户发送结果
-message UserSendResult {
-  string userId = 1;
-  bool success = 2;
-  string message = 3;
-  string error = 4;
-}
+// 新设计采用类型化（上下行）的 XxxReq（代表上行）/XxxPush（代表下行） 消息
 
 // Web基础响应
 message WebBaseResponse {
@@ -76,4 +30,184 @@ message WebBaseResponse {
   string message = 2;
   string data = 3;
   bool success = 4;
+}
+
+// =====================================================
+// 精简高效的长连接 WebSocket 消息协议
+// =====================================================
+
+// 消息类型枚举
+enum MsgType {
+  MSG_TYPE_UNKNOWN = 0;
+  
+  // ========== 单聊相关 ==========
+  C2C_SEND = 1;              // C2C发送消息（上行）
+  C2C_ACK = 2;               // C2C消息确认（上行/下行）
+  C2C_WITHDRAW = 3;          // C2C撤回消息（上行/下行）
+  C2C_MSG_PUSH = 5;          // 服务端推送单聊消息（下行）
+  
+  // ========== 群聊相关（预留，暂未实现） ==========
+  GROUP_SEND = 7;            // 群聊发送消息（上行）
+  GROUP_MSG_PUSH = 8;        // 服务端推送群聊消息（下行）
+  GROUP_ACK = 9;             // 群聊消息确认（上行）
+  GROUP_WITHDRAW = 10;       // 群聊撤回消息（上行/下行）
+  
+  // ========== 通用功能 ==========
+  GET_BATCH_MSG_IDS = 4;     // 批量获取消息ID（上行）
+  PUSH_BATCH_MSG_IDS = 6;    // 服务端推送消息ID列表（下行）
+}
+
+// 基础消息包装（客户端->服务端）
+message ImProtoRequest {
+  MsgType type = 1;           // 消息类型
+  bytes payload = 2;          // 具体消息内容（根据type反序列化）
+}
+
+// 基础响应包装（服务端->客户端）
+message ImProtoResponse {
+  MsgType type = 1;           // 消息类型
+  bytes payload = 2;          // 具体消息内容
+  int32 code = 3;             // 响应码（0:成功，其他:失败）
+  string msg = 4;             // 错误消息（可选）
+}
+
+// ========== 单聊上行消息（客户端→服务端）==========
+
+// C2C发送消息请求 - 上行
+message C2CSendReq {
+  string msgId = 1;           // 消息ID（雪花算法生成）
+  string from = 2;            // 发送人ID
+  string to = 3;              // 接收人ID
+  int32 format = 4;           // 消息格式（1:文本,2:图片,3:语音等）
+  string content = 5;         // 消息内容
+  int64 time = 6;             // 客户端时间戳（毫秒）
+  string chatId = 7;          // 会话ID
+}
+
+// C2C消息确认请求 - 上行
+message C2CAckReq {
+  string msgId = 1;           // 消息ID
+  string from = 2;            // 发送人ID
+  string to = 3;              // 接收人ID
+  int32 status = 4;           // 消息状态（3:未读，4:已读）
+  string chatId = 5;          // 会话ID
+}
+
+// C2C撤回消息请求 - 上行
+message C2CWithdrawReq {
+  string msgId = 1;           // 要撤回的消息ID
+  string from = 2;            // 发送人ID
+  string to = 3;              // 接收人ID
+  string chatId = 4;          // 会话ID
+}
+
+// 批量获取消息ID请求 - 上行
+message GetBatchMsgIdsReq {
+  string userId = 1;          // 用户ID
+}
+
+// ========== 单聊下行消息（服务端→客户端）==========
+
+// 服务端推送C2C消息 - 下行
+message C2CMsgPush {
+  string msgId = 1;           // 消息ID
+  string from = 2;            // 发送人ID
+  string to = 3;              // 接收人ID
+  int32 format = 4;           // 消息格式
+  string content = 5;         // 消息内容
+  int64 time = 6;             // 服务器时间戳（毫秒）
+  string chatId = 7;          // 会话ID
+}
+
+// 批量消息ID推送 - 下行
+message BatchMsgIdsPush {
+  repeated string msgIds = 1; // 消息ID列表
 } 
+
+// 服务端ACK推送 - 下行（gRPC专用）
+message ServerAckPush {
+  string toUserId = 1;
+  string msgId = 2;
+  string chatId = 3;
+  int32 msgReceivedStatus = 4; // 1=SERVER_RECEIVED
+  string ackTextDesc = 5;
+  int64 receiveTime = 6;
+}
+
+// 客户端ACK推送 - 下行（gRPC专用）
+message ClientAckPush {
+  string toUserId = 1;
+  string msgId = 2;
+  string chatId = 3;
+  int32 msgReceivedStatus = 4; // 3=UN_READ, 4=READED
+  string ackTextDesc = 5;
+  int64 receiveTime = 6;
+}
+
+// 撤回消息推送 - 下行（gRPC专用）
+message WithdrawPush {
+  string toUserId = 1;
+  string msgId = 2;
+  string chatId = 3;
+  string fromUserId = 4;
+}
+
+// 好友请求推送 - 下行（gRPC专用）
+message FriendRequestPush {
+  string fromUserId = 1;
+  string toUserId = 2;
+  string requestMessage = 3;
+  int64 requestTime = 4;
+}
+
+// ================= 群聊相关消息（预留，暂未实现业务逻辑） =================
+
+// 群聊发送消息请求 - 上行
+message GroupSendReq {
+  string msgId = 1;           // 消息ID
+  string from = 2;            // 发送人ID
+  string groupId = 3;         // 群ID
+  int32 format = 4;           // 消息格式（1:文本,2:图片,3:语音等）
+  string content = 5;         // 消息内容
+  int64 time = 6;             // 客户端时间戳（毫秒）
+}
+
+// 群聊消息推送 - 下行
+message GroupMsgPush {
+  string msgId = 1;           // 消息ID
+  string from = 2;            // 发送人ID
+  string fromNickname = 3;    // 发送人昵称（群聊显示用）
+  string fromAvatar = 4;      // 发送人头像（群聊显示用）
+  string groupId = 5;         // 群ID
+  string groupName = 6;       // 群名称
+  int32 format = 7;           // 消息格式
+  string content = 8;         // 消息内容
+  int64 time = 9;             // 服务器时间戳（毫秒）
+  int32 memberCount = 10;     // 群成员数（可选）
+}
+
+// 群聊消息确认请求 - 上行
+message GroupAckReq {
+  string msgId = 1;           // 消息ID
+  string userId = 2;          // 确认人ID
+  string groupId = 3;         // 群ID
+  int32 status = 4;           // 消息状态（3:未读，4:已读）
+}
+
+// 群聊撤回消息请求 - 上行
+message GroupWithdrawReq {
+  string msgId = 1;           // 要撤回的消息ID
+  string from = 2;            // 发送人ID（或管理员ID）
+  string groupId = 3;         // 群ID
+  int64 withdrawTime = 4;     // 撤回时间戳
+}
+
+// 群聊撤回消息推送 - 下行
+message GroupWithdrawPush {
+  string msgId = 1;           // 被撤回的消息ID
+  string from = 2;            // 撤回操作人ID
+  string groupId = 3;         // 群ID
+  string operatorNickname = 4;// 操作人昵称（用于显示"XXX撤回了一条消息"）
+  int64 withdrawTime = 5;     // 撤回时间戳
+  bool isAdmin = 6;           // 是否为管理员撤回（true=管理员撤回他人消息）
+}

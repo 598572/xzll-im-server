@@ -53,7 +53,7 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
             }
 
             // 设置推送内容
-            String fromUserName = StringUtils.hasText(pushVO.getFromUserName()) ? 
+            String fromUserName = StringUtils.hasText(pushVO.getFromUserName()) ?
                     pushVO.getFromUserName() : pushVO.getFromUserId();
             pushVO.setPushTitle("好友申请");
             pushVO.setPushContent(fromUserName + " 请求添加您为好友");
@@ -109,9 +109,9 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
             }
 
             // 设置推送内容
-            String toUserName = (toUser != null && StringUtils.hasText(toUser.getUserFullName())) ? 
+            String toUserName = (toUser != null && StringUtils.hasText(toUser.getUserFullName())) ?
                     toUser.getUserFullName() : friendRequest.getToUserId();
-            
+
             pushVO.setPushTitle("好友申请结果");
             if (friendRequest.getStatus() == 1) {
                 pushVO.setPushContent(toUserName + " 同意了您的好友申请");
