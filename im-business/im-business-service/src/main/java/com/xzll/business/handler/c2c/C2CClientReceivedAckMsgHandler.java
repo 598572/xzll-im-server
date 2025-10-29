@@ -25,12 +25,10 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class C2CClientReceivedAckMsgHandler {
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     @Resource
     private RedissonUtils redissonUtils;
-    @Resource
-    private SmartGrpcClientManager grpcClientManager;
     @Resource
     private GrpcMessageService grpcMessageService;
     @Resource
@@ -38,7 +36,12 @@ public class C2CClientReceivedAckMsgHandler {
 
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void clientReceivedAckMsgDeal(C2CReceivedMsgAckAO dto) {
-        boolean updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
+        boolean updateResult = true;
+        if (imC2CMsgRecordService != null) {
+            updateResult = imC2CMsgRecordService.updateC2CMsgReceivedStatus(dto);
+        } else {
+            log.warn("HBase服务未启用，跳过更新消息状态，注意此举仅适用于开发环境");
+        }
         long needDeleteMsgId = com.xzll.common.util.msgId.SnowflakeIdService.getSnowflakeId(dto.getMsgId());
 
         //2. 如果是已读消息，清零该会话的未读数

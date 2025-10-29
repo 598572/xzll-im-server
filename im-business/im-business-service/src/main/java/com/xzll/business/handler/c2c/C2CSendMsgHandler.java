@@ -4,14 +4,10 @@ import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.UnreadCountService;
-import com.xzll.common.constant.ImConstant;
-import com.xzll.common.constant.ImSourceUrlConstant;
-import com.xzll.common.constant.MsgStatusEnum;
-import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
-import com.xzll.common.utils.RedissonUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +25,13 @@ import java.util.concurrent.CompletableFuture;
 public class C2CSendMsgHandler {
     @Resource
     private ImChatService imChatService;
-    @Resource
+    
+    @Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
     
     // 替换Dubbo为gRPC
     @Resource
     private GrpcMessageService grpcMessageService;
-    
-    @Resource
-    private RedissonUtils redissonUtils;
     @Resource
     private UnreadCountService unreadCountService;
 
@@ -49,7 +43,12 @@ public class C2CSendMsgHandler {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void sendC2CMsgDeal(C2CSendMsgAO dto) {
         boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
-        boolean writeMsg = imC2CMsgRecordService.saveC2CMsg(dto);
+        boolean writeMsg = true;
+        if (imC2CMsgRecordService != null) {
+            writeMsg = imC2CMsgRecordService.saveC2CMsg(dto);
+        } else {
+            log.warn("HBase服务未启用，跳过消息存储到HBase，注意此举仅适用于开发环境");
+        }
         if (writeChat && writeMsg) {
             // 增加接收方的未读消息数
             try {

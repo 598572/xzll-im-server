@@ -24,10 +24,8 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class C2CClientWithdrawMsgHandler {
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
-    @Resource
-    private RedissonUtils redissonUtils;
     @Resource
     private GrpcMessageService grpcMessageService;
 
@@ -40,7 +38,12 @@ public class C2CClientWithdrawMsgHandler {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void clientWithdrawMsgDeal(C2CWithdrawMsgAO ao) {
         //1. 更新消息状态为：未读/已读
-        boolean updateResult = imC2CMsgRecordService.updateC2CMsgWithdrawStatus(ao);
+        boolean updateResult = true;
+        if (imC2CMsgRecordService != null) {
+            updateResult = imC2CMsgRecordService.updateC2CMsgWithdrawStatus(ao);
+        } else {
+            log.warn("HBase服务未启用，跳过更新撤回状态，注意此举仅适用于开发环境");
+        }
         //2. 撤回消息发送至接收方
         if (updateResult) {
             com.xzll.grpc.WithdrawPush withdrawPush = com.xzll.grpc.WithdrawPush.newBuilder()
