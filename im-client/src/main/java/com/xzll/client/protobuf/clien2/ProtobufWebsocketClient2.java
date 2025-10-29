@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ProtobufWebsocketClient2 {
 
-    public static final String VALUE = "1966369607918948352"; // user2
+    public static final String VALUE = "1966479049087913984"; // user2
     private static EventLoopGroup group = new NioEventLoopGroup();
 
     private String ip;

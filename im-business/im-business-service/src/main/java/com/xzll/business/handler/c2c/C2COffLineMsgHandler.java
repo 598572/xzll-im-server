@@ -24,15 +24,14 @@ import java.util.concurrent.CompletableFuture;
 public class C2COffLineMsgHandler {
     @Resource
     private ImChatService imChatService;
-    @Resource
+    
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
     
     // 替换Dubbo为gRPC
     @Resource
     private GrpcMessageService grpcMessageService;
-    
-    @Resource
-    private RedissonUtils redissonUtils;
+
 
     /**
      * 离线消息处理 - 入库并发送服务端ACK
@@ -40,7 +39,12 @@ public class C2COffLineMsgHandler {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void sendC2CMsgDeal(C2CSendMsgAO dto) {
         boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
-        boolean writeMsg = imC2CMsgRecordHBaseService.saveC2CMsg(dto);
+        boolean writeMsg = true;
+        if (imC2CMsgRecordHBaseService != null) {
+            writeMsg = imC2CMsgRecordHBaseService.saveC2CMsg(dto);
+        } else {
+            log.warn("HBase服务未启用，跳过离线消息存储到HBase，注意此举仅适用于开发环境");
+        }
         if (writeChat && writeMsg) {
             // 发送服务端ACK，告知发送方消息已接收并存储
             com.xzll.grpc.ServerAckPush ackPush = com.xzll.grpc.ServerAckPush.newBuilder()

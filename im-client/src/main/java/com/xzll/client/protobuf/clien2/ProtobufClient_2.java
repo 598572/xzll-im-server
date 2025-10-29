@@ -17,8 +17,8 @@ public class ProtobufClient_2 {
     public static final String GONGWANG = "1.92.82.32";
 
     public static void start(String[] args) {
-//        ProtobufWebsocketClient2 websocketClient = new ProtobufWebsocketClient2(LOCAL, 10001);
-        ProtobufWebsocketClient2 websocketClient = new ProtobufWebsocketClient2(huawei, 80);
+        ProtobufWebsocketClient2 websocketClient = new ProtobufWebsocketClient2(LOCAL, 10001);
+//        ProtobufWebsocketClient2 websocketClient = new ProtobufWebsocketClient2(huawei, 80);
         try {
             websocketClient.run();
         } catch (InterruptedException | URISyntaxException e) {

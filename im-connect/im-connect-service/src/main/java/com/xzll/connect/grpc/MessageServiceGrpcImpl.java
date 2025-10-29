@@ -2,6 +2,7 @@ package com.xzll.connect.grpc;
 
 import cn.hutool.core.lang.Assert;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ProtoResponseCode;
 import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.utils.RedissonUtils;
@@ -58,7 +59,7 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             ImProtoResponse response = ImProtoResponse.newBuilder()
                     .setType(MsgType.C2C_ACK)
                     .setPayload(com.google.protobuf.ByteString.copyFrom(ackReq.toByteArray()))
-                    .setCode(0)
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
 
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
@@ -103,7 +104,7 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             ImProtoResponse response = ImProtoResponse.newBuilder()
                     .setType(MsgType.C2C_ACK)
                     .setPayload(com.google.protobuf.ByteString.copyFrom(ackReq.toByteArray()))
-                    .setCode(0)
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
 
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
@@ -146,7 +147,7 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             ImProtoResponse response = ImProtoResponse.newBuilder()
                     .setType(MsgType.C2C_WITHDRAW)
                     .setPayload(com.google.protobuf.ByteString.copyFrom(withdrawReq.toByteArray()))
-                    .setCode(0)
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
 
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
@@ -249,9 +250,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
                     
                     // 构建 ImProtoResponse 并序列化为字节数组
                     ImProtoResponse response = ImProtoResponse.newBuilder()
-                            .setType(MsgType.C2C_ACK)  // 临时使用
+                            .setType(MsgType.FRIEND_REQUEST)  // 好友请求消息类型
                             .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
-                            .setCode(0)
+                            .setCode(ProtoResponseCode.SUCCESS)
                             .build();
                     
                     // 使用 ZSet 存储，score 使用时间戳，便于排序
@@ -275,9 +276,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
 
             // 用户在线，直接推送
             ImProtoResponse response = ImProtoResponse.newBuilder()
-                    .setType(MsgType.C2C_ACK)  // 临时使用
+                    .setType(MsgType.FRIEND_REQUEST)  // 好友请求消息类型
                     .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
-                    .setCode(0)
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
 
             boolean success = sendProtoToClient(targetChannel, response);
@@ -326,9 +327,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
                     
                     // 构建 ImProtoResponse 并序列化为字节数组
                     ImProtoResponse response = ImProtoResponse.newBuilder()
-                            .setType(MsgType.C2C_ACK)  // 临时使用
+                            .setType(MsgType.FRIEND_RESPONSE)  // 好友响应消息类型
                             .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
-                            .setCode(0)
+                            .setCode(ProtoResponseCode.SUCCESS)
                             .build();
                     
                     // 使用 ZSet 存储，score 使用时间戳，便于排序
@@ -352,9 +353,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
 
             // 用户在线，直接推送
             ImProtoResponse response = ImProtoResponse.newBuilder()
-                    .setType(MsgType.C2C_ACK)  // 临时使用
+                    .setType(MsgType.FRIEND_RESPONSE)  // 好友响应消息类型
                     .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
-                    .setCode(0)
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
 
             boolean success = sendProtoToClient(targetChannel, response);

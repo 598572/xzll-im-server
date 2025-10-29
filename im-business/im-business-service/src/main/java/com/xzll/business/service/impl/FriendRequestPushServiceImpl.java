@@ -34,7 +34,7 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
             // 构建申请人信息
             String fromUserName = fromUser != null && StringUtils.hasText(fromUser.getUserFullName()) ?
                     fromUser.getUserFullName() : friendRequest.getFromUserId();
-            String fromUserAvatar = fromUser != null ? fromUser.getHeadImage() : "";
+            String fromUserAvatar = fromUser != null && org.apache.commons.lang3.StringUtils.isNotBlank(fromUser.getHeadImage()) ? fromUser.getHeadImage() : org.apache.commons.lang3.StringUtils.EMPTY;
             
             // 构建 Protobuf Push 消息
             FriendRequestPush push = FriendRequestPush.newBuilder()
@@ -83,7 +83,7 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
             // 构建响应人信息（处理申请的人）
             String toUserName = (toUser != null && StringUtils.hasText(toUser.getUserFullName())) ?
                     toUser.getUserFullName() : friendRequest.getToUserId();
-            String toUserAvatar = toUser != null ? toUser.getHeadImage() : "";
+            String toUserAvatar = toUser != null && org.apache.commons.lang3.StringUtils.isNotBlank(toUser.getHeadImage()) ? toUser.getHeadImage() : "";
             
             // 构建推送内容
             String pushContent;

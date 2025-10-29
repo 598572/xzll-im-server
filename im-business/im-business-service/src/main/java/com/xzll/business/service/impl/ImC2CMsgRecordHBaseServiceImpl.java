@@ -53,9 +53,18 @@ import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECOR
  * - 支持高并发写入
  * - 数据持久化可靠
  * - 支持消息状态更新
+ * 
+ * 本地开发支持：
+ * - 当 hbase.enabled=false 时，该 Bean 不会被创建
+ * - 业务逻辑应使用 @Autowired(required = false) 注入
  */
 @Service
 @Slf4j
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "hbase.enabled", 
+    havingValue = "true", 
+    matchIfMissing = false
+)
 public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseService {
 
     // HBase表名

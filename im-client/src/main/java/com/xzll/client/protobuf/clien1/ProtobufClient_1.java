@@ -17,8 +17,8 @@ public class ProtobufClient_1 {
 
     public static void start(String[] args) {
         // 根据需要选择服务器地址
-//        ProtobufWebsocketClient1 websocketClient = new ProtobufWebsocketClient1(LOCAL, 10001);
-        ProtobufWebsocketClient1 websocketClient = new ProtobufWebsocketClient1(huawei, 80);
+        ProtobufWebsocketClient1 websocketClient = new ProtobufWebsocketClient1(LOCAL, 10001);
+//        ProtobufWebsocketClient1 websocketClient = new ProtobufWebsocketClient1(huawei, 80);
         try {
             websocketClient.run();
         } catch (InterruptedException e) {
