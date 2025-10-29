@@ -169,7 +169,15 @@ public class ProtobufWebsocketClientHandler1 extends SimpleChannelInboundHandler
                     }
                     break;
 
-                
+                case FRIEND_REQUEST:
+                    // 处理好友请求（user1作为接收方）
+                    handleFriendRequest(protoResponse);
+                    break;
+
+                case FRIEND_RESPONSE:
+                    // 处理好友响应（user1作为发送方收到响应）
+                    handleFriendResponse(protoResponse);
+                    break;
                     
                 default:
                     System.out.println("未知消息类型: " + msgType);
@@ -255,6 +263,58 @@ public class ProtobufWebsocketClientHandler1 extends SimpleChannelInboundHandler
             
         } catch (InvalidProtocolBufferException e) {
             System.err.println("解析 BatchMsgIdsPush 失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理好友请求
+     */
+    private void handleFriendRequest(ImProtoResponse protoResponse) {
+        try {
+            FriendRequestPush request = FriendRequestPush.parseFrom(protoResponse.getPayload());
+            
+            System.out.println("============================================");
+            System.out.println("📨 [user1] 收到好友请求:");
+            System.out.println("  申请人: " + request.getFromUserName() + " (" + request.getFromUserId() + ")");
+            System.out.println("  申请消息: " + request.getRequestMessage());
+            System.out.println("  请求ID: " + request.getRequestId());
+            System.out.println("  推送标题: " + request.getPushTitle());
+            System.out.println("  推送内容: " + request.getPushContent());
+            System.out.println("============================================");
+            
+        } catch (InvalidProtocolBufferException e) {
+            System.err.println("❌ [user1] 解析好友请求失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 处理好友响应（user1 作为申请人收到对方的响应）
+     */
+    private void handleFriendResponse(ImProtoResponse protoResponse) {
+        try {
+            FriendResponsePush response = FriendResponsePush.parseFrom(protoResponse.getPayload());
+            
+            System.out.println("============================================");
+            System.out.println("📬 [user1] 收到好友申请响应:");
+            System.out.println("  响应人: " + response.getFromUserName() + " (" + response.getFromUserId() + ")");
+            System.out.println("  请求ID: " + response.getRequestId());
+            
+            if (response.getStatus() == 1) {
+                System.out.println("  结果: ✅ 已同意");
+                System.out.println("  🎉 恭喜！" + response.getFromUserName() + " 同意了你的好友申请");
+            } else if (response.getStatus() == 2) {
+                System.out.println("  结果: ❌ 已拒绝");
+                System.out.println("  😔 " + response.getFromUserName() + " 拒绝了你的好友申请");
+            } else {
+                System.out.println("  结果: ❓ 未知状态(" + response.getStatus() + ")");
+            }
+            
+            System.out.println("  推送标题: " + response.getPushTitle());
+            System.out.println("  推送内容: " + response.getPushContent());
+            System.out.println("============================================");
+            
+        } catch (InvalidProtocolBufferException e) {
+            System.err.println("❌ [user1] 解析好友响应失败: " + e.getMessage());
         }
     }
 

@@ -3,6 +3,7 @@ package com.xzll.connect.strategy.impl.c2c;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
+import com.xzll.common.constant.ProtoResponseCode;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
@@ -236,7 +237,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             ImProtoResponse response = ImProtoResponse.newBuilder()
                 .setType(MsgType.C2C_MSG_PUSH)
                 .setPayload(com.google.protobuf.ByteString.copyFrom(pushMsg.toByteArray()))
-                .setCode(0)
+                .setCode(ProtoResponseCode.SUCCESS)
                 .build();
             
             byte[] bytes = response.toByteArray();

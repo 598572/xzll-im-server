@@ -1,6 +1,7 @@
 package com.xzll.connect.strategy.impl;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.xzll.common.constant.ProtoResponseCode;
 import com.xzll.common.util.msgId.SnowflakeIdService;
 import com.xzll.connect.strategy.ProtoMsgHandlerStrategy;
 import com.xzll.grpc.*;
@@ -76,7 +77,7 @@ public class ClientGetBatchMsgIdsProtoStrategyImpl implements ProtoMsgHandlerStr
             ImProtoResponse response = ImProtoResponse.newBuilder()
                 .setType(msgType)
                 .setPayload(com.google.protobuf.ByteString.copyFrom(payload))
-                .setCode(0)
+                .setCode(ProtoResponseCode.SUCCESS)
                 .build();
             
             byte[] bytes = response.toByteArray();

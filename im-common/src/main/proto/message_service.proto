@@ -58,6 +58,10 @@ enum MsgType {
   GROUP_ACK = 9;             // 群聊消息确认（上行）
   GROUP_WITHDRAW = 10;       // 群聊撤回消息（上行/下行）
   
+  // ========== 好友相关 ==========
+  FRIEND_REQUEST = 11;       // 好友请求推送（下行）
+  FRIEND_RESPONSE = 12;      // 好友响应推送（下行）
+  
   // ========== 通用功能 ==========
   GET_BATCH_MSG_IDS = 4;     // 批量获取消息ID（上行）
   PUSH_BATCH_MSG_IDS = 6;    // 服务端推送消息ID列表（下行）
