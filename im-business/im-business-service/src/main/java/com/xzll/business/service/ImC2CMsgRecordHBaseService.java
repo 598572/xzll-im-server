@@ -1,5 +1,7 @@
 package com.xzll.business.service;
 
+import com.xzll.business.dto.request.ChatHistoryQueryDTO;
+import com.xzll.business.dto.response.ChatHistoryResponseDTO;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
@@ -41,4 +43,11 @@ public interface ImC2CMsgRecordHBaseService {
      * @return 消息记录映射 Map<chatId, ImC2CMsgRecord>
      */
     Map<String, ImC2CMsgRecord> batchGetLastMessagesByChatIds(List<String> chatIds);
+
+    /**
+     * 查询聊天历史记录 (基于HBase范围扫描)
+     * @param queryDTO 查询条件
+     * @return 聊天历史记录响应
+     */
+    ChatHistoryResponseDTO queryChatHistory(ChatHistoryQueryDTO queryDTO);
 }

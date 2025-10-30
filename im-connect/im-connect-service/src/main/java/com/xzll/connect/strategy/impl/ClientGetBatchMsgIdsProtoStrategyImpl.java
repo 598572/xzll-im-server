@@ -50,8 +50,7 @@ public class ClientGetBatchMsgIdsProtoStrategyImpl implements ProtoMsgHandlerStr
             log.info("{}消息详情 - userId: {}", TAG, req.getUserId());
             
             // 生成一批消息id
-            List<String> msgIds = snowflakeIdService.generateBatchMessageId(
-                Long.parseLong(req.getUserId()), false);
+            List<String> msgIds = snowflakeIdService.generateBatchSimpleMessageId(1000);
             
             // 构建响应
             com.xzll.grpc.BatchMsgIdsPush resp = com.xzll.grpc.BatchMsgIdsPush.newBuilder()

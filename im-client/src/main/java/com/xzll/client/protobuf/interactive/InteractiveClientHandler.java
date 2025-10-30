@@ -1,5 +1,6 @@
 package com.xzll.client.protobuf.interactive;
 
+import com.alibaba.fastjson.JSONObject;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.xzll.grpc.*;
 import io.netty.buffer.ByteBuf;
@@ -29,7 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @Description: 交互式客户端处理器
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
-    
+
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "8083";
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
     private ChannelPromise handshakeFuture;
@@ -402,14 +405,15 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
         try {
             System.out.println("[" + getTime() + "] ⏳ 正在处理好友请求...");
             
-            // 构建JSON请求体
-            String jsonBody = String.format(
-                "{\"requestId\":\"%s\",\"userId\":\"%s\",\"handleResult\":%d}",
-                requestId, request.getToUserId(), handleResult
-            );
+            // 构建处理请求参数（参考client2实现）
+            JSONObject handleRequest = new JSONObject();
+            handleRequest.put("requestId", request.getRequestId());
+            handleRequest.put("userId", request.getToUserId());
+            handleRequest.put("handleResult", handleResult); // 1=同意, 2=拒绝
             
-            // 调用HTTP接口
-            String result = sendHttpPost("http://127.0.0.1:8083/api/friend/request/handle", jsonBody);
+            // 调用HTTP接口处理好友申请
+            String result = sendHttpPost("http://" + IP + ":" + PORT + "/api/friend/request/handle",
+                                       handleRequest.toJSONString());
             
             // 处理成功，从待处理列表中移除
             pendingFriendRequests.remove(requestId);
