@@ -31,8 +31,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
 
-    public static final String IP = "127.0.0.1";
-    public static final String PORT = "8083";
+//    public static final String IP = "127.0.0.1";
+//    public static final String PORT = "8083";
+
+
+        public static final String IP = "120.46.85.43";
+    public static final String PORT = "80";
+
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
     private ChannelPromise handshakeFuture;
@@ -412,8 +417,10 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             handleRequest.put("handleResult", handleResult); // 1=同意, 2=拒绝
             
             // 调用HTTP接口处理好友申请
-            String result = sendHttpPost("http://" + IP + ":" + PORT + "/api/friend/request/handle",
+            String result = sendHttpPost("http://" + IP + ":" + PORT + "/im-business/api/friend/request/handle",
                                        handleRequest.toJSONString());
+
+
             
             // 处理成功，从待处理列表中移除
             pendingFriendRequests.remove(requestId);
