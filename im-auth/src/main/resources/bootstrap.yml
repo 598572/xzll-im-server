@@ -21,3 +21,4 @@ spring:
           refresh: true
       discovery:
         server-addr: @nacos.serverAddr@
+        namespace: @nacos.config.namespace@
