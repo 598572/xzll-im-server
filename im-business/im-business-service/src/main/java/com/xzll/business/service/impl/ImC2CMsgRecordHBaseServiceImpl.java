@@ -2,6 +2,8 @@ package com.xzll.business.service.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.config.HBaseTableUtil;
+import com.xzll.business.dto.request.ChatHistoryQueryDTO;
+import com.xzll.business.dto.response.ChatHistoryResponseDTO;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.constant.MsgStatusEnum;
@@ -10,6 +12,7 @@ import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -27,8 +30,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import java.util.ArrayList;
+import java.util.NavigableMap;
+import org.apache.commons.lang3.StringUtils;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -101,6 +105,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             },
             new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略
     );
+    public static final String ROW_KEY_LINK = "_";
 
     @Resource
     private Connection hbaseConnection;
@@ -699,4 +704,215 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                     operationType, chatId, msgId, e);
         }
     }
+
+    /**
+     * 根据会话id 查询聊天记录 用于c端点击进会话后的查询
+     * 注意：   （点击进会话时   最近50条先查本地数据库，下拉 / 本地没消息时（保证多端同步） 才查此接口）
+     *
+     * @param queryDTO 查询条件
+     * @return
+     */
+    @Override
+    public ChatHistoryResponseDTO queryChatHistory(ChatHistoryQueryDTO queryDTO) {
+        log.info("开始查询聊天历史记录: chatId={}, userId={}, lastMsgId={}, pageSize={}, startTime={}, endTime={}", 
+                queryDTO.getChatId(), queryDTO.getUserId(), queryDTO.getLastMsgId(), 
+                queryDTO.getPageSize(), queryDTO.getStartTime(), queryDTO.getEndTime());
+
+        ChatHistoryResponseDTO response = new ChatHistoryResponseDTO();
+        response.setMessages(new ArrayList<>());
+        response.setHasMore(false);
+        response.setCurrentPageSize(0);
+        response.setTotalCount(0);
+
+        if (StringUtils.isBlank(queryDTO.getChatId())) {
+            log.warn("chatId为空，无法查询聊天历史");
+            return response;
+        }
+
+        try {
+            Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
+            try {
+                // 创建Scan对象
+                Scan scan = createHistoryScan(queryDTO);
+                
+                // 执行扫描
+                ResultScanner scanner = table.getScanner(scan);
+                List<ChatHistoryResponseDTO.ChatMessageVO> messages = new ArrayList<>();
+                
+                try {
+                    for (Result result : scanner) {
+                        if (messages.size() >= queryDTO.getPageSize()) {
+                            response.setHasMore(true);
+                            break;
+                        }
+                        
+                        ChatHistoryResponseDTO.ChatMessageVO messageVO = convertToMessageVO(result);
+                        if (messageVO != null) {
+                            messages.add(messageVO);
+                        }
+                    }
+                } finally {
+                    scanner.close();
+                }
+                
+                // 设置响应数据
+                response.setMessages(messages);
+                response.setCurrentPageSize(messages.size());
+                response.setTotalCount(messages.size());
+                
+                // 设置下一页的lastMsgId
+                if (!messages.isEmpty() && response.getHasMore()) {
+                    ChatHistoryResponseDTO.ChatMessageVO lastMsg = messages.get(messages.size() - 1);
+                    response.setNextLastMsgId(lastMsg.getMsgId());
+                }
+                
+                log.info("聊天历史查询完成: chatId={}, 查询到{}条记录, hasMore={}", 
+                        queryDTO.getChatId(), messages.size(), response.getHasMore());
+                
+            } finally {
+                if (table != null) {
+                    table.close();
+                }
+            }
+        } catch (Exception e) {
+            log.error("查询聊天历史记录失败: chatId={}, userId={}", 
+                    queryDTO.getChatId(), queryDTO.getUserId(), e);
+        }
+        
+        return response;
+    }
+
+    /**
+     * 创建历史记录扫描器 - 支持基于RowKey的时间范围过滤优化
+     */
+    private Scan createHistoryScan(ChatHistoryQueryDTO queryDTO) {
+        Scan scan;
+        String chatIdPrefix = queryDTO.getChatId() + ROW_KEY_LINK;
+        
+        // 计算基于时间范围的RowKey边界
+        String timeBasedStartRow = null;
+        String timeBasedEndRow = null;
+        
+        if (queryDTO.getStartTime() != null) {
+            String startMsgId = SnowflakeIdService.generateMsgIdLowerBound(queryDTO.getStartTime());
+            timeBasedStartRow = chatIdPrefix + startMsgId;
+        }
+        
+        if (queryDTO.getEndTime() != null) {
+            String endMsgId = SnowflakeIdService.generateMsgIdUpperBound(queryDTO.getEndTime());
+            timeBasedEndRow = chatIdPrefix + endMsgId;
+        }
+        
+        if (StringUtils.isNotBlank(queryDTO.getLastMsgId())) {
+            // 分页查询：从指定消息ID开始，同时考虑时间范围
+            if (queryDTO.getReverse()) {
+                // 倒序查询：查询比lastMsgId小的消息
+                String startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
+                String stopRow = chatIdPrefix + queryDTO.getLastMsgId();
+                scan = new Scan()
+                        .withStartRow(Bytes.toBytes(startRow))
+                        .withStopRow(Bytes.toBytes(stopRow))
+                        .setReversed(true);
+            } else {
+                // 正序查询：查询比lastMsgId大的消息
+                String startRow = chatIdPrefix + queryDTO.getLastMsgId() + "0";
+                String stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                scan = new Scan()
+                        .withStartRow(Bytes.toBytes(startRow))
+                        .withStopRow(Bytes.toBytes(stopRow));
+            }
+        } else {
+            // 首次查询：基于时间范围构造RowKey范围
+            String startRow, stopRow;
+            
+            if (queryDTO.getReverse()) {
+                // 倒序查询
+                startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
+                stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                scan = new Scan()
+                        .withStartRow(Bytes.toBytes(startRow))
+                        .withStopRow(Bytes.toBytes(stopRow))
+                        .setReversed(true);
+            } else {
+                // 正序查询
+                startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
+                stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                scan = new Scan()
+                        .withStartRow(Bytes.toBytes(startRow))
+                        .withStopRow(Bytes.toBytes(stopRow));
+            }
+        }
+        
+        // 设置查询数量限制（多查询一条用于判断是否还有更多数据）
+        scan.setLimit(queryDTO.getPageSize() + 1);
+        
+        log.debug("HBase扫描范围: startRow={}, stopRow={}, reverse={}", 
+                new String(scan.getStartRow()), new String(scan.getStopRow()), queryDTO.getReverse());
+        
+        return scan;
+    }
+
+
+    /**
+     * 将HBase Result转换为ChatMessageVO
+     */
+    private ChatHistoryResponseDTO.ChatMessageVO convertToMessageVO(Result result) {
+        if (result == null || result.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            ChatHistoryResponseDTO.ChatMessageVO messageVO = new ChatHistoryResponseDTO.ChatMessageVO();
+            
+            // 设置RowKey
+            String rowKey = Bytes.toString(result.getRow());
+            messageVO.setRowkey(rowKey);
+            
+            // 解析各个字段
+            NavigableMap<byte[], byte[]> familyMap = result.getFamilyMap(Bytes.toBytes(COLUMN_FAMILY));
+            for (Map.Entry<byte[], byte[]> entry : familyMap.entrySet()) {
+                String columnName = Bytes.toString(entry.getKey());
+                String stringValue = Bytes.toString(entry.getValue());
+                
+                switch (columnName) {
+                    case COLUMN_FROM_USER_ID:
+                        messageVO.setFromUserId(stringValue);
+                        break;
+                    case COLUMN_TO_USER_ID:
+                        messageVO.setToUserId(stringValue);
+                        break;
+                    case COLUMN_MSG_ID:
+                        messageVO.setMsgId(stringValue);
+                        break;
+                    case COLUMN_MSG_FORMAT:
+                        messageVO.setMsgFormat(safeParseInteger(stringValue, 1));
+                        break;
+                    case COLUMN_MSG_CONTENT:
+                        messageVO.setMsgContent(stringValue);
+                        break;
+                    case COLUMN_MSG_CREATE_TIME:
+                        messageVO.setMsgCreateTime(safeParseLong(stringValue, System.currentTimeMillis()));
+                        break;
+                    case COLUMN_MSG_STATUS:
+                        messageVO.setMsgStatus(safeParseInteger(stringValue, 1));
+                        break;
+                    case COLUMN_CHAT_ID:
+                        messageVO.setChatId(stringValue);
+                        break;
+                    case COLUMN_CREATE_TIME:
+                        messageVO.setCreateTime(safeParseLong(stringValue, System.currentTimeMillis()));
+                        break;
+                    case COLUMN_UPDATE_TIME:
+                        messageVO.setUpdateTime(safeParseLong(stringValue, System.currentTimeMillis()));
+                        break;
+                }
+            }
+            
+            return messageVO;
+        } catch (Exception e) {
+            log.error("转换消息VO失败", e);
+            return null;
+        }
+    }
+
 }

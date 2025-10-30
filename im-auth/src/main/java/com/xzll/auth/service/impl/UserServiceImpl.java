@@ -176,8 +176,8 @@ public class UserServiceImpl implements UserDetailsService, UserService {
         ImUserDO user = new ImUserDO();
         BeanUtils.copyProperties(userDTO, user);
 
-        // 生成用户ID
-        user.setUserId(snowflakeIdService.nextId() + StringUtils.EMPTY);
+        // 生成用户ID - 使用压缩雪花算法（10-12位数字，比原版减少约40%）
+        user.setUserId(snowflakeIdService.generateCompactUserId());
         
         // 加密密码
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));

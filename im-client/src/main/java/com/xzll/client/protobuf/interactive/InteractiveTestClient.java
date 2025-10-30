@@ -31,7 +31,15 @@ import java.util.concurrent.TimeUnit;
  * 4. 实时显示收到的消息
  */
 public class InteractiveTestClient {
-    
+
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "10001";
+
+
+//    public static final String IP = "120.46.85.43";
+//    public static final String PORT = "80";
+
+
     private static String currentUserId;
     private static Channel channel;
     
@@ -64,7 +72,7 @@ public class InteractiveTestClient {
         EventLoopGroup group = new NioEventLoopGroup();
         try {
             // WebSocket URI (需要带上 userId 参数)
-            URI uri = new URI("ws://127.0.0.1:10001/websocket?userId=" + currentUserId);
+            URI uri = new URI("ws://" + IP + ":" + PORT + "/websocket?userId=" + currentUserId);
             
             // 设置 HTTP Headers
             DefaultHttpHeaders headers = new DefaultHttpHeaders();
@@ -275,7 +283,10 @@ public class InteractiveTestClient {
     private static void handleFriendCommand(InteractiveClientHandler handler, String subCommand, String fullInput) {
         String[] parts = fullInput.split("\\s+");
         
-        switch (subCommand.toLowerCase()) {
+        // 从subCommand中提取真正的子命令（第一个单词）
+        String realSubCommand = subCommand.split("\\s+")[0].toLowerCase();
+        
+        switch (realSubCommand) {
             case "accept":
             case "a":
                 if (parts.length < 3) {
@@ -300,7 +311,7 @@ public class InteractiveTestClient {
                 break;
             
             default:
-                System.out.println("❌ 未知子命令: " + subCommand);
+                System.out.println("❌ 未知子命令: " + realSubCommand);
                 System.out.println("💡 可用命令:");
                 System.out.println("   friend accept <requestId>  - 同意好友请求");
                 System.out.println("   friend reject <requestId>  - 拒绝好友请求");
