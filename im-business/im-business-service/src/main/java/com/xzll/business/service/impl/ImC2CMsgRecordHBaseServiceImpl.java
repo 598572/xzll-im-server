@@ -810,12 +810,13 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             // 分页查询：从指定消息ID开始，同时考虑时间范围
             if (queryDTO.getReverse()) {
                 // 倒序查询：查询比lastMsgId小的消息
-                String startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
+                // 在HBase倒序扫描中，startRow应该是较大的值，stopRow应该是较小的值
                 String stopRow = C2CMessageRowKeyUtil.generateRowKey(queryDTO.getChatId(), queryDTO.getLastMsgId());
+                String startRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow))
-                        .setReversed(true);
+                        .setReversed(queryDTO.getReverse());
             } else {
                 // 正序查询：查询比lastMsgId大的消息
                 String startRow = C2CMessageRowKeyUtil.generateRowKey(queryDTO.getChatId(), queryDTO.getLastMsgId() + "0");
@@ -829,15 +830,16 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             String startRow, stopRow;
             
             if (queryDTO.getReverse()) {
-                // 倒序查询
-                startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
-                stopRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
+                // 倒序查询：从时间范围的结束位置开始向前扫描
+                // 在HBase倒序扫描中，startRow应该是较大的值，stopRow应该是较小的值
+                startRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
+                stopRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow))
-                        .setReversed(true);
+                        .setReversed(queryDTO.getReverse());
             } else {
-                // 正序查询
+                // 正序查询：从时间范围的开始位置向后扫描
                 startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
                 stopRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
                 scan = new Scan()
