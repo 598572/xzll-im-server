@@ -19,10 +19,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.util.CollectionUtils;
 
 /**
  * @Author: hzz
@@ -47,6 +50,12 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     
     // 存储待处理的好友请求 <requestId, FriendRequestPush>
     private final Map<String, FriendRequestPush> pendingFriendRequests = new ConcurrentHashMap<>();
+    
+    // 存储从服务端获取的消息ID
+    private static final List<String> msgIds = new ArrayList<>();
+    
+    // 标识是否正在获取消息ID
+    private static volatile boolean getMsgFlag = false;
     
     private static final DateTimeFormatter TIME_FORMATTER = 
         DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -153,7 +162,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     break;
                 
                 case PUSH_BATCH_MSG_IDS:
-                    // 忽略批量消息ID
+                    handleBatchMsgIds(protoResponse);
                     break;
                 
                 default:
@@ -310,7 +319,29 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
      */
     public void sendTextMessage(String toUserId, String content) {
         try {
-            String msgId = UUID.randomUUID().toString();
+            // 检查是否有可用的msgId
+            if (getMsgFlag) {
+                System.out.println("[" + getTime() + "] ⏳ 正在获取消息ID，请稍候...");
+                return;
+            }
+            
+            if (CollectionUtils.isEmpty(msgIds)) {
+                System.out.println("[" + getTime() + "] 📥 消息ID为空，正在获取...");
+                getMsgIds();
+                getMsgFlag = true;
+                return;
+            }
+            
+            // 从集合中取出一个msgId
+            String msgId;
+            synchronized (msgIds) {
+                if (msgIds.isEmpty()) {
+                    System.out.println("[" + getTime() + "] ❌ 消息ID已用完，请重新获取");
+                    return;
+                }
+                msgId = msgIds.remove(0);
+            }
+            
             String chatId = generateChatId(userId, toUserId);
             
             // 构建 C2CSendReq
@@ -417,9 +448,11 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             handleRequest.put("handleResult", handleResult); // 1=同意, 2=拒绝
             
             // 调用HTTP接口处理好友申请
-            String result = sendHttpPost("http://" + IP + ":" + PORT + "/im-business/api/friend/request/handle",
+            String result = sendHttpPost("http://" + "120.46.85.43" + ":" + "80" + "/im-business/api/friend/request/handle",
                                        handleRequest.toJSONString());
 
+//            String result = sendHttpPost("http://" + "192.168.1.150" + ":" + "8083" + "/api/friend/request/handle",
+//                    handleRequest.toJSONString());
 
             
             // 处理成功，从待处理列表中移除
@@ -522,6 +555,61 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         System.out.println("[" + getTime() + "] ❌ 连接已断开");
         super.channelInactive(ctx);
+    }
+    
+    /**
+     * 获取消息ID列表
+     */
+    private void getMsgIds() {
+        try {
+            // 构建获取消息ID请求
+            GetBatchMsgIdsReq getBatchMsgIdsReq = GetBatchMsgIdsReq.newBuilder()
+                    .setUserId(userId)
+                    .build();
+
+            // 包装为 ImProtoRequest
+            ImProtoRequest protoRequest = ImProtoRequest.newBuilder()
+                    .setType(MsgType.GET_BATCH_MSG_IDS)
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(getBatchMsgIdsReq.toByteArray()))
+                    .build();
+
+            // 发送 Protobuf 二进制消息
+            byte[] bytes = protoRequest.toByteArray();
+            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+            BinaryWebSocketFrame binaryFrame = new BinaryWebSocketFrame(buf);
+            handshakeFuture.channel().writeAndFlush(binaryFrame);
+            System.out.println("[" + getTime() + "] 📤 发送获取消息ID请求");
+        } catch (Exception e) {
+            System.err.println("[" + getTime() + "] ❌ 获取消息ID失败: " + e.getMessage());
+            getMsgFlag = false; // 重置标志位
+        }
+    }
+    
+    /**
+     * 处理批量消息ID
+     */
+    private void handleBatchMsgIds(ImProtoResponse protoResponse) {
+        try {
+            BatchMsgIdsPush resp = BatchMsgIdsPush.parseFrom(protoResponse.getPayload());
+            List<String> msgIdList = resp.getMsgIdsList();
+            
+            System.out.println("[" + getTime() + "] 📨 获取到一批消息ID，数量: " + msgIdList.size());
+            
+            if (!CollectionUtils.isEmpty(msgIdList)) {
+                synchronized (msgIds) {
+                    msgIds.addAll(msgIdList);
+                }
+                getMsgFlag = false; // 重置标志位
+                System.out.println("[" + getTime() + "] ✅ 消息ID已添加到本地缓存，当前缓存数量: " + msgIds.size());
+            } else {
+                getMsgFlag = false; // 重置标志位
+                System.out.println("[" + getTime() + "] ⚠️ 获取到的消息ID列表为空");
+            }
+            
+        } catch (InvalidProtocolBufferException e) {
+            System.err.println("[" + getTime() + "] ❌ 解析 BatchMsgIdsPush 失败: " + e.getMessage());
+            getMsgFlag = false; // 重置标志位
+        }
     }
 }
 
