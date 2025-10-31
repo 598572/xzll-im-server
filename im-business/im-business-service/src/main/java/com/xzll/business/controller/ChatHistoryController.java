@@ -4,12 +4,14 @@ import com.xzll.business.dto.request.ChatHistoryQueryDTO;
 import com.xzll.business.dto.response.ChatHistoryResponseDTO;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.util.List;
 
 /**
  * @Author: hzz
@@ -80,10 +82,10 @@ public class ChatHistoryController {
 
     /**
      * 检查用户是否有权访问指定会话
-     * 从chatId中解析参与用户，验证当前用户是否为参与者之一
+     * 使用ChatIdUtils统一解析chatId，验证当前用户是否为参与者之一
      * 
      * @param userId 当前用户ID
-     * @param chatId 会话ID (格式如: user1-user2)
+     * @param chatId 会话ID (格式如: 100-1-123-456)
      * @return 是否有权访问
      */
     private boolean isUserAuthorizedForChat(String userId, String chatId) {
@@ -92,23 +94,21 @@ public class ChatHistoryController {
         }
         
         try {
-            // 解析chatId中的参与用户
-            // 支持格式：user1-user2, user1_user2 等
-            String[] participants = chatId.split("-");
+            // 使用ChatIdUtils统一解析逻辑
+            boolean authorized = ChatIdUtils.isUserAuthorizedForChat(userId, chatId);
             
-            // 检查当前用户是否是参与者之一
-            for (String participant : participants) {
-                if (userId.equals(participant.trim())) {
-                    log.debug("用户 {} 有权访问会话 {}", userId, chatId);
-                    return true;
-                }
+            if (authorized) {
+                log.debug("用户 {} 有权访问会话 {}", userId, chatId);
+            } else {
+                // 获取参与用户列表用于日志输出
+                List<String> participants = ChatIdUtils.getParticipantUserIds(chatId);
+                log.warn("用户 {} 无权访问会话 {}, 参与者: {}", userId, chatId, String.join(",", participants));
             }
             
-            log.warn("用户 {} 无权访问会话 {}, 参与者: {}", userId, chatId, String.join(",", participants));
-            return false;
+            return authorized;
             
         } catch (Exception e) {
-            log.error("解析chatId失败: {}", chatId, e);
+            log.error("验证会话权限失败: userId={}, chatId={}", userId, chatId, e);
             return false;
         }
     }
