@@ -265,7 +265,7 @@ public class HBaseTestController {
 
 
 
-    @Autowired
+    @Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
 
     /**
@@ -275,7 +275,11 @@ public class HBaseTestController {
      */
     @PostMapping("/send")
     public void sendMessage(@Valid @RequestBody C2CSendMsgAO sendMsgAO) {
-        imC2CMsgRecordHBaseService.saveC2CMsg(sendMsgAO);
+        if (imC2CMsgRecordHBaseService != null) {
+            imC2CMsgRecordHBaseService.saveC2CMsg(sendMsgAO);
+        } else {
+            throw new RuntimeException("HBase服务未启用");
+        }
     }
 
 

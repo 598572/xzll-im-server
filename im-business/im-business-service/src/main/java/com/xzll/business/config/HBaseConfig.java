@@ -5,6 +5,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,10 +15,11 @@ import java.io.IOException;
  * 
  * @Author: hzz
  * @Date:  2025/8/27 16:37:58
- * @Description: 
+ * @Description: HBase 配置类，支持本地开发时禁用
  */
 @Slf4j
 @Configuration
+@ConditionalOnProperty(name = "hbase.enabled", havingValue = "true", matchIfMissing = false)
 public class HBaseConfig {
 
 

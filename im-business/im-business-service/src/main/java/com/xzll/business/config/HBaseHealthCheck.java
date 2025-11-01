@@ -19,7 +19,7 @@ import java.io.IOException;
 @Component
 public class HBaseHealthCheck {
 
-    @Autowired
+    @Autowired(required = false)
     private Connection hbaseConnection;
 
     /**

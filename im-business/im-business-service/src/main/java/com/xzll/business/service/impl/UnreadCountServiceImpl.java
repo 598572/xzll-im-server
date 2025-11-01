@@ -55,27 +55,10 @@ public class UnreadCountServiceImpl implements UnreadCountService {
         }
 
         try {
-            String redisKey = buildRedisKey(userId);
-            
-            // 使用 Redisson 的原子增加操作
-            RMap<String, Integer> map = redissonClient.getMap(redisKey);
-            Integer newCount = map.merge(chatId, increment, Integer::sum);
-            
-            // 设置过期时间
-            map.expire(EXPIRE_DAYS, TimeUnit.DAYS);
-            
-            log.debug("增加未读消息数成功: userId={}, chatId={}, increment={}, newCount={}", 
-                    userId, chatId, increment, newCount);
+            // 使用 String 类型存储，避免类型转换问题
+            doIncrementUnreadCount(userId, chatId, increment);
         } catch (Exception e) {
             log.error("增加未读消息数失败: userId={}, chatId={}, increment={}", userId, chatId, increment, e);
-            
-            // 降级方案：使用读取-修改-写入
-            try {
-                fallbackIncrementUnreadCount(userId, chatId, increment);
-            } catch (Exception fallbackEx) {
-                log.error("降级增加未读消息数也失败: userId={}, chatId={}, increment={}", 
-                    userId, chatId, increment, fallbackEx);
-            }
         }
     }
 
@@ -85,9 +68,9 @@ public class UnreadCountServiceImpl implements UnreadCountService {
     }
 
     /**
-     * 降级方案：使用读取-修改-写入的方式增加未读数
+     * 使用读取-修改-写入的方式增加未读数（使用 String 类型避免类型转换问题）
      */
-    private void fallbackIncrementUnreadCount(String userId, String chatId, int increment) {
+    private void doIncrementUnreadCount(String userId, String chatId, int increment) {
         String redisKey = buildRedisKey(userId);
         
         // 获取当前值
@@ -109,7 +92,7 @@ public class UnreadCountServiceImpl implements UnreadCountService {
         redissonUtils.setHash(redisKey, chatId, String.valueOf(newCount));
         redissonUtils.expire(redisKey, EXPIRE_DAYS, TimeUnit.DAYS);
         
-        log.info("降级方案增加未读消息数成功: userId={}, chatId={}, oldCount={}, increment={}, newCount={}", 
+        log.debug("增加未读消息数成功: userId={}, chatId={}, oldCount={}, increment={}, newCount={}", 
             userId, chatId, currentCount, increment, newCount);
     }
 

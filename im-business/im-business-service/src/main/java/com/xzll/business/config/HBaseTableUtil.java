@@ -13,6 +13,7 @@ import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
@@ -28,10 +29,11 @@ import org.apache.hadoop.hbase.client.Scan;
 /**
  * @Author: hzz
  * @Date: 2024/12/20
- * @Description: HBase表管理工具类
+ * @Description: HBase表管理工具类，支持本地开发时禁用
  */
 @Component
 @Slf4j
+@ConditionalOnProperty(name = "hbase.enabled", havingValue = "true", matchIfMissing = false)
 public class HBaseTableUtil {
 
     // 表名

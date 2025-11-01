@@ -1,13 +1,10 @@
 package com.xzll.business.handler.c2c;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSONUtil;
+
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
-import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.base.WebBaseResponse;
+
+
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
-import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
-import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
 import com.xzll.common.utils.RedissonUtils;
@@ -27,10 +24,8 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class C2CClientWithdrawMsgHandler {
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
-    @Resource
-    private RedissonUtils redissonUtils;
     @Resource
     private GrpcMessageService grpcMessageService;
 
@@ -43,13 +38,22 @@ public class C2CClientWithdrawMsgHandler {
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void clientWithdrawMsgDeal(C2CWithdrawMsgAO ao) {
         //1. 更新消息状态为：未读/已读
-        boolean updateResult = imC2CMsgRecordService.updateC2CMsgWithdrawStatus(ao);
+        boolean updateResult = true;
+        if (imC2CMsgRecordService != null) {
+            updateResult = imC2CMsgRecordService.updateC2CMsgWithdrawStatus(ao);
+        } else {
+            log.warn("HBase服务未启用，跳过更新撤回状态，注意此举仅适用于开发环境");
+        }
         //2. 撤回消息发送至接收方
         if (updateResult) {
-            C2CWithdrawMsgVO c2CWithdrawMsgVo = getC2CWithdrawMsgVO(ao);
-            
-            // 使用gRPC异步发送撤回消息
-            CompletableFuture<Boolean> future = grpcMessageService.sendWithdrawMsg(c2CWithdrawMsgVo);
+            com.xzll.grpc.WithdrawPush withdrawPush = com.xzll.grpc.WithdrawPush.newBuilder()
+                    .setMsgId(ao.getMsgId())
+                    .setChatId(ao.getChatId())
+                    .setFromUserId(ao.getFromUserId())
+                    .setToUserId(ao.getToUserId())
+                    .build();
+            // 使用gRPC发送撤回 - 异步方式
+            CompletableFuture<Boolean> future = grpcMessageService.sendWithdrawMsg(withdrawPush);
             future.whenComplete((success, throwable) -> {
                 if (throwable != null) {
                     log.error("gRPC发送撤回消息失败: {}", throwable.getMessage(), throwable);
@@ -60,16 +64,4 @@ public class C2CClientWithdrawMsgHandler {
         }
     }
 
-
-    /**
-     * 后期有时间改为 mapstract
-     *
-     * @param packet
-     * @return
-     */
-    public static C2CWithdrawMsgVO getC2CWithdrawMsgVO(C2CWithdrawMsgAO packet) {
-        C2CWithdrawMsgVO c2CWithdrawMsgVo = new C2CWithdrawMsgVO();
-        BeanUtil.copyProperties(packet, c2CWithdrawMsgVo);
-        return c2CWithdrawMsgVo;
-    }
 }

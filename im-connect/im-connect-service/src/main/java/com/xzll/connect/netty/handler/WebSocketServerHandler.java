@@ -1,10 +1,7 @@
 package com.xzll.connect.netty.handler;
 
 
-import cn.hutool.json.JSONUtil;
-import com.alibaba.fastjson.JSON;
 import com.xzll.common.constant.ImConstant;
-import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.config.ImMsgConfig;
 import com.xzll.connect.dispatcher.HandlerDispatcher;
@@ -249,6 +246,12 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                             
                             // 推送离线消息
                             pushOfflineMessages(ctx, uid);
+                            
+                            // 推送离线好友请求
+                            pushOfflineFriendRequests(ctx, uid);
+                            
+                            // 推送离线好友响应
+                            pushOfflineFriendResponses(ctx, uid);
                         } catch (Exception e) {
                             log.error("用户上线后处理异常, uid: {}", uidStr, e);
                         }
@@ -296,48 +299,55 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             return;
         }
         
-        //判断是否为文本消息
+        // JSON 格式已废弃，仅支持 Protobuf 二进制消息
         if ((frame instanceof TextWebSocketFrame)) {
-            log.debug("[WebSocketServerHandler]_消息类型: 文本");
-            String text = ((TextWebSocketFrame) frame).text();
+            log.warn("[WebSocketServerHandler]_收到文本消息，但系统已切换为仅支持 Protobuf 二进制格式，请升级客户端");
+            ctx.close();
+            return;
+        }
+
+        // Protobuf 二进制消息处理（唯一支持的格式）
+        if (frame instanceof BinaryWebSocketFrame) {
+            log.debug("[WebSocketServerHandler]_消息类型: protobuf 二进制");
+            ByteBuf content = ((BinaryWebSocketFrame) frame).content();
             
             // 消息长度检查
-            if (text.length() > MAX_MESSAGE_LENGTH) {
-                log.warn("消息长度超过限制: {} bytes", text.length());
+            int readableBytes = content.readableBytes();
+            if (readableBytes > MAX_MESSAGE_LENGTH) {
+                log.warn("protobuf 消息长度超过限制: {} bytes", readableBytes);
                 ctx.close();
                 return;
             }
             
             try {
-                ImBaseRequest<?> imBaseRequest = JSON.parseObject(text, ImBaseRequest.class);
+                // 解析 protobuf 消息
+                byte[] bytes = new byte[readableBytes];
+                content.getBytes(content.readerIndex(), bytes);
+                com.xzll.grpc.ImProtoRequest protoRequest = com.xzll.grpc.ImProtoRequest.parseFrom(bytes);
+                
                 if (log.isDebugEnabled()) {
-                    log.debug("[WebSocketServerHandler]_消息原始数据: imBaseRequest:{}", JSONUtil.toJsonStr(imBaseRequest));
+                    log.debug("[WebSocketServerHandler]_protobuf消息: type={}", protoRequest.getType());
                 }
                 
                 // 检查线程池状态，避免任务堆积
                 ThreadPoolExecutor executor = threadPoolTaskExecutor.getThreadPoolExecutor();
                 if (executor.getQueue().size() > MAX_QUEUE_SIZE) {
-                    log.warn("线程池队列过长，拒绝处理消息: {}", executor.getQueue().size());
+                    log.warn("线程池队列过长，拒绝处理protobuf消息: {}", executor.getQueue().size());
                     return;
                 }
                 
-                //分发&处理消息，业务和netty线程隔离
+                // 分发&处理 protobuf 消息，业务和netty线程隔离
                 CompletableFuture.runAsync(() -> {
                     try {
-                        handlerDispatcher.dispatcher(ctx, imBaseRequest);
+                        handlerDispatcher.dispatcher(ctx, protoRequest);
                     } catch (Exception e) {
-                        log.error("[WebSocketServerHandler]_分发消息异常, request: {}", imBaseRequest, e);
+                        log.error("[WebSocketServerHandler]_分发protobuf消息异常, type: {}", protoRequest.getType(), e);
                     }
                 }, threadPoolTaskExecutor);
                 
             } catch (Exception e) {
-                log.error("[WebSocketServerHandler]_解析消息失败!,text: {}", text, e);
+                log.error("[WebSocketServerHandler]_解析protobuf消息失败!", e);
             }
-        }
-
-        if (frame instanceof BinaryWebSocketFrame) {
-            //暂不适配该类型
-            log.debug("[WebSocketServerHandler]_消息类型: 二进制");
         }
     }
 
@@ -371,6 +381,102 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             }
         } catch (Exception e) {
             log.error("推送离线消息异常, uid: {}", uid, e);
+        }
+    }
+    
+    /**
+     * 推送离线好友请求
+     */
+    private void pushOfflineFriendRequests(ChannelHandlerContext ctx, Object uid) {
+        try {
+            String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_REQUEST_KEY + uid;
+            Collection<String> offlineFriendRequests = redissonUtils.getZSetRevRange(offlineKey, 0, -1);
+            
+            if (!CollectionUtils.isEmpty(offlineFriendRequests)) {
+                log.info("推送离线好友请求, uid: {}, count: {}", uid, offlineFriendRequests.size());
+                
+                int successCount = 0;
+                for (String encodedMsg : offlineFriendRequests) {
+                    if (ctx.channel().isActive()) {
+                        try {
+                            // Base64 解码
+                            byte[] bytes = java.util.Base64.getDecoder().decode(encodedMsg);
+                            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+                            
+                            ctx.channel().writeAndFlush(new BinaryWebSocketFrame(buf))
+                                .addListener(future -> {
+                                    if (future.isSuccess()) {
+                                        log.debug("离线好友请求推送成功, uid: {}", uid);
+                                    } else {
+                                        log.error("发送离线好友请求失败, uid: {}", uid, future.cause());
+                                    }
+                                });
+                            successCount++;
+                        } catch (Exception e) {
+                            log.error("解析离线好友请求失败, uid: {}", uid, e);
+                        }
+                    } else {
+                        log.warn("连接已断开，停止推送离线好友请求, uid: {}", uid);
+                        break;
+                    }
+                }
+                
+                // 推送完成后删除整个 ZSet
+                if (successCount > 0) {
+                    redissonUtils.delete(offlineKey);
+                    log.info("离线好友请求推送完成，已清理Redis缓存, uid: {}, successCount: {}", uid, successCount);
+                }
+            }
+        } catch (Exception e) {
+            log.error("推送离线好友请求异常, uid: {}", uid, e);
+        }
+    }
+    
+    /**
+     * 推送离线好友响应
+     */
+    private void pushOfflineFriendResponses(ChannelHandlerContext ctx, Object uid) {
+        try {
+            String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_RESPONSE_KEY + uid;
+            Collection<String> offlineFriendResponses = redissonUtils.getZSetRevRange(offlineKey, 0, -1);
+            
+            if (!CollectionUtils.isEmpty(offlineFriendResponses)) {
+                log.info("推送离线好友响应, uid: {}, count: {}", uid, offlineFriendResponses.size());
+                
+                int successCount = 0;
+                for (String encodedMsg : offlineFriendResponses) {
+                    if (ctx.channel().isActive()) {
+                        try {
+                            // Base64 解码
+                            byte[] bytes = java.util.Base64.getDecoder().decode(encodedMsg);
+                            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+                            
+                            ctx.channel().writeAndFlush(new BinaryWebSocketFrame(buf))
+                                .addListener(future -> {
+                                    if (future.isSuccess()) {
+                                        log.debug("离线好友响应推送成功, uid: {}", uid);
+                                    } else {
+                                        log.error("发送离线好友响应失败, uid: {}", uid, future.cause());
+                                    }
+                                });
+                            successCount++;
+                        } catch (Exception e) {
+                            log.error("解析离线好友响应失败, uid: {}", uid, e);
+                        }
+                    } else {
+                        log.warn("连接已断开，停止推送离线好友响应, uid: {}", uid);
+                        break;
+                    }
+                }
+                
+                // 推送完成后删除整个 ZSet
+                if (successCount > 0) {
+                    redissonUtils.delete(offlineKey);
+                    log.info("离线好友响应推送完成，已清理Redis缓存, uid: {}, successCount: {}", uid, successCount);
+                }
+            }
+        } catch (Exception e) {
+            log.error("推送离线好友响应异常, uid: {}", uid, e);
         }
     }
 

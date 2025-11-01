@@ -10,9 +10,19 @@ import java.util.zip.CRC32;
 /**
  * @Author: hzz
  * @Date: 2024/6/16 08:46:17
- * @Description: 基于雪花算法保证消息绝对唯一【数据中心暂时是集群名，workId 根据配置的策略来生成】，
- * 融入会话类型和uid使其信息【更丰富】
- * 增加本地序列号 保证 消息id 【严格自增】 暂不需要 雪花id中有序列号
+ * @Description: 基于雪花算法的消息ID生成服务
+ * 
+ * 【版本升级说明 - 2025/10/30】
+ * - 新增简化版消息ID生成：只使用雪花算法ID，去掉会话类型和用户ID
+ * - 优势：ID更短、HBase RowKey更高效、减少存储开销
+ * - 推荐使用：generateSimpleMessageId() 替代 generateMessageId()
+ * - 旧方法已标记为 @Deprecated 但保持兼容
+ * 
+ * 技术特点：
+ * - 数据中心ID：基于集群名生成
+ * - 工作节点ID：根据配置策略生成（MAC地址、Docker ID等）  
+ * - ID池机制：批量生成提升性能
+ * - 严格自增：雪花算法保证时间有序
  */
 public class SnowflakeIdService {
 
@@ -128,6 +138,15 @@ public class SnowflakeIdService {
         return sdf.format(new Date(timestamp));
     }
 
+    /**
+     * 【已废弃】批量生成消息ID（旧格式）
+     * 
+     * @deprecated 使用 generateBatchSimpleMessageId(int count) 替代
+     * @param userId 用户ID（已不需要）
+     * @param isGroupChat 是否群聊（已不需要）
+     * @return 旧格式消息ID列表
+     */
+    @Deprecated
     public List<String> generateBatchMessageId(long userId, boolean isGroupChat) {
         List<String> ids = new ArrayList<>(ONCE_BATCH_COUNT);
         for (int i = 0; i < ONCE_BATCH_COUNT; i++) {
@@ -156,12 +175,39 @@ public class SnowflakeIdService {
     //============================== 提供给外部的方法 ==============================
 
     /**
-     * 提供给外部，获取消息id的公共方法
-     *
-     * @param userId
-     * @param isGroupChat
-     * @return
+     * 【推荐】生成简化的消息ID - 只使用雪花算法ID
+     * 优势：ID更短、性能更好、减少HBase RowKey长度
+     * 
+     * @return 纯雪花算法ID字符串
      */
+    public String generateSimpleMessageId() {
+        long id = getNextIdFromPool();
+        return String.valueOf(id);
+    }
+
+    /**
+     * 批量生成简化的消息ID
+     * 
+     * @param count 生成数量
+     * @return 消息ID列表
+     */
+    public List<String> generateBatchSimpleMessageId(int count) {
+        List<String> ids = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            ids.add(generateSimpleMessageId());
+        }
+        return ids;
+    }
+
+    /**
+     * 【已废弃】提供给外部，获取消息id的公共方法
+     * 
+     * @deprecated 使用 generateSimpleMessageId() 替代，新版本只使用雪花算法ID
+     * @param userId 用户ID（已不需要）
+     * @param isGroupChat 是否群聊（已不需要）
+     * @return 格式：type-userId-snowflakeId
+     */
+    @Deprecated
     public String generateMessageId(long userId, boolean isGroupChat) {
         long id = getNextIdFromPool();
         // 获取本地递增序列 雪花算法已经实现序列号 无需多此一举了
@@ -171,14 +217,41 @@ public class SnowflakeIdService {
     }
 
     /**
-     * 提供给外部，从消息id 获取雪花id
-     *
-     * @param msgId
-     * @return
+     * 【推荐】从简化消息ID获取雪花ID（新格式专用）
+     * 适用于 generateSimpleMessageId() 生成的ID
+     * 
+     * @param msgId 简化格式的消息ID（纯数字字符串）
+     * @return 雪花算法ID
      */
+    public static Long getSnowflakeIdFromSimple(String msgId) {
+        try {
+            return Long.valueOf(msgId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid simple message ID format: " + msgId, e);
+        }
+    }
+
+    /**
+     * 【已废弃】提供给外部，从消息id 获取雪花id（兼容旧格式）
+     * 适用于旧格式：type-userId-snowflakeId
+     *
+     * @deprecated 使用 getSnowflakeIdFromSimple(String msgId) 替代
+     * @param msgId 旧格式的消息ID
+     * @return 雪花算法ID
+     */
+    @Deprecated
     public static Long getSnowflakeId(String msgId) {
-        String snowflakeId = msgId.split("-")[2];
-        return Long.valueOf(snowflakeId);
+        try {
+            // 先尝试新格式（纯数字）
+            return Long.valueOf(msgId);
+        } catch (NumberFormatException e) {
+            // 回退到旧格式解析
+            String[] parts = msgId.split("-");
+            if (parts.length >= 3) {
+                return Long.valueOf(parts[2]);
+            }
+            throw new IllegalArgumentException("Invalid message ID format: " + msgId, e);
+        }
     }
 
     /**
@@ -196,6 +269,269 @@ public class SnowflakeIdService {
         System.out.println("Datacenter ID: " + datacenterId);
         System.out.println("Worker ID: " + workerId);
         System.out.println("Sequence: " + sequence);
+    }
+
+    //============================== 压缩雪花算法 - 用户ID专用 ==============================
+    
+    // 压缩雪花算法参数（用户ID专用）
+    private static final long USER_ID_START_TIME = 1640995200L; // 2022-01-01 00:00:00 秒时间戳
+    private static final long USER_MACHINE_ID_BITS = 4L;        // 4位机器ID，最多16台机器
+    private static final long USER_SEQUENCE_BITS = 6L;          // 6位序列号，每秒最多64个ID
+    
+    private static final long MAX_USER_MACHINE_ID = (1L << USER_MACHINE_ID_BITS) - 1;  // 15
+    private static final long MAX_USER_SEQUENCE = (1L << USER_SEQUENCE_BITS) - 1;      // 63
+    private static final long USER_MACHINE_SHIFT = USER_SEQUENCE_BITS;                  // 6
+    private static final long USER_TIMESTAMP_SHIFT = USER_SEQUENCE_BITS + USER_MACHINE_ID_BITS; // 10
+    
+    // 用户ID生成专用变量
+    private long userIdLastTimestamp = -1L;
+    private long userIdSequence = 0L;
+    private final long userMachineId;
+    
+    // 初始化用户机器ID（在构造函数中设置）
+    {
+        // 基于现有的datacenterId和workerId生成用户机器ID
+        userMachineId = (datacenterId + workerId) % (MAX_USER_MACHINE_ID + 1);
+    }
+
+    /**
+     * 【推荐】生成压缩雪花算法用户ID - 专为用户ID优化
+     * 
+     * 特点：
+     * - ID长度：10-12位数字（比原版减少约40%）
+     * - 时间范围：136年（2022-2158年）
+     * - 保留时间特性：可解析注册时间
+     * - 高性能：每秒可生成64个唯一ID
+     * 
+     * @return 压缩格式的用户ID字符串
+     */
+    public synchronized String generateCompactUserId() {
+        long timestamp = System.currentTimeMillis() / 1000 - USER_ID_START_TIME;
+        
+        // 检查时钟回拨
+        if (timestamp < userIdLastTimestamp) {
+            throw new RuntimeException("用户ID生成失败：检测到时钟回拨，当前时间=" + timestamp + 
+                                     ", 上次时间=" + userIdLastTimestamp);
+        }
+        
+        // 处理同一秒内的序列号
+        if (timestamp == userIdLastTimestamp) {
+            userIdSequence = (userIdSequence + 1) & MAX_USER_SEQUENCE;
+            if (userIdSequence == 0) {
+                // 序列号用完，等待下一秒
+                timestamp = waitForNextSecond(userIdLastTimestamp);
+            }
+        } else {
+            // 新的一秒，重置序列号
+            userIdSequence = 0L;
+        }
+        
+        userIdLastTimestamp = timestamp;
+        
+        // 组装压缩ID：[32位时间戳][4位机器ID][6位序列号] = 42位
+        long compactId = (timestamp << USER_TIMESTAMP_SHIFT) | 
+                        (userMachineId << USER_MACHINE_SHIFT) | 
+                        userIdSequence;
+        
+        return String.valueOf(compactId);
+    }
+
+    /**
+     * 批量生成压缩用户ID
+     * 
+     * @param count 生成数量
+     * @return 用户ID列表
+     */
+    public List<String> generateBatchCompactUserId(int count) {
+        List<String> userIds = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            userIds.add(generateCompactUserId());
+        }
+        return userIds;
+    }
+
+    /**
+     * 从压缩用户ID中提取注册时间
+     * 
+     * @param compactUserId 压缩格式的用户ID
+     * @return 用户注册时间的毫秒时间戳
+     */
+    public static long extractUserRegistrationTime(String compactUserId) {
+        try {
+            long id = Long.parseLong(compactUserId);
+            long timestamp = id >> USER_TIMESTAMP_SHIFT;
+            return (timestamp + USER_ID_START_TIME) * 1000; // 转为毫秒时间戳
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("无效的压缩用户ID格式: " + compactUserId, e);
+        }
+    }
+
+    /**
+     * 从压缩用户ID中提取机器ID
+     * 
+     * @param compactUserId 压缩格式的用户ID  
+     * @return 机器ID
+     */
+    public static long extractMachineId(String compactUserId) {
+        try {
+            long id = Long.parseLong(compactUserId);
+            return (id >> USER_MACHINE_SHIFT) & MAX_USER_MACHINE_ID;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("无效的压缩用户ID格式: " + compactUserId, e);
+        }
+    }
+
+    /**
+     * 从压缩用户ID中提取序列号
+     * 
+     * @param compactUserId 压缩格式的用户ID
+     * @return 序列号
+     */
+    public static long extractSequence(String compactUserId) {
+        try {
+            long id = Long.parseLong(compactUserId);
+            return id & MAX_USER_SEQUENCE;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("无效的压缩用户ID格式: " + compactUserId, e);
+        }
+    }
+
+    /**
+     * 解析压缩用户ID的详细信息
+     * 
+     * @param compactUserId 压缩格式的用户ID
+     */
+    public static void parseCompactUserId(String compactUserId) {
+        try {
+            long id = Long.parseLong(compactUserId);
+            long timestamp = id >> USER_TIMESTAMP_SHIFT;
+            long machineId = (id >> USER_MACHINE_SHIFT) & MAX_USER_MACHINE_ID;
+            long sequence = id & MAX_USER_SEQUENCE;
+            
+            long registrationTime = (timestamp + USER_ID_START_TIME) * 1000;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            
+            System.out.println("========== 压缩用户ID解析结果 ==========");
+            System.out.println("用户ID: " + compactUserId);
+            System.out.println("注册时间: " + sdf.format(new Date(registrationTime)));
+            System.out.println("机器ID: " + machineId);
+            System.out.println("序列号: " + sequence);
+            System.out.println("时间戳: " + timestamp + " (秒)");
+            System.out.println("======================================");
+        } catch (NumberFormatException e) {
+            System.err.println("解析失败：无效的压缩用户ID格式 - " + compactUserId);
+        }
+    }
+
+    /**
+     * 检查压缩用户ID的有效性
+     * 
+     * @param compactUserId 压缩格式的用户ID
+     * @return 是否有效
+     */
+    public static boolean isValidCompactUserId(String compactUserId) {
+        try {
+            long id = Long.parseLong(compactUserId);
+            long timestamp = id >> USER_TIMESTAMP_SHIFT;
+            long machineId = (id >> USER_MACHINE_SHIFT) & MAX_USER_MACHINE_ID;
+            long sequence = id & MAX_USER_SEQUENCE;
+            
+            // 检查各部分是否在有效范围内
+            return timestamp > 0 && 
+                   machineId >= 0 && machineId <= MAX_USER_MACHINE_ID &&
+                   sequence >= 0 && sequence <= MAX_USER_SEQUENCE;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 等待下一秒
+     */
+    private long waitForNextSecond(long lastTimestamp) {
+        long timestamp = System.currentTimeMillis() / 1000 - USER_ID_START_TIME;
+        while (timestamp <= lastTimestamp) {
+            timestamp = System.currentTimeMillis() / 1000 - USER_ID_START_TIME;
+        }
+        return timestamp;
+    }
+
+    /**
+     * 获取压缩雪花算法的统计信息
+     * 
+     * @return 统计信息字符串
+     */
+    public String getCompactUserIdStats() {
+        long currentTime = System.currentTimeMillis() / 1000;
+        long usedYears = (long)((currentTime - USER_ID_START_TIME) / (365.25 * 24 * 3600));
+        long remainingYears = 136 - usedYears;
+        
+        return String.format(
+            "压缩用户ID统计信息:\n" +
+            "- 算法类型: 压缩雪花算法\n" +
+            "- ID位数: 42位 (约10-12位数字)\n" +
+            "- 时间精度: 秒级\n" +
+            "- 机器ID: %d (最大15)\n" +
+            "- 已运行: %d年\n" +
+            "- 剩余可用: %d年\n" +
+            "- 每秒容量: 64个ID\n" +
+            "- 到期时间: 约2158年",
+            userMachineId, usedYears, remainingYears
+        );
+    }
+
+    /**
+     * 根据时间戳生成对应的消息ID边界（用于HBase RowKey范围查询）
+     * 
+     * @param timestamp 毫秒级时间戳
+     * @param isUpperBound 是否为上边界（true=最大值，false=最小值）
+     * @return 对应的消息ID字符串
+     */
+    public static String generateMsgIdBoundaryFromTimestamp(Long timestamp, boolean isUpperBound) {
+        if (timestamp == null) {
+            return "";
+        }
+        
+        try {
+            // 将毫秒时间戳转换为压缩雪花算法的秒级时间戳
+            long compressedTimestamp = timestamp / 1000 - USER_ID_START_TIME;
+            
+            // 构造边界msgId
+            long boundaryMsgId;
+            if (isUpperBound) {
+                // 上边界：使用最大机器ID和最大序列号
+                boundaryMsgId = (compressedTimestamp << USER_TIMESTAMP_SHIFT) | 
+                               (MAX_USER_MACHINE_ID << USER_MACHINE_SHIFT) | 
+                               MAX_USER_SEQUENCE;
+            } else {
+                // 下边界：使用最小机器ID和最小序列号（都为0）
+                boundaryMsgId = compressedTimestamp << USER_TIMESTAMP_SHIFT;
+            }
+            
+            return String.valueOf(boundaryMsgId);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("时间戳转换msgId边界失败: timestamp=" + timestamp, e);
+        }
+    }
+
+    /**
+     * 根据时间戳生成下边界消息ID（用于范围查询的起始点）
+     * 
+     * @param timestamp 毫秒级时间戳
+     * @return 对应的最小消息ID
+     */
+    public static String generateMsgIdLowerBound(Long timestamp) {
+        return generateMsgIdBoundaryFromTimestamp(timestamp, false);
+    }
+
+    /**
+     * 根据时间戳生成上边界消息ID（用于范围查询的结束点）
+     * 
+     * @param timestamp 毫秒级时间戳
+     * @return 对应的最大消息ID
+     */
+    public static String generateMsgIdUpperBound(Long timestamp) {
+        return generateMsgIdBoundaryFromTimestamp(timestamp, true);
     }
 
 

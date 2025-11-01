@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,7 +44,7 @@ public class ImChatServiceImpl implements ImChatService {
     @Resource
     private ImPersonalChatOptService imPersonalChatOptService;
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
 
     @Resource
@@ -126,7 +127,13 @@ public class ImChatServiceImpl implements ImChatService {
         List<ImPersonalChatOpt> allPersonalChats = imPersonalChatOptService.findPersonalChatByUserId(queryOpt, null, null);
         
         // 4. 从HBase批量查询每个会话的最后一条消息
-        Map<String, ImC2CMsgRecord> lastMsgMap = imC2CMsgRecordHBaseService.batchGetLastMessagesByChatIds(chatIds);
+        final Map<String, ImC2CMsgRecord> lastMsgMap;
+        if (imC2CMsgRecordHBaseService != null) {
+            lastMsgMap = imC2CMsgRecordHBaseService.batchGetLastMessagesByChatIds(chatIds);
+        } else {
+            log.warn("HBase服务未启用，无法查询最后一条消息");
+            lastMsgMap = new HashMap<>();
+        }
         
         // 5. 从Redis批量获取未读消息数
         Map<String, Integer> unreadCountMap = unreadCountService.getAllUnreadCounts(ao.getUserId());

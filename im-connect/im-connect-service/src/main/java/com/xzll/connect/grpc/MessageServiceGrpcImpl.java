@@ -1,26 +1,29 @@
 package com.xzll.connect.grpc;
 
 import cn.hutool.core.lang.Assert;
-import cn.hutool.json.JSONUtil;
+import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.ProtoResponseCode;
 import com.xzll.common.constant.answercode.AnswerCode;
 import com.xzll.common.pojo.base.WebBaseResponse;
-import com.xzll.common.pojo.base.ImBaseResponse;
-import com.xzll.common.pojo.response.C2CWithdrawMsgVO;
-import com.xzll.common.pojo.response.base.CommonMsgVO;
+import com.xzll.common.utils.RedissonUtils;
 import com.xzll.connect.netty.channel.LocalChannelManager;
-import com.xzll.common.pojo.response.C2CClientReceivedMsgAckVO;
-import com.xzll.common.pojo.response.C2CServerReceivedMsgAckVO;
-import com.xzll.common.pojo.base.ImBaseRequest;
 import com.xzll.connect.service.TransferC2CMsgService;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.Channel;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.Objects;
+
+import com.xzll.grpc.ImProtoResponse;
+import com.xzll.grpc.MsgType;
+import com.xzll.grpc.C2CAckReq;
+import com.xzll.grpc.C2CWithdrawReq;
 
 /**
  * @Author: hzz
@@ -33,20 +36,34 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
 
     @Resource
     private TransferC2CMsgService transferC2CMsgService;
+    
+    @Resource
+    private RedissonUtils redissonUtils;
 
     @Override
-    public void responseServerAck2Client(com.xzll.grpc.CommonMsgRequest request, 
+    public void responseServerAck2Client(com.xzll.grpc.ServerAckPush request, 
                                        StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
             Assert.isTrue(Objects.nonNull(request), "参数错误");
             Assert.isTrue(StringUtils.isNotBlank(request.getToUserId()), "发送服务端ack时缺少必填参数");
             
-            // 构建响应服务端是否接收成功消息
-            C2CServerReceivedMsgAckVO ackVo = buildServerAckVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(request.getUrl(), ackVo);
-            
+            // 按新协议：构建 C2CAckReq，type=C2C_ACK，通过二进制帧下发
+            C2CAckReq ackReq = C2CAckReq.newBuilder()
+                    .setMsgId(request.getMsgId())
+                    .setFrom("")
+                    .setTo(request.getToUserId())
+                    .setStatus(request.getMsgReceivedStatus())
+                    .setChatId(request.getChatId())
+                    .build();
+
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.C2C_ACK)
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(ackReq.toByteArray()))
+                    .setCode(ProtoResponseCode.SUCCESS)
+                    .build();
+
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+            boolean result = this.sendProtoToClient(targetChannel, response);
             
             AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
             com.xzll.grpc.WebBaseResponse grpcResponse = buildGrpcResponse(resultAnswer);
@@ -69,18 +86,29 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     }
 
     @Override
-    public void responseClientAck2Client(com.xzll.grpc.CommonMsgRequest request, 
+    public void responseClientAck2Client(com.xzll.grpc.ClientAckPush request, 
                                        StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
             Assert.isTrue(Objects.nonNull(request), "参数错误");
             Assert.isTrue(StringUtils.isNotBlank(request.getToUserId()), "发送客户端ack时缺少必填参数");
             
-            // 构建响应消息接收方客户端是否接收成功消息
-            C2CClientReceivedMsgAckVO ackDTO = buildClientAckVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getUrl(), ackDTO);
-            
+            // 按新协议：构建 C2CAckReq（未读/已读），type=C2C_ACK，通过二进制帧下发
+            C2CAckReq ackReq = C2CAckReq.newBuilder()
+                    .setMsgId(request.getMsgId())
+                    .setFrom("")
+                    .setTo(request.getToUserId())
+                    .setStatus(request.getMsgReceivedStatus())
+                    .setChatId(request.getChatId())
+                    .build();
+
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.C2C_ACK)
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(ackReq.toByteArray()))
+                    .setCode(ProtoResponseCode.SUCCESS)
+                    .build();
+
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+            boolean result = this.sendProtoToClient(targetChannel, response);
             
             AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
             com.xzll.grpc.WebBaseResponse grpcResponse = buildGrpcResponse(resultAnswer);
@@ -103,17 +131,27 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     }
 
     @Override
-    public void sendWithdrawMsg2Client(com.xzll.grpc.CommonMsgRequest request, 
+    public void sendWithdrawMsg2Client(com.xzll.grpc.WithdrawPush request, 
                                      StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
             Assert.isTrue(Objects.nonNull(request), "参数错误");
             
-            // 构建响应消息接收方客户端是否接收成功消息
-            C2CWithdrawMsgVO withdrawMsgVo = buildWithdrawMsgVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getUrl(), withdrawMsgVo);
-            
+            // 按新协议：构建 C2CWithdrawReq，type=C2C_WITHDRAW，通过二进制帧下发
+            C2CWithdrawReq withdrawReq = C2CWithdrawReq.newBuilder()
+                    .setMsgId(request.getMsgId())
+                    .setFrom(request.getFromUserId())
+                    .setTo(request.getToUserId())
+                    .setChatId(request.getChatId())
+                    .build();
+
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.C2C_WITHDRAW)
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(withdrawReq.toByteArray()))
+                    .setCode(ProtoResponseCode.SUCCESS)
+                    .build();
+
             Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            boolean result = this.sendMsg2Client(targetChannel, imBaseResponse);
+            boolean result = this.sendProtoToClient(targetChannel, response);
             
             AnswerCode resultAnswer = result ? AnswerCode.SUCCESS : AnswerCode.ERROR;
             com.xzll.grpc.WebBaseResponse grpcResponse = buildGrpcResponse(resultAnswer);
@@ -136,15 +174,14 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     }
 
     @Override
-    public void transferC2CMsg(com.xzll.grpc.ImBaseRequest request, 
+    public void transferC2CMsg(com.xzll.grpc.ImProtoRequest request, 
                               StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
-            // 这里需要调用原来的消息转发逻辑
-            // 将gRPC请求转换为ImBaseRequest
-            ImBaseRequest imBaseRequest = convertGrpcToImBaseRequest(request);
+            // 【优化】直接传递 ImProtoRequest，无需额外包装
+            // 体积最小、传输最快、带宽占用最小、序列化最快
             
-            // 调用原有的转发服务
-            WebBaseResponse<String> result = transferC2CMsgService.transferC2CMsg(imBaseRequest);
+            // 调用转发服务
+            WebBaseResponse result = transferC2CMsgService.transferC2CMsg(request);
             
             com.xzll.grpc.WebBaseResponse grpcResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
                     .setCode(result.getCode())
@@ -156,10 +193,11 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             responseObserver.onNext(grpcResponse);
             responseObserver.onCompleted();
             
-            log.info("gRPC转发C2C消息成功，响应: {}", result.getMsg());
+            log.info("gRPC跨服务器转发Protobuf消息成功, msgType: {}, 响应: {}", 
+                request.getType(), result.getMsg());
             
         } catch (Exception e) {
-            log.error("gRPC转发C2C消息异常:", e);
+            log.error("gRPC跨服务器转发Protobuf消息异常:", e);
             com.xzll.grpc.WebBaseResponse errorResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
                     .setCode(AnswerCode.ERROR.getCode())
                     .setMessage("处理失败: " + e.getMessage())
@@ -170,99 +208,96 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
         }
     }
 
-    @Override
-    public void batchSendToUsers(com.xzll.grpc.BatchSendRequest request, 
-                                StreamObserver<com.xzll.grpc.BatchSendResponse> responseObserver) {
+
+    /**
+     * 发送消息到客户端
+     */
+    private boolean sendProtoToClient(Channel channel, ImProtoResponse response) {
         try {
-            // 实现批量发送逻辑
-            com.xzll.grpc.BatchSendResponse.Builder responseBuilder = com.xzll.grpc.BatchSendResponse.newBuilder();
-            
-            int totalCount = request.getUserIdsCount();
-            int successCount = 0;
-            int failureCount = 0;
-            
-            for (String userId : request.getUserIdsList()) {
-                try {
-                    // 构建单个消息请求
-                    com.xzll.grpc.CommonMsgRequest singleRequest = com.xzll.grpc.CommonMsgRequest.newBuilder()
-                            .setToUserId(userId)
-                            .setUrl(request.getMessage().getUrl())
-                            .setMsgId(request.getMessage().getMsgId())
-                            .setChatId(request.getMessage().getChatId())
-                            .setFromUserId(request.getMessage().getFromUserId())
-                            .setMsgContent(request.getMessage().getMsgContent())
-                            .setMsgFormat(request.getMessage().getMsgFormat())
-                            .setMsgCreateTime(request.getMessage().getMsgCreateTime())
-                            .setMsgStatus(request.getMessage().getMsgStatus())
-                            .build();
-                    
-                    // 根据消息类型调用相应的方法
-                    boolean success = false;
-                    switch (request.getMessageType()) {
-                        case "SERVER_ACK":
-                            success = sendServerAckInternal(singleRequest);
-                            break;
-                        case "CLIENT_ACK":
-                            success = sendClientAckInternal(singleRequest);
-                            break;
-                        case "WITHDRAW":
-                            success = sendWithdrawMsgInternal(singleRequest);
-                            break;
-                        default:
-                            log.warn("未知的消息类型: {}", request.getMessageType());
-                            success = false;
-                    }
-                    
-                    // 构建用户结果
-                    com.xzll.grpc.UserSendResult userResult = com.xzll.grpc.UserSendResult.newBuilder()
-                            .setUserId(userId)
-                            .setSuccess(success)
-                            .setMessage(success ? "发送成功" : "发送失败")
-                            .setError(success ? "" : "处理异常")
-                            .build();
-                    
-                    responseBuilder.addResults(userResult);
-                    
-                    if (success) {
-                        successCount++;
-                    } else {
-                        failureCount++;
-                    }
-                    
-                } catch (Exception e) {
-                    log.error("批量发送消息给用户 {} 失败: {}", userId, e.getMessage());
-                    
-                    com.xzll.grpc.UserSendResult userResult = com.xzll.grpc.UserSendResult.newBuilder()
-                            .setUserId(userId)
-                            .setSuccess(false)
-                            .setMessage("发送失败")
-                            .setError(e.getMessage())
-                            .build();
-                    
-                    responseBuilder.addResults(userResult);
-                    failureCount++;
-                }
+            if (Objects.nonNull(channel)) {
+                byte[] bytes = response.toByteArray();
+                ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+                channel.writeAndFlush(new BinaryWebSocketFrame(buf));
+                return true;
             }
+            log.error("服务端发送protobuf_传入的channel为空，不发送!");
+        } catch (Exception e) {
+            log.error("服务端发送protobuf_异常:", e);
+        }
+        return false;
+    }
+
+    /**
+     * 推送好友请求到客户端
+     */
+    @Override
+    public void pushFriendRequest2Client(com.xzll.grpc.FriendRequestPush request,
+                                         StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
+        try {
+            log.info("gRPC接收好友请求推送: toUserId={}, fromUserId={}, requestId={}", 
+                    request.getToUserId(), request.getFromUserId(), request.getRequestId());
+
+            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
             
-            // 构建最终响应
-            com.xzll.grpc.BatchSendResponse response = responseBuilder
-                    .setTotalCount(totalCount)
-                    .setSuccessCount(successCount)
-                    .setFailureCount(failureCount)
+            // 检查用户是否在线
+            if (targetChannel == null) {
+                log.warn("目标用户不在线，将好友请求保存为离线推送: toUserId={}, requestId={}", 
+                        request.getToUserId(), request.getRequestId());
+                
+                // 将好友请求保存到 Redis，待用户上线后推送
+                try {
+                    String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_REQUEST_KEY + request.getToUserId();
+                    
+                    // 构建 ImProtoResponse 并序列化为字节数组
+                    ImProtoResponse response = ImProtoResponse.newBuilder()
+                            .setType(MsgType.FRIEND_REQUEST)  // 好友请求消息类型
+                            .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                            .setCode(ProtoResponseCode.SUCCESS)
+                            .build();
+                    
+                    // 使用 ZSet 存储，score 使用时间戳，便于排序
+                    redissonUtils.addZSet(
+                            offlineKey, 
+                            java.util.Base64.getEncoder().encodeToString(response.toByteArray()),
+                            System.currentTimeMillis()
+                    );
+                    
+                    log.info("好友请求已保存为离线推送: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId());
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+                } catch (Exception e) {
+                    log.error("保存离线好友请求失败: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId(), e);
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+                }
+                responseObserver.onCompleted();
+                return;
+            }
+
+            // 用户在线，直接推送
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.FRIEND_REQUEST)  // 好友请求消息类型
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                    .setCode(ProtoResponseCode.SUCCESS)
                     .build();
+
+            boolean success = sendProtoToClient(targetChannel, response);
             
-            responseObserver.onNext(response);
+            if (success) {
+                log.info("好友请求推送成功: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+            } else {
+                log.error("好友请求推送失败: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+            }
             responseObserver.onCompleted();
             
-            log.info("gRPC批量发送消息完成，总数: {}, 成功: {}, 失败: {}", totalCount, successCount, failureCount);
-            
         } catch (Exception e) {
-            log.error("gRPC批量发送消息异常:", e);
-            // 返回错误响应
-            com.xzll.grpc.BatchSendResponse errorResponse = com.xzll.grpc.BatchSendResponse.newBuilder()
-                    .setTotalCount(0)
-                    .setSuccessCount(0)
-                    .setFailureCount(0)
+            log.error("gRPC推送好友请求异常:", e);
+            com.xzll.grpc.WebBaseResponse errorResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
+                    .setCode(AnswerCode.ERROR.getCode())
+                    .setMessage("处理失败: " + e.getMessage())
+                    .setSuccess(false)
                     .build();
             responseObserver.onNext(errorResponse);
             responseObserver.onCompleted();
@@ -270,19 +305,80 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     }
 
     /**
-     * 发送消息到客户端
+     * 推送好友响应到客户端
      */
-    private boolean sendMsg2Client(Channel channel, ImBaseResponse packet) {
+    @Override
+    public void pushFriendResponse2Client(com.xzll.grpc.FriendResponsePush request,
+                                          StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
-            if (Objects.nonNull(channel)) {
-                channel.writeAndFlush(new TextWebSocketFrame(JSONUtil.toJsonStr(packet)));
-                return true;
+            log.info("gRPC接收好友响应推送: toUserId={}, fromUserId={}, requestId={}, status={}", 
+                    request.getToUserId(), request.getFromUserId(), request.getRequestId(), request.getStatus());
+
+            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
+            
+            // 检查用户是否在线
+            if (targetChannel == null) {
+                log.warn("目标用户不在线，将好友响应保存为离线推送: toUserId={}, requestId={}", 
+                        request.getToUserId(), request.getRequestId());
+                
+                // 将好友响应保存到 Redis，待用户上线后推送
+                try {
+                    String offlineKey = ImConstant.RedisKeyConstant.OFF_LINE_FRIEND_RESPONSE_KEY + request.getToUserId();
+                    
+                    // 构建 ImProtoResponse 并序列化为字节数组
+                    ImProtoResponse response = ImProtoResponse.newBuilder()
+                            .setType(MsgType.FRIEND_RESPONSE)  // 好友响应消息类型
+                            .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                            .setCode(ProtoResponseCode.SUCCESS)
+                            .build();
+                    
+                    // 使用 ZSet 存储，score 使用时间戳，便于排序
+                    redissonUtils.addZSet(
+                            offlineKey, 
+                            java.util.Base64.getEncoder().encodeToString(response.toByteArray()),
+                            System.currentTimeMillis()
+                    );
+                    
+                    log.info("好友响应已保存为离线推送: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId());
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+                } catch (Exception e) {
+                    log.error("保存离线好友响应失败: toUserId={}, requestId={}", 
+                            request.getToUserId(), request.getRequestId(), e);
+                    responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+                }
+                responseObserver.onCompleted();
+                return;
             }
-            log.error("服务端发送ack_传入的channel为空，不发送!");
+
+            // 用户在线，直接推送
+            ImProtoResponse response = ImProtoResponse.newBuilder()
+                    .setType(MsgType.FRIEND_RESPONSE)  // 好友响应消息类型
+                    .setPayload(com.google.protobuf.ByteString.copyFrom(request.toByteArray()))
+                    .setCode(ProtoResponseCode.SUCCESS)
+                    .build();
+
+            boolean success = sendProtoToClient(targetChannel, response);
+            
+            if (success) {
+                log.info("好友响应推送成功: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.SUCCESS));
+            } else {
+                log.error("好友响应推送失败: toUserId={}, requestId={}", request.getToUserId(), request.getRequestId());
+                responseObserver.onNext(buildGrpcResponse(AnswerCode.ERROR));
+            }
+            responseObserver.onCompleted();
+            
         } catch (Exception e) {
-            log.error("服务端发送ack_异常:", e);
+            log.error("gRPC推送好友响应异常:", e);
+            com.xzll.grpc.WebBaseResponse errorResponse = com.xzll.grpc.WebBaseResponse.newBuilder()
+                    .setCode(AnswerCode.ERROR.getCode())
+                    .setMessage("处理失败: " + e.getMessage())
+                    .setSuccess(false)
+                    .build();
+            responseObserver.onNext(errorResponse);
+            responseObserver.onCompleted();
         }
-        return false;
     }
 
     /**
@@ -296,101 +392,4 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
                 .build();
     }
 
-    /**
-     * 构建服务端ack VO
-     */
-    private C2CServerReceivedMsgAckVO buildServerAckVO(com.xzll.grpc.CommonMsgRequest request) {
-        C2CServerReceivedMsgAckVO ackVo = new C2CServerReceivedMsgAckVO();
-        ackVo.setAckTextDesc(request.getAckTextDesc());
-        ackVo.setMsgReceivedStatus(request.getMsgReceivedStatus());
-        ackVo.setReceiveTime(request.getReceiveTime());
-        ackVo.setChatId(request.getChatId());
-        ackVo.setToUserId(request.getToUserId());
-        ackVo.setUrl(request.getUrl());
-        ackVo.setMsgId(request.getMsgId());
-        return ackVo;
-    }
-
-    /**
-     * 构建客户端ack VO
-     */
-    private C2CClientReceivedMsgAckVO buildClientAckVO(com.xzll.grpc.CommonMsgRequest request) {
-        C2CClientReceivedMsgAckVO ackDTO = new C2CClientReceivedMsgAckVO();
-        ackDTO.setAckTextDesc(request.getAckTextDesc());
-        ackDTO.setMsgReceivedStatus(request.getMsgReceivedStatus());
-        ackDTO.setReceiveTime(request.getReceiveTime());
-        ackDTO.setChatId(request.getChatId());
-        ackDTO.setToUserId(request.getToUserId());
-        ackDTO.setUrl(request.getUrl());
-        ackDTO.setMsgId(request.getMsgId());
-        return ackDTO;
-    }
-
-    /**
-     * 构建撤回消息 VO
-     */
-    private C2CWithdrawMsgVO buildWithdrawMsgVO(com.xzll.grpc.CommonMsgRequest request) {
-        C2CWithdrawMsgVO withdrawMsgVo = new C2CWithdrawMsgVO();
-        withdrawMsgVo.setToUserId(request.getToUserId());
-        withdrawMsgVo.setUrl(request.getUrl());
-        withdrawMsgVo.setMsgId(request.getMsgId());
-        // chatId 不在 CommonMsgVO 中，跳过设置
-        return withdrawMsgVo;
-    }
-
-    /**
-     * 将gRPC请求转换为ImBaseRequest
-     */
-    private ImBaseRequest convertGrpcToImBaseRequest(com.xzll.grpc.ImBaseRequest grpcRequest) {
-        ImBaseRequest imBaseRequest = new ImBaseRequest();
-        imBaseRequest.setUrl(grpcRequest.getUrl());
-        imBaseRequest.setBody(grpcRequest.getBody().toByteArray());
-        // 设置headers（如果需要）
-        return imBaseRequest;
-    }
-
-    /**
-     * 内部发送服务端ACK
-     */
-    private boolean sendServerAckInternal(com.xzll.grpc.CommonMsgRequest request) {
-        try {
-            C2CServerReceivedMsgAckVO ackVo = buildServerAckVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(request.getUrl(), ackVo);
-            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            return sendMsg2Client(targetChannel, imBaseResponse);
-        } catch (Exception e) {
-            log.error("内部发送服务端ACK失败: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 内部发送客户端ACK
-     */
-    private boolean sendClientAckInternal(com.xzll.grpc.CommonMsgRequest request) {
-        try {
-            C2CClientReceivedMsgAckVO ackDTO = buildClientAckVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(ackDTO.getUrl(), ackDTO);
-            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            return sendMsg2Client(targetChannel, imBaseResponse);
-        } catch (Exception e) {
-            log.error("内部发送客户端ACK失败: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 内部发送撤回消息
-     */
-    private boolean sendWithdrawMsgInternal(com.xzll.grpc.CommonMsgRequest request) {
-        try {
-            C2CWithdrawMsgVO withdrawMsgVo = buildWithdrawMsgVO(request);
-            ImBaseResponse imBaseResponse = ImBaseResponse.buildPushToClientData(withdrawMsgVo.getUrl(), withdrawMsgVo);
-            Channel targetChannel = LocalChannelManager.getChannelByUserId(request.getToUserId());
-            return sendMsg2Client(targetChannel, imBaseResponse);
-        } catch (Exception e) {
-            log.error("内部发送撤回消息失败: {}", e.getMessage());
-            return false;
-        }
-    }
 } 
