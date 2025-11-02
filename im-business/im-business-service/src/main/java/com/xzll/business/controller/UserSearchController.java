@@ -2,6 +2,7 @@ package com.xzll.business.controller;
 
 import com.xzll.business.service.UserSearchService;
 import com.xzll.business.service.SearchSecurityService;
+import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.UserSearchAO;
 import com.xzll.common.pojo.response.UserSearchVO;
@@ -20,7 +21,7 @@ import java.util.List;
 @RequestMapping("/api/user")
 @CrossOrigin
 @Slf4j
-public class UserSearchController {
+public class UserSearchController extends BaseController {
 
     @Resource
     private UserSearchService userSearchService;
@@ -34,6 +35,12 @@ public class UserSearchController {
     @PostMapping("/search")
     public WebBaseResponse<List<UserSearchVO>> searchUsers(@RequestBody UserSearchAO ao) {
         log.info("搜索用户_入参:{}", ao);
+
+        String currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return WebBaseResponse.returnResultError("用户未登录");
+        }
+        ao.setCurrentUserId(currentUserId);
 
         try {
             // 参数校验
