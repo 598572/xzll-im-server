@@ -1,6 +1,8 @@
 package com.xzll.gateway.filter;
 
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.nimbusds.jose.JWSObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -34,7 +36,25 @@ public class AuthGlobalFilter implements GlobalFilter {
             JWSObject jwsObject = JWSObject.parse(realToken);
             String userStr = jwsObject.getPayload().toString();
             log.info("AuthGlobalFilter.filter() user:{}", userStr);
-            ServerHttpRequest request = exchange.getRequest().mutate().header("user", userStr).build();
+            
+            JSONObject userJson = JSON.parseObject(userStr);
+            String userId = null;
+            if (userJson != null && userJson.containsKey("id")) {
+                userId = userJson.getString("id");
+            }
+            
+            ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate()
+                    .header("user", userStr);
+            
+            // 如果成功提取到userId，添加到X-User-Id头中
+            if (StrUtil.isNotEmpty(userId)) {
+                requestBuilder.header("X-User-Id", userId);
+                log.debug("从JWT中提取userId并添加到请求头: {}", userId);
+            } else {
+                log.warn("无法从JWT中提取userId，payload: {}", userStr);
+            }
+            
+            ServerHttpRequest request = requestBuilder.build();
             exchange = exchange.mutate().request(request).build();
         } catch (Exception e) {
             log.error("网关认证过滤器异常e:",e);
