@@ -13,6 +13,7 @@ import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.common.util.msgId.SnowflakeIdService;
+import com.xzll.business.util.C2CMessageRowKeyUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -105,7 +106,6 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             },
             new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略
     );
-    public static final String ROW_KEY_LINK = "_";
 
     @Resource
     private Connection hbaseConnection;
@@ -123,8 +123,8 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         try {
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
-                // 构建RowKey: chatId + "-" + msgId
-                String rowKey = dto.getChatId() + "-" + dto.getMsgId();
+                // 构建RowKey
+                String rowKey = C2CMessageRowKeyUtil.generateRowKey(dto.getChatId(), dto.getMsgId());
                 
                 // 构建Put对象
                 Put put = new Put(Bytes.toBytes(rowKey));
@@ -170,7 +170,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
                 // 构建RowKey
-                String rowKey = dto.getChatId() + "-" + dto.getMsgId();
+                String rowKey = C2CMessageRowKeyUtil.generateRowKey(dto.getChatId(), dto.getMsgId());
                 
                 // 构建Put对象更新消息状态
                 Put put = new Put(Bytes.toBytes(rowKey));
@@ -205,7 +205,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
                 // 构建RowKey
-                String rowKey = dto.getChatId() + "-" + dto.getMsgId();
+                String rowKey = C2CMessageRowKeyUtil.generateRowKey(dto.getChatId(), dto.getMsgId());
                 
                 // 构建Put对象更新消息状态
                 Put put = new Put(Bytes.toBytes(rowKey));
@@ -240,7 +240,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
             try {
                 // 构建RowKey
-                String rowKey = dto.getChatId() + "-" + dto.getMsgId();
+                String rowKey = C2CMessageRowKeyUtil.generateRowKey(dto.getChatId(), dto.getMsgId());
                 
                 // 构建Put对象更新消息状态
                 Put put = new Put(Bytes.toBytes(rowKey));
@@ -528,10 +528,10 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             // 使用反向扫描，从最新的消息开始扫描
             Scan scan = new Scan();
             
-            // 正确的RowKey范围：chatId + "-" + msgId
+            // 正确的RowKey范围：使用工具类生成标准格式
             // 由于msgId是雪花算法，时间戳部分在开头，所以最新的消息RowKey最大
-            scan.withStartRow(Bytes.toBytes(chatId + "-" + Long.MAX_VALUE)); // 从chatId-最大值开始
-            scan.withStopRow(Bytes.toBytes(chatId + "-")); // 到chatId-结束
+            scan.withStartRow(Bytes.toBytes(C2CMessageRowKeyUtil.generateRowKey(chatId, String.valueOf(Long.MAX_VALUE)))); // 从chatId_最大值开始
+            scan.withStopRow(Bytes.toBytes(C2CMessageRowKeyUtil.generateChatPrefix(chatId))); // 到chatId_前缀结束
             
             scan.setReversed(true); // 反向扫描，获取最新的消息
             scan.setLimit(1); // 只取第一条（最新的）
@@ -562,11 +562,14 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             
             // 从RowKey中提取chatId和msgId
             String rowKey = Bytes.toString(result.getRow());
-            // RowKey格式：chatId + "-" + msgId
-            String[] parts = rowKey.split("-", 2);
-            if (parts.length >= 2) {
-                msgRecord.setChatId(parts[0]);
-                msgRecord.setMsgId(parts[1]);
+            try {
+                C2CMessageRowKeyUtil.RowKeyInfo rowKeyInfo = C2CMessageRowKeyUtil.parseRowKey(rowKey);
+                msgRecord.setChatId(rowKeyInfo.getChatId());
+                msgRecord.setMsgId(rowKeyInfo.getMsgId());
+            } catch (Exception e) {
+                log.warn("解析RowKey失败: {}", rowKey, e);
+                // 降级处理：设置原始rowKey作为msgId，避免数据丢失
+                msgRecord.setMsgId(rowKey);
             }
             
             for (Cell cell : result.rawCells()) {
@@ -787,7 +790,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
      */
     private Scan createHistoryScan(ChatHistoryQueryDTO queryDTO) {
         Scan scan;
-        String chatIdPrefix = queryDTO.getChatId() + ROW_KEY_LINK;
+        String chatIdPrefix = C2CMessageRowKeyUtil.generateChatPrefix(queryDTO.getChatId());
         
         // 计算基于时间范围的RowKey边界
         String timeBasedStartRow = null;
@@ -795,28 +798,29 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         
         if (queryDTO.getStartTime() != null) {
             String startMsgId = SnowflakeIdService.generateMsgIdLowerBound(queryDTO.getStartTime());
-            timeBasedStartRow = chatIdPrefix + startMsgId;
+            timeBasedStartRow = C2CMessageRowKeyUtil.generateTimeRangeRowKey(queryDTO.getChatId(), startMsgId);
         }
         
         if (queryDTO.getEndTime() != null) {
             String endMsgId = SnowflakeIdService.generateMsgIdUpperBound(queryDTO.getEndTime());
-            timeBasedEndRow = chatIdPrefix + endMsgId;
+            timeBasedEndRow = C2CMessageRowKeyUtil.generateTimeRangeRowKey(queryDTO.getChatId(), endMsgId);
         }
         
         if (StringUtils.isNotBlank(queryDTO.getLastMsgId())) {
             // 分页查询：从指定消息ID开始，同时考虑时间范围
             if (queryDTO.getReverse()) {
                 // 倒序查询：查询比lastMsgId小的消息
-                String startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
-                String stopRow = chatIdPrefix + queryDTO.getLastMsgId();
+                // 在HBase倒序扫描中，startRow应该是较大的值，stopRow应该是较小的值
+                String stopRow = C2CMessageRowKeyUtil.generateRowKey(queryDTO.getChatId(), queryDTO.getLastMsgId());
+                String startRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow))
-                        .setReversed(true);
+                        .setReversed(queryDTO.getReverse());
             } else {
                 // 正序查询：查询比lastMsgId大的消息
-                String startRow = chatIdPrefix + queryDTO.getLastMsgId() + "0";
-                String stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                String startRow = C2CMessageRowKeyUtil.generateRowKey(queryDTO.getChatId(), queryDTO.getLastMsgId() + "0");
+                String stopRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow));
@@ -826,17 +830,18 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             String startRow, stopRow;
             
             if (queryDTO.getReverse()) {
-                // 倒序查询
-                startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
-                stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                // 倒序查询：从时间范围的结束位置开始向前扫描
+                // 在HBase倒序扫描中，startRow应该是较大的值，stopRow应该是较小的值
+                startRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
+                stopRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow))
-                        .setReversed(true);
+                        .setReversed(queryDTO.getReverse());
             } else {
-                // 正序查询
+                // 正序查询：从时间范围的开始位置向后扫描
                 startRow = timeBasedStartRow != null ? timeBasedStartRow : chatIdPrefix;
-                stopRow = timeBasedEndRow != null ? timeBasedEndRow : chatIdPrefix + Character.MAX_VALUE;
+                stopRow = timeBasedEndRow != null ? timeBasedEndRow : C2CMessageRowKeyUtil.generateChatEndRow(queryDTO.getChatId());
                 scan = new Scan()
                         .withStartRow(Bytes.toBytes(startRow))
                         .withStopRow(Bytes.toBytes(stopRow));

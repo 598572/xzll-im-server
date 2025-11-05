@@ -493,18 +493,21 @@ public class SnowflakeIdService {
         }
         
         try {
-            // 将毫秒时间戳转换为压缩雪花算法的秒级时间戳
+            // 注意：消息ID使用的是秒级精度的压缩雪花算法
+            // 输入是毫秒级时间戳，需要转换为秒级，然后减去起点时间
             long compressedTimestamp = timestamp / 1000 - USER_ID_START_TIME;
             
             // 构造边界msgId
             long boundaryMsgId;
             if (isUpperBound) {
-                // 上边界：使用最大机器ID和最大序列号
+                // 上边界：该秒内的最大msgId（使用最大机器ID和最大序列号）
+                // 这确保包含该秒的所有消息
                 boundaryMsgId = (compressedTimestamp << USER_TIMESTAMP_SHIFT) | 
                                (MAX_USER_MACHINE_ID << USER_MACHINE_SHIFT) | 
                                MAX_USER_SEQUENCE;
             } else {
-                // 下边界：使用最小机器ID和最小序列号（都为0）
+                // 下边界：该秒内的最小msgId（使用最小机器ID和最小序列号）
+                // 这确保从该秒的第一条消息开始
                 boundaryMsgId = compressedTimestamp << USER_TIMESTAMP_SHIFT;
             }
             
