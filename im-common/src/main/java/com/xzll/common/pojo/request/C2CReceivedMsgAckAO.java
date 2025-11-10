@@ -18,6 +18,11 @@ import java.util.List;
 @Accessors(chain = true)
 public class C2CReceivedMsgAckAO extends CommonMsgAO {
 
+    /**
+     * 客户端消息ID（UUID，用于客户端关联）
+     */
+    private String clientMsgId;
+
     private String fromUserId;
 
     private String toUserId;

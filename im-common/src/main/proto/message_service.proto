@@ -85,22 +85,24 @@ message ImProtoResponse {
 
 // C2C发送消息请求 - 上行
 message C2CSendReq {
-  string msgId = 1;           // 消息ID（雪花算法生成）
-  string from = 2;            // 发送人ID
-  string to = 3;              // 接收人ID
-  int32 format = 4;           // 消息格式（1:文本,2:图片,3:语音等）
-  string content = 5;         // 消息内容
-  int64 time = 6;             // 客户端时间戳（毫秒）
-  string chatId = 7;          // 会话ID
+  string clientMsgId = 1;     // 客户端消息ID（UUID，客户端生成，用于去重）
+  string msgId = 2;           // 服务端消息ID（雪花算法生成）
+  string from = 3;            // 发送人ID
+  string to = 4;              // 接收人ID
+  int32 format = 5;           // 消息格式（1:文本,2:图片,3:语音等）
+  string content = 6;         // 消息内容
+  int64 time = 7;             // 客户端时间戳（毫秒）
+  string chatId = 8;          // 会话ID
 }
 
 // C2C消息确认请求 - 上行
 message C2CAckReq {
-  string msgId = 1;           // 消息ID
-  string from = 2;            // 发送人ID
-  string to = 3;              // 接收人ID
-  int32 status = 4;           // 消息状态（3:未读，4:已读）
-  string chatId = 5;          // 会话ID
+  string clientMsgId = 1;     // 客户端消息ID（UUID，用于精确匹配）
+  string msgId = 2;           // 服务端消息ID
+  string from = 3;            // 发送人ID
+  string to = 4;              // 接收人ID
+  int32 status = 5;           // 消息状态（3:未读，4:已读）
+  string chatId = 6;          // 会话ID
 }
 
 // C2C撤回消息请求 - 上行
@@ -120,13 +122,14 @@ message GetBatchMsgIdsReq {
 
 // 服务端推送C2C消息 - 下行
 message C2CMsgPush {
-  string msgId = 1;           // 消息ID
-  string from = 2;            // 发送人ID
-  string to = 3;              // 接收人ID
-  int32 format = 4;           // 消息格式
-  string content = 5;         // 消息内容
-  int64 time = 6;             // 服务器时间戳（毫秒）
-  string chatId = 7;          // 会话ID
+  string clientMsgId = 1;     // 客户端消息ID（UUID，用于去重）
+  string msgId = 2;           // 服务端消息ID（雪花算法生成）
+  string from = 3;            // 发送人ID
+  string to = 4;              // 接收人ID
+  int32 format = 5;           // 消息格式
+  string content = 6;         // 消息内容
+  int64 time = 7;             // 服务器时间戳（毫秒）
+  string chatId = 8;          // 会话ID
 }
 
 // 批量消息ID推送 - 下行
@@ -137,21 +140,23 @@ message BatchMsgIdsPush {
 // 服务端ACK推送 - 下行（gRPC专用）
 message ServerAckPush {
   string toUserId = 1;
-  string msgId = 2;
-  string chatId = 3;
-  int32 msgReceivedStatus = 4; // 1=SERVER_RECEIVED
-  string ackTextDesc = 5;
-  int64 receiveTime = 6;
+  string clientMsgId = 2;      // 客户端消息ID（用于客户端匹配）
+  string msgId = 3;            // 服务端消息ID
+  string chatId = 4;
+  int32 msgReceivedStatus = 5; // 1=SERVER_RECEIVED
+  string ackTextDesc = 6;
+  int64 receiveTime = 7;
 }
 
 // 客户端ACK推送 - 下行（gRPC专用）
 message ClientAckPush {
   string toUserId = 1;
-  string msgId = 2;
-  string chatId = 3;
-  int32 msgReceivedStatus = 4; // 3=UN_READ, 4=READED
-  string ackTextDesc = 5;
-  int64 receiveTime = 6;
+  string clientMsgId = 2;      // 客户端消息ID（用于客户端匹配）
+  string msgId = 3;            // 服务端消息ID
+  string chatId = 4;
+  int32 msgReceivedStatus = 5; // 3=UN_READ, 4=READED
+  string ackTextDesc = 6;
+  int64 receiveTime = 7;
 }
 
 // 撤回消息推送 - 下行（gRPC专用）

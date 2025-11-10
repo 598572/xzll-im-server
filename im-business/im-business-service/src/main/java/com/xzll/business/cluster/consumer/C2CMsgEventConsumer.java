@@ -11,7 +11,6 @@ import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
-import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.common.rocketmq.RocketMQClusterEventListener;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
@@ -95,7 +94,11 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
      * 将C2COffLineMsgAO转换为C2CSendMsgAO
      */
     private C2CSendMsgAO convertToC2CSendMsgAO(C2COffLineMsgAO offLineMsgAO) {
+        log.debug("【C2CMsgEventConsumer-转换开始】离线消息转换 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
+            offLineMsgAO.getClientMsgId(), offLineMsgAO.getMsgId(), offLineMsgAO.getFromUserId(), offLineMsgAO.getToUserId());
+        
         C2CSendMsgAO sendMsgAO = new C2CSendMsgAO();
+        sendMsgAO.setClientMsgId(offLineMsgAO.getClientMsgId()); // 修复：设置客户端消息ID
         sendMsgAO.setFromUserId(offLineMsgAO.getFromUserId());
         sendMsgAO.setToUserId(offLineMsgAO.getToUserId());
         sendMsgAO.setMsgContent(offLineMsgAO.getMsgContent());
@@ -104,6 +107,10 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
         sendMsgAO.setChatId(offLineMsgAO.getChatId());
         sendMsgAO.setUrl(offLineMsgAO.getUrl());
         sendMsgAO.setMsgCreateTime(offLineMsgAO.getMsgCreateTime());
+        
+        log.debug("【C2CMsgEventConsumer-转换完成】转换结果 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
+            sendMsgAO.getClientMsgId(), sendMsgAO.getMsgId(), sendMsgAO.getFromUserId(), sendMsgAO.getToUserId());
+        
         return sendMsgAO;
     }
 }
