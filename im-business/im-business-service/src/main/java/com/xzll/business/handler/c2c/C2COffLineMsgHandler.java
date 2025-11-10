@@ -46,9 +46,10 @@ public class C2COffLineMsgHandler {
             log.warn("HBase服务未启用，跳过离线消息存储到HBase，注意此举仅适用于开发环境");
         }
         if (writeChat && writeMsg) {
-            // 发送服务端ACK，告知发送方消息已接收并存储
+            // 发送服务端ACK，告知发送方消息已接收并存储（双轨制：包含客户端消息ID）
             com.xzll.grpc.ServerAckPush ackPush = com.xzll.grpc.ServerAckPush.newBuilder()
-                    .setMsgId(dto.getMsgId())
+                    .setClientMsgId(dto.getClientMsgId()) // 客户端消息ID
+                    .setMsgId(dto.getMsgId()) // 服务端消息ID
                     .setChatId(dto.getChatId())
                     .setToUserId(dto.getFromUserId())
                     .setAckTextDesc("SERVER_RECEIVED")

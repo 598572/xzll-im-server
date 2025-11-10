@@ -59,9 +59,10 @@ public class C2CSendMsgHandler {
                 // 这里不抛异常，避免影响消息发送的主流程
             }
             
-            // 发送server_ack
+            // 发送server_ack（双轨制：包含客户端消息ID和服务端消息ID）
             com.xzll.grpc.ServerAckPush ackPush = com.xzll.grpc.ServerAckPush.newBuilder()
-                    .setMsgId(dto.getMsgId())
+                    .setClientMsgId(dto.getClientMsgId()) // 客户端消息ID（用于客户端匹配）
+                    .setMsgId(dto.getMsgId()) // 服务端消息ID
                     .setChatId(dto.getChatId())
                     //此时toUser是消息发送方 所以这里是fromUserId
                     .setToUserId(dto.getFromUserId())

@@ -1,7 +1,9 @@
 package com.xzll.client.protobuf.interactive;
 
+import cn.hutool.core.lang.Assert;
 import com.alibaba.fastjson.JSONObject;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.grpc.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -19,12 +21,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 /**
@@ -342,7 +343,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                 msgId = msgIds.remove(0);
             }
             
-            String chatId = generateChatId(userId, toUserId);
+//            String chatId = generateChatId(userId, toUserId);
             
             // 构建 C2CSendReq
             C2CSendReq sendReq = C2CSendReq.newBuilder()
@@ -352,7 +353,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     .setFormat(1) // 1=文本
                     .setContent(content)
                     .setTime(System.currentTimeMillis())
-                    .setChatId(chatId)
+                    .setChatId(buildC2CChatId(100,Long.parseLong(userId.toString()),Long.parseLong(toUserId.toString())))
                     .build();
             
             // 包装为 ImProtoRequest
@@ -410,7 +411,28 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             return userId2 + "_" + userId1;
         }
     }
-    
+
+    public static String buildChatId(Integer bizType, String chatType, Long fromUserId, Long toUserId) {
+        Assert.isTrue(StringUtils.isNotBlank(chatType) && Objects.nonNull(fromUserId) && Objects.nonNull(toUserId));
+        bizType = bizType == null ? ImConstant.DEFAULT_BIZ_TYPE : bizType;
+        return String.format("%d-%s-%s-%s", bizType, ImConstant.ChatType.CHAT_TYPE_MAP.get(chatType), fromUserId, toUserId);
+    }
+
+    public static String buildC2CChatId(Integer bizType, Long fromUserId, Long toUserId) {
+        //单聊时 第一个userId是小的 第二个userId是较大的
+        Long smallUserId = null;
+        Long bigUserId = null;
+        if (fromUserId < toUserId) {
+            smallUserId = fromUserId;
+            bigUserId = toUserId;
+        } else {
+            smallUserId = toUserId;
+            bigUserId = fromUserId;
+        }
+        return buildChatId(bizType, ImConstant.ChatType.C2C, smallUserId, bigUserId);
+    }
+
+
     /**
      * 获取当前时间
      */

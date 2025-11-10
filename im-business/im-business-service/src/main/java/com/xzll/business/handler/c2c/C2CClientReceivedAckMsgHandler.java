@@ -59,10 +59,11 @@ public class C2CClientReceivedAckMsgHandler {
 //        long needDeleteMsgId = SnowflakeIdService.getSnowflakeId(dto.getMsgId());
         redissonUtils.removeZSetByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
 
-        //4. 接收方客户端ack发送至发送方
+        //4. 接收方客户端ack发送至发送方（双轨制：包含客户端消息ID）
         if (updateResult) {
             com.xzll.grpc.ClientAckPush ackPush = com.xzll.grpc.ClientAckPush.newBuilder()
-                    .setMsgId(dto.getMsgId())
+                    .setClientMsgId(dto.getClientMsgId()) // 客户端消息ID
+                    .setMsgId(dto.getMsgId()) // 服务端消息ID
                     .setChatId(dto.getChatId())
                     .setToUserId(dto.getToUserId())
                     .setAckTextDesc(com.xzll.common.constant.MsgStatusEnum.MsgStatus.getNameByCode(dto.getMsgStatus()))

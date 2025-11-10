@@ -48,8 +48,10 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             Assert.isTrue(StringUtils.isNotBlank(request.getToUserId()), "发送服务端ack时缺少必填参数");
             
             // 按新协议：构建 C2CAckReq，type=C2C_ACK，通过二进制帧下发
+            // 双轨制：包含 clientMsgId 和 serverMsgId
             C2CAckReq ackReq = C2CAckReq.newBuilder()
-                    .setMsgId(request.getMsgId())
+                    .setClientMsgId(request.getClientMsgId()) //  客户端消息ID
+                    .setMsgId(request.getMsgId()) // 服务端消息ID
                     .setFrom("")
                     .setTo(request.getToUserId())
                     .setStatus(request.getMsgReceivedStatus())
@@ -93,8 +95,10 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             Assert.isTrue(StringUtils.isNotBlank(request.getToUserId()), "发送客户端ack时缺少必填参数");
             
             // 按新协议：构建 C2CAckReq（未读/已读），type=C2C_ACK，通过二进制帧下发
+            // 双轨制：包含 clientMsgId 和 serverMsgId
             C2CAckReq ackReq = C2CAckReq.newBuilder()
-                    .setMsgId(request.getMsgId())
+                    .setClientMsgId(request.getClientMsgId()) // ✅ 客户端消息ID
+                    .setMsgId(request.getMsgId()) // ✅ 服务端消息ID
                     .setFrom("")
                     .setTo(request.getToUserId())
                     .setStatus(request.getMsgReceivedStatus())

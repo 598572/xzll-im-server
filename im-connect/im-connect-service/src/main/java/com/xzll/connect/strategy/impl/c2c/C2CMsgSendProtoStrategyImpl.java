@@ -126,9 +126,10 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                     MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(
                         stubWrapper.getChannelInfo().getChannel());
                     
-                    // 构建 C2CSendReq
+                    // 构建 C2CSendReq（双轨制：传递两个ID）
                     C2CSendReq c2cReq = C2CSendReq.newBuilder()
-                        .setMsgId(packet.getMsgId())
+                        .setClientMsgId(packet.getClientMsgId()) // 客户端消息ID
+                        .setMsgId(packet.getMsgId()) // 服务端消息ID
                         .setFrom(packet.getFromUserId())
                         .setTo(packet.getToUserId())
                         .setFormat(packet.getMsgFormat())
@@ -203,7 +204,8 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     private C2CSendMsgAO convertToAO(C2CSendReq req) {
         C2CSendMsgAO ao = new C2CSendMsgAO();
-        ao.setMsgId(req.getMsgId());
+        ao.setClientMsgId(req.getClientMsgId()); // 双轨制：保留客户端消息ID
+        ao.setMsgId(req.getMsgId()); // 服务端消息ID（可能为空，由服务端生成）
         ao.setFromUserId(req.getFrom());
         ao.setToUserId(req.getTo());
         ao.setMsgFormat(req.getFormat());
@@ -219,7 +221,8 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     private C2CMsgPush buildPushMsgResp(C2CSendMsgAO packet) {
         return C2CMsgPush.newBuilder()
-            .setMsgId(packet.getMsgId())
+            .setClientMsgId(packet.getClientMsgId()) // 双轨制：传递客户端消息ID
+            .setMsgId(packet.getMsgId()) // 服务端消息ID
             .setFrom(packet.getFromUserId())
             .setTo(packet.getToUserId())
             .setFormat(packet.getMsgFormat())
@@ -254,6 +257,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     private C2COffLineMsgAO buildOffLineMsgDTO(C2CSendMsgAO packet) {
         C2COffLineMsgAO build = C2COffLineMsgAO.builder()
+            .clientMsgId(packet.getClientMsgId()) // 双轨制：传递客户端消息ID
             .fromUserId(packet.getFromUserId())
             .toUserId(packet.getToUserId())
             .msgStatus(MsgStatusEnum.MsgStatus.OFF_LINE.getCode())

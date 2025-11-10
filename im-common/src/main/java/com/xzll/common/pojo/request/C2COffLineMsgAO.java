@@ -9,6 +9,11 @@ import lombok.Data;
 public class C2COffLineMsgAO extends CommonMsgAO {
 
     /**
+     * 客户端消息ID（UUID，用于客户端关联）
+     */
+    private String clientMsgId;
+
+    /**
      * 消息内容
      */
     private String msgContent;

@@ -46,9 +46,9 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
             // 解析 C2CAckReq
             C2CAckReq req = C2CAckReq.parseFrom(protoRequest.getPayload());
             
-            // 打印消息详细内容
-            log.info("{}消息详情 - msgId: {}, from: {}, to: {}, status: {}, chatId: {}", 
-                TAG, req.getMsgId(), req.getFrom(), req.getTo(), req.getStatus(), req.getChatId());
+            // 打印消息详细内容（双轨制：显示两个ID）
+            log.info("{}消息详情 - clientMsgId: {}, serverMsgId: {}, from: {}, to: {}, status: {}, chatId: {}", 
+                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo(), req.getStatus(), req.getChatId());
             
             // 转换为内部 AO 对象
             C2CReceivedMsgAckAO packet = convertToAO(req);
@@ -63,11 +63,12 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
     }
     
     /**
-     * 将 C2CAckReq 转换为 C2CReceivedMsgAckAO
+     * 将 C2CAckReq 转换为 C2CReceivedMsgAckAO（双轨制：保留 clientMsgId）
      */
     private C2CReceivedMsgAckAO convertToAO(C2CAckReq req) {
         C2CReceivedMsgAckAO ao = new C2CReceivedMsgAckAO();
-        ao.setMsgId(req.getMsgId());
+        ao.setClientMsgId(req.getClientMsgId()); // ✅ 双轨制：保留客户端消息ID
+        ao.setMsgId(req.getMsgId()); // 服务端消息ID
         ao.setFromUserId(req.getFrom());
         ao.setToUserId(req.getTo());
         ao.setMsgStatus(req.getStatus());
