@@ -85,11 +85,16 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             // 解析 C2CSendReq
             C2CSendReq req = C2CSendReq.parseFrom(protoRequest.getPayload());
             
-            // 打印消息详细内容
-            log.info("{}消息详情 - msgId: {}, from: {}, to: {}, format: {}, chatId: {}, time: {}, contentLength: {}", 
-                TAG, req.getMsgId(), req.getFrom(), req.getTo(), req.getFormat(), 
+            // 打印消息详细内容（双轨制）
+            log.debug("{}【步骤1-接收消息】clientMsgId: {}, msgId: {}, from: {}, to: {}, format: {}, chatId: {}, time: {}, contentLength: {}",
+                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo(), req.getFormat(), 
                 req.getChatId(), req.getTime(), req.getContent().length());
+            
             C2CSendMsgAO packet = convertToAO(req);
+            
+            // 打印转换后的AO对象信息
+            log.debug("{}【步骤2-转换完成】转换后AO - clientMsgId: {}, msgId: {}, fromUserId: {}, toUserId: {}, chatId: {}",
+                TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getFromUserId(), packet.getToUserId(), packet.getChatId());
             
             //1. 更新会话记录并保存消息记录
             c2CMsgProvider.sendC2CMsg(packet);
@@ -109,17 +114,20 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             //3. 根据接收人状态做对应的处理
             if (null != targetChannel && Objects.equals(ImConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
                 // 直接发送
-                log.info("{}用户{}在线且在本台机器上,将直接发送", TAG, packet.getToUserId());
+                log.debug("{}【步骤3-本地发送】用户{}在线且在本台机器上,将直接发送 - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 sendProtoMsg(targetChannel, buildPushMsgResp(packet));
                 
             } else if (null == userStatus && null == targetChannel) {
-                log.info("{}用户{}不在线，将消息保存至离线表中", TAG, packet.getToUserId());
+                log.debug("{}【步骤3-离线处理】用户{}不在线，将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 // 发送mq消息，记录离线消息并更新db中消息状态为离线
                 c2CMsgProvider.offLineMsg(buildOffLineMsgDTO(packet));
                 
             } else if (Objects.isNull(targetChannel) && Objects.equals(ImConstant.UserStatus.ON_LINE.toString(), userStatus)
                     && StringUtils.isNotBlank(ipPortStr)) {
-                log.info("{}用户{}在线但是不在该机器上,跨服务器转发,目标服务器:{}", TAG, packet.getToUserId(), ipPortStr);
+                log.debug("{}【步骤3-跨服务器转发】用户{}在线但是不在该机器上,跨服务器转发,目标服务器:{} - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), ipPortStr, packet.getClientMsgId(), packet.getMsgId());
                 
                 // 【优化】通过 gRPC 跨服务器转发（直接传递 ImProtoRequest，最小化体积）
                 String targetIp = NettyAttrUtil.getIpStr(ipPortStr);
@@ -141,6 +149,9 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                         .setChatId(packet.getChatId())
                         .build();
                     
+                    log.info("{}【跨服务器转发-构建请求】目标IP: {}, 转发数据 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
+                        TAG, targetIp, c2cReq.getClientMsgId(), c2cReq.getMsgId(), c2cReq.getFrom(), c2cReq.getTo());
+                    
                     // 构建 ImProtoRequest（直接传递，无额外包装）
                     ImProtoRequest forwardRequest = ImProtoRequest.newBuilder()
                         .setType(MsgType.C2C_SEND)
@@ -149,10 +160,12 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                     
                     // 调用目标服务器的 transferC2CMsg 直接传递protobuf对象
                     com.xzll.grpc.WebBaseResponse response = stub.transferC2CMsg(forwardRequest);
-                    log.info("{}通过gRPC转发消息结果: code={}, msg={}", TAG, response.getCode(), response.getMessage());
+                    log.info("{}【跨服务器转发-结果】gRPC转发消息结果: code={}, msg={} - clientMsgId: {}, msgId: {}", 
+                        TAG, response.getCode(), response.getMessage(), packet.getClientMsgId(), packet.getMsgId());
                     
                 } catch (Exception e) {
-                    log.error("{}gRPC转发消息失败: {}", TAG, e.getMessage(), e);
+                    log.error("{}【跨服务器转发-异常】gRPC转发消息失败 - clientMsgId: {}, msgId: {}, error: {}", 
+                        TAG, packet.getClientMsgId(), packet.getMsgId(), e.getMessage(), e);
                 }
             }
             
@@ -172,32 +185,42 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     @Override
     public WebBaseResponse receiveAndSendMsg(ImProtoRequest protoRequest) {
-        log.debug("{}目标服务器接收并转发消息_开始", TAG);
+        log.debug("{}【receiveAndSendMsg开始】目标服务器接收并转发消息", TAG);
         
         try {
             // 解析 C2CSendReq
             C2CSendReq req = C2CSendReq.parseFrom(protoRequest.getPayload());
+            log.info("{}【receiveAndSendMsg-解析】接收到转发消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
+                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo());
+            
             C2CSendMsgAO packet = convertToAO(req);
             
             // 获取本地接收人 Channel
             Channel targetChannel = LocalChannelManager.getChannelByUserId(packet.getToUserId());
             String userStatus = redissonUtils.getHash(ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, packet.getToUserId());
             
+            log.debug("{}【receiveAndSendMsg-状态检查】用户: {}, 在线状态: {}, 本地Channel: {} - clientMsgId: {}, msgId: {}",
+                TAG, packet.getToUserId(), userStatus, (targetChannel != null ? "存在" : "不存在"), 
+                packet.getClientMsgId(), packet.getMsgId());
+            
             // 二次校验接收人在线状态
             if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
-                log.info("{}跳转后用户{}在线,将直接发送消息", TAG, packet.getToUserId());
+                log.debug("{}【receiveAndSendMsg-本地发送】跳转后用户{}在线,将直接发送消息 - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 sendProtoMsg(targetChannel, buildPushMsgResp(packet));
             } else {
-                log.info("{}跳转后用户{}不在线,将消息保存至离线表中", TAG, packet.getToUserId());
+                log.debug("{}【receiveAndSendMsg-离线处理】跳转后用户{}不在线,将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 // 发送mq消息，记录离线消息并更新db中消息状态为离线
                 c2CMsgProvider.offLineMsg(buildOffLineMsgDTO(packet));
             }
             
-            log.debug("{}目标服务器接收并转发消息_结束", TAG);
+            log.info("{}【receiveAndSendMsg完成】目标服务器接收并转发消息成功 - clientMsgId: {}, msgId: {}", 
+                TAG, packet.getClientMsgId(), packet.getMsgId());
             return WebBaseResponse.returnResultSuccess("跳转消息成功");
             
         } catch (InvalidProtocolBufferException e) {
-            log.error("{}解析 protobuf 消息失败", TAG, e);
+            log.error("{}【receiveAndSendMsg-异常】解析 protobuf 消息失败", TAG, e);
             return WebBaseResponse.returnResultError("解析消息失败: " + e.getMessage());
         }
     }
@@ -245,6 +268,9 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg) {
         try {
+            log.debug("{}【sendProtoMsg】开始发送消息到客户端 - clientMsgId: {}, msgId: {}, to: {}",
+                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo());
+            
             ImProtoResponse response = ImProtoResponse.newBuilder()
                 .setType(MsgType.C2C_MSG_PUSH)
                 .setPayload(com.google.protobuf.ByteString.copyFrom(pushMsg.toByteArray()))
@@ -254,9 +280,12 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             byte[] bytes = response.toByteArray();
             ByteBuf buf = Unpooled.wrappedBuffer(bytes);
             channel.writeAndFlush(new BinaryWebSocketFrame(buf));
-            log.debug("{}发送 protobuf 消息成功", TAG);
+            
+            log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId: {}, msgId: {}, to: {}, payloadSize: {} bytes",
+                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo(), bytes.length);
         } catch (Exception e) {
-            log.error("{}发送 protobuf 消息失败", TAG, e);
+            log.error("{}【sendProtoMsg异常】发送 protobuf 消息失败 - clientMsgId: {}, msgId: {}, to: {}, error: {}", 
+                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo(), e.getMessage(), e);
         }
     }
     
