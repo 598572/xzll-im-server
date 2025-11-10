@@ -96,6 +96,7 @@ public class C2CMsgEventConsumer implements RocketMQClusterEventListener, Initia
      */
     private C2CSendMsgAO convertToC2CSendMsgAO(C2COffLineMsgAO offLineMsgAO) {
         C2CSendMsgAO sendMsgAO = new C2CSendMsgAO();
+        sendMsgAO.setClientMsgId(offLineMsgAO.getClientMsgId()); // 修复：设置客户端消息ID
         sendMsgAO.setFromUserId(offLineMsgAO.getFromUserId());
         sendMsgAO.setToUserId(offLineMsgAO.getToUserId());
         sendMsgAO.setMsgContent(offLineMsgAO.getMsgContent());
