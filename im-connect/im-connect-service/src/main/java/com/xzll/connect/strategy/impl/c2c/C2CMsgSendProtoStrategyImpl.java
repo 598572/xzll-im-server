@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.Objects;
+import com.xzll.common.util.msgId.SnowflakeIdService;
 
 /**
  * @Author: hzz
@@ -57,6 +58,8 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     private SmartGrpcClientManager grpcClientManager;
     @Resource
     private GrpcClientConfig grpcClientConfig;
+    @Resource
+    private SnowflakeIdService snowflakeIdService;
 
     @Override
     public MsgType supportMsgType() {
@@ -205,7 +208,12 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     private C2CSendMsgAO convertToAO(C2CSendReq req) {
         C2CSendMsgAO ao = new C2CSendMsgAO();
         ao.setClientMsgId(req.getClientMsgId()); // 双轨制：保留客户端消息ID
-        ao.setMsgId(req.getMsgId()); // 服务端消息ID（可能为空，由服务端生成）
+        
+        // 服务端消息ID生成逻辑：雪花算法
+        String msgId = snowflakeIdService.generateSimpleMessageId();
+        log.info("{}客户端msgId为空，服务端生成新msgId: {}", TAG, msgId);
+        ao.setMsgId(msgId);
+        
         ao.setFromUserId(req.getFrom());
         ao.setToUserId(req.getTo());
         ao.setMsgFormat(req.getFormat());
