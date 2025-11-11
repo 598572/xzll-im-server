@@ -2,6 +2,7 @@ package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
+import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.grpc.GrpcMessageService;
@@ -30,6 +31,8 @@ public class C2COffLineMsgHandler {
     // 替换Dubbo为gRPC
     @Resource
     private GrpcMessageService grpcMessageService;
+    @Resource
+    private ServerAckSimpleRetryService serverAckSimpleRetryService;
 
 
     /**
@@ -72,14 +75,17 @@ public class C2COffLineMsgHandler {
             log.debug("【C2COffLineMsgHandler-ACK构建完成】ServerAckPush构建完成 - clientMsgId: {}, msgId: {}, toUserId: {}, status: {}",
                 ackPush.getClientMsgId(), ackPush.getMsgId(), ackPush.getToUserId(), ackPush.getMsgReceivedStatus());
                     
-            // 使用gRPC发送服务端ACK  - 异步方式
-            CompletableFuture<Boolean> future = grpcMessageService.sendServerAck(ackPush);
+            // 使用MQ重试server ack消息
+            CompletableFuture<Boolean> future = serverAckSimpleRetryService.sendServerAckWithRetry(ackPush);
             future.whenComplete((success, throwable) -> {
                 if (throwable != null) {
-                    log.error("【C2COffLineMsgHandler-ACK发送失败】离线消息服务端ACK发送失败 - clientMsgId: {}, msgId: {}, error: {}", 
+                    log.error("【C2COffLineMsgHandler-ACK重试异常】离线消息服务端ACK(MQ重试)异常 - clientMsgId: {}, msgId: {}, error: {}", 
                         dto.getClientMsgId(), dto.getMsgId(), throwable.getMessage(), throwable);
+                } else if (success) {
+                    log.info("【C2COffLineMsgHandler-ACK发送成功】离线消息服务端ACK发送成功 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
+                        dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
                 } else {
-                    log.info("【C2COffLineMsgHandler-ACK发送成功】离线消息服务端ACK发送成功 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
+                    log.error("【C2COffLineMsgHandler-ACK最终失败】离线消息服务端ACK(MQ重试)最终失败 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
                         dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
                 }
             });

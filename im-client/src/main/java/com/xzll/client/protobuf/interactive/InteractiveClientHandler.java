@@ -35,12 +35,12 @@ import org.springframework.util.CollectionUtils;
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
 
-//    public static final String IP = "127.0.0.1";
-//    public static final String PORT = "8083";
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "8083";
 
 
-    public static final String IP = "120.46.85.43";
-    public static final String PORT = "80";
+//    public static final String IP = "120.46.85.43";
+//    public static final String PORT = "80";
 
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
@@ -233,15 +233,45 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理客户端ACK（来自其他客户端的确认）
+     * 处理ACK消息（统一处理ServerAck和ClientAck）
+     * 注意：ServerAck(status=1)和ClientAck(status=3/4)都通过C2C_ACK发送
      */
     private void handleClientAck(ImProtoResponse protoResponse) {
         try {
-            ClientAckPush clientAck = ClientAckPush.parseFrom(protoResponse.getPayload());
+            C2CAckReq ackReq = C2CAckReq.parseFrom(protoResponse.getPayload());
             
             String statusText;
             String emoji;
-            switch (clientAck.getMsgReceivedStatus()) {
+            
+            // 判断是ServerAck还是ClientAck
+            if (ackReq.getStatus() == 1) {
+                // ✅ ServerAck：服务端已接收
+                statusText = "服务端已接收";
+                emoji = "💡";
+                
+                // 从已发送消息中查找对应的消息，计算耗时
+                Long sendTime = sentMessages.get(ackReq.getClientMsgId());
+                String timeInfo = sendTime != null ? 
+                    String.format(" (耗时: %dms)", System.currentTimeMillis() - sendTime) : "";
+                
+                System.out.println();
+                System.out.println("╔════════════════════════════════════════════════════╗");
+                System.out.println("║          💡 ★★★ 收到ServerAck（双轨制）★★★        ║");
+                System.out.println("╠════════════════════════════════════════════════════╣");
+                System.out.println("║  客户端ID: " + ackReq.getClientMsgId());
+                System.out.println("║  服务端ID: " + ackReq.getMsgId());
+                System.out.println("║  状态: SERVER_RECEIVED" + timeInfo);
+                System.out.println("║  chatId: " + ackReq.getChatId());
+                System.out.println("║  时间: " + getTime());
+                System.out.println("╚════════════════════════════════════════════════════╝");
+                
+                // 清理已发送消息记录（可选，避免内存泄漏）
+                sentMessages.remove(ackReq.getClientMsgId());
+                return;
+            }
+            
+            // ClientAck：对方未读/已读
+            switch (ackReq.getStatus()) {
                 case 3:
                     statusText = "对方未读";
                     emoji = "📬";
@@ -251,15 +281,15 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     emoji = "✅";
                     break;
                 default:
-                    statusText = "未知状态(" + clientAck.getMsgReceivedStatus() + ")";
+                    statusText = "未知状态(" + ackReq.getStatus() + ")";
                     emoji = "❓";
             }
             
             System.out.println("[" + getTime() + "] " + emoji + " 客户端ACK: " + statusText + 
-                             " (clientId: " + clientAck.getClientMsgId() + ", msgId: " + clientAck.getMsgId() + ")");
+                             " (clientId: " + ackReq.getClientMsgId() + ", msgId: " + ackReq.getMsgId() + ")");
             
         } catch (InvalidProtocolBufferException e) {
-            System.err.println("[" + getTime() + "] ❌ 解析客户端ACK失败: " + e.getMessage());
+            System.err.println("[" + getTime() + "] ❌ 解析ACK失败: " + e.getMessage());
         }
     }
     
