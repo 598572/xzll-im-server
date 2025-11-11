@@ -79,8 +79,8 @@ public interface ImConstant {
      * rocketMq topic
      */
     public static class TopicConstant {
-        public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
-        public static final String XZLL_DATA_SYNC_TOPIC = "im_c2cmsg-sync-es-topic";
+        public static final String XZLL_C2CMSG_TOPIC = "XZLL-C2CMSG-TOPIC";
+        public static final String XZLL_DATA_SYNC_TOPIC = "IM_C2CMSG-SYNC-ES-TOPIC";
     }
 
     public static class RedisKeyConstant {

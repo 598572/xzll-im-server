@@ -82,7 +82,7 @@ public class C2COffLineMsgHandler {
                     log.error("【C2COffLineMsgHandler-ACK重试异常】离线消息服务端ACK(MQ重试)异常 - clientMsgId: {}, msgId: {}, error: {}", 
                         dto.getClientMsgId(), dto.getMsgId(), throwable.getMessage(), throwable);
                 } else if (success) {
-                    log.info("【C2COffLineMsgHandler-ACK发送成功】离线消息服务端ACK发送成功（MQ重试） - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
+                    log.info("【C2COffLineMsgHandler-ACK发送成功】离线消息服务端ACK发送成功 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
                         dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
                 } else {
                     log.error("【C2COffLineMsgHandler-ACK最终失败】离线消息服务端ACK(MQ重试)最终失败 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 

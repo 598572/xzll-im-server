@@ -41,8 +41,9 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     @Resource
     private RedissonUtils redissonUtils;
 
-
-    private int failRate=100;
+    // todo 上线时要务必为0
+    //模拟server ack发送失败 0-100 越高失败比例越高 生产环境务必为0 ， 此配置暂时无法通过@Value注入 故写在代码中，仅用于调试
+    private int failRate=0;
 
 
     @Override

@@ -128,8 +128,9 @@ public class ServerAckSimpleRetryService {
      */
     private boolean sendToMqRetry(ServerAckPush ackPush, int retryCount) {
         try {
+            // 将Protobuf对象转换为可序列化的数据对象
             ServerAckRetryEvent retryEvent = new ServerAckRetryEvent();
-            retryEvent.setServerAckPush(ackPush);
+            retryEvent.setServerAckPush(ServerAckPushData.fromProtobuf(ackPush));
             retryEvent.setRetryCount(retryCount);
             retryEvent.setMaxRetries(maxRetries);
             retryEvent.setCreateTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -173,7 +174,8 @@ public class ServerAckSimpleRetryService {
      * 处理MQ重试事件（由Consumer调用）
      */
     public void handleMqRetry(ServerAckRetryEvent retryEvent) {
-        ServerAckPush ackPush = retryEvent.getServerAckPush();
+        // 将数据对象转换回Protobuf对象
+        ServerAckPush ackPush = retryEvent.getServerAckPush().toProtobuf();
         int currentRetry = retryEvent.getRetryCount();
         
         log.info("{}处理MQ重试 - clientMsgId: {}, 第{}次重试", 
@@ -309,14 +311,14 @@ public class ServerAckSimpleRetryService {
      * ServerAck重试事件
      */
     public static class ServerAckRetryEvent {
-        private ServerAckPush serverAckPush;
+        private ServerAckPushData serverAckPush;
         private int retryCount;
         private int maxRetries;
         private String createTime;
         
         // Getters and Setters
-        public ServerAckPush getServerAckPush() { return serverAckPush; }
-        public void setServerAckPush(ServerAckPush serverAckPush) { this.serverAckPush = serverAckPush; }
+        public ServerAckPushData getServerAckPush() { return serverAckPush; }
+        public void setServerAckPush(ServerAckPushData serverAckPush) { this.serverAckPush = serverAckPush; }
         
         public int getRetryCount() { return retryCount; }
         public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
@@ -326,5 +328,66 @@ public class ServerAckSimpleRetryService {
         
         public String getCreateTime() { return createTime; }
         public void setCreateTime(String createTime) { this.createTime = createTime; }
+    }
+    
+    /**
+     * ServerAckPush的可序列化数据对象（避免Protobuf对象序列化问题）
+     */
+    public static class ServerAckPushData {
+        private String toUserId;
+        private String clientMsgId;
+        private String msgId;
+        private String chatId;
+        private String ackTextDesc;
+        private int msgReceivedStatus;
+        private long receiveTime;
+        
+        // 从Protobuf对象转换
+        public static ServerAckPushData fromProtobuf(ServerAckPush push) {
+            ServerAckPushData data = new ServerAckPushData();
+            data.setToUserId(push.getToUserId());
+            data.setClientMsgId(push.getClientMsgId());
+            data.setMsgId(push.getMsgId());
+            data.setChatId(push.getChatId());
+            data.setAckTextDesc(push.getAckTextDesc());
+            data.setMsgReceivedStatus(push.getMsgReceivedStatus());
+            data.setReceiveTime(push.getReceiveTime());
+            return data;
+        }
+        
+        // 转换为Protobuf对象
+        public ServerAckPush toProtobuf() {
+            return ServerAckPush.newBuilder()
+                .setToUserId(toUserId != null ? toUserId : "")
+                .setClientMsgId(clientMsgId != null ? clientMsgId : "")
+                .setMsgId(msgId != null ? msgId : "")
+                .setChatId(chatId != null ? chatId : "")
+                .setAckTextDesc(ackTextDesc != null ? ackTextDesc : "")
+                .setMsgReceivedStatus(msgReceivedStatus)
+                .setReceiveTime(receiveTime)
+                .build();
+        }
+        
+        // Getters and Setters
+        public String getToUserId() { return toUserId; }
+        public void setToUserId(String toUserId) { this.toUserId = toUserId; }
+        
+        public String getClientMsgId() { return clientMsgId; }
+        public void setClientMsgId(String clientMsgId) { this.clientMsgId = clientMsgId; }
+        
+        public String getMsgId() { return msgId; }
+        public void setMsgId(String msgId) { this.msgId = msgId; }
+        
+        public String getChatId() { return chatId; }
+        public void setChatId(String chatId) { this.chatId = chatId; }
+        
+        public String getAckTextDesc() { return ackTextDesc; }
+        public void setAckTextDesc(String ackTextDesc) { this.ackTextDesc = ackTextDesc; }
+        
+        public int getMsgReceivedStatus() { return msgReceivedStatus; }
+        public void setMsgReceivedStatus(int msgReceivedStatus) { this.msgReceivedStatus = msgReceivedStatus; }
+        
+        public long getReceiveTime() { return receiveTime; }
+        public void setReceiveTime(long receiveTime) { this.receiveTime = receiveTime; }
     }
 }
