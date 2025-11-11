@@ -37,14 +37,17 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
                 boolean success = stub.responseServerAck2Client(push).getSuccess();
                 if (success) {
                     successRequests.incrementAndGet();
+                    return true;
                 } else {
                     failureRequests.incrementAndGet();
+                    log.warn("发送服务端ACK返回失败: toUserId={}", push.getToUserId());
+                    return false;
                 }
-                return success;
             } catch (Exception e) {
                 failureRequests.incrementAndGet();
-                log.error("发送服务端ACK失败: {}", e.getMessage(), e);
-                return false;
+                log.error("发送服务端ACK异常: {}", e.getMessage(), e);
+                // 抛出运行时异常，让CompletableFuture捕获
+                throw new RuntimeException("发送ServerAck失败: " + e.getMessage(), e);
             }
         });
     }

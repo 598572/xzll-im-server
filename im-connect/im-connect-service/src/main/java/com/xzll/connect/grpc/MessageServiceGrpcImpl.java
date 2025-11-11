@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.Objects;
+import java.util.Random;
 
 import com.xzll.grpc.ImProtoResponse;
 import com.xzll.grpc.MsgType;
@@ -40,12 +41,27 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
     @Resource
     private RedissonUtils redissonUtils;
 
+
+    private int failRate=100;
+
+
     @Override
     public void responseServerAck2Client(com.xzll.grpc.ServerAckPush request, 
                                        StreamObserver<com.xzll.grpc.WebBaseResponse> responseObserver) {
         try {
             Assert.isTrue(Objects.nonNull(request), "参数错误");
             Assert.isTrue(StringUtils.isNotBlank(request.getToUserId()), "发送服务端ack时缺少必填参数");
+            
+            // ✅ 测试模式：模拟ServerAck发送失败（用于测试重试机制）
+            if (failRate > 0 && new Random().nextInt(100) < failRate) {
+                log.warn("【测试模式】模拟ServerAck发送失败 - clientMsgId: {}, msgId: {}, failRate: {}%", 
+                    request.getClientMsgId(), request.getMsgId(), failRate);
+                
+                // 直接抛出异常，触发重试机制
+                responseObserver.onError(new io.grpc.StatusRuntimeException(
+                    io.grpc.Status.UNAVAILABLE.withDescription("测试模式：模拟发送失败")));
+                return;
+            }
             
             // 按新协议：构建 C2CAckReq，type=C2C_ACK，通过二进制帧下发
             // 双轨制：包含 clientMsgId 和 serverMsgId

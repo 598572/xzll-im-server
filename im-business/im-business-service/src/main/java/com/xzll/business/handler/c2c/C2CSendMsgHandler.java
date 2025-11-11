@@ -1,9 +1,9 @@
 package com.xzll.business.handler.c2c;
 
-import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.UnreadCountService;
+import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +34,8 @@ public class C2CSendMsgHandler {
     private GrpcMessageService grpcMessageService;
     @Resource
     private UnreadCountService unreadCountService;
+    @Resource
+    private ServerAckSimpleRetryService serverAckSimpleRetryService;
 
     /**
      * 单聊消息 - 使用gRPC发送
@@ -88,21 +90,20 @@ public class C2CSendMsgHandler {
             log.info("【C2CSendMsgHandler-ACK构建完成】ServerAckPush构建完成 - clientMsgId: {}, msgId: {}, toUserId: {}, status: {}", 
                 ackPush.getClientMsgId(), ackPush.getMsgId(), ackPush.getToUserId(), ackPush.getMsgReceivedStatus());
                     
-            // 使用gRPC发送ACK - 异步方式
-            CompletableFuture<Boolean> future = grpcMessageService.sendServerAck(ackPush);
+            // 使用MQ重试serve ack服务
+            CompletableFuture<Boolean> future = serverAckSimpleRetryService.sendServerAckWithRetry(ackPush);
             
             // 异步处理结果
             future.thenAccept(success -> {
                 if (success) {
-                    log.info("【C2CSendMsgHandler-ACK发送成功】在线消息服务端ACK发送成功 - clientMsgId: {}, msgId: {}, from: {}", 
+                    log.info("【C2CSendMsgHandler-ACK发送成功】在线消息服务端ACK发送成功（MQ重试） - clientMsgId: {}, msgId: {}, from: {}", 
                         dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId());
                 } else {
-                    log.error("【C2CSendMsgHandler-ACK发送失败】在线消息服务端ACK发送失败 - clientMsgId: {}, msgId: {}, from: {}", 
+                    log.error("【C2CSendMsgHandler-ACK最终失败】在线消息服务端ACK(MQ重试)最终失败 - clientMsgId: {}, msgId: {}, from: {}", 
                         dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId());
-                    // 可以在这里实现重试逻辑
                 }
             }).exceptionally(throwable -> {
-                log.error("【C2CSendMsgHandler-ACK发送异常】在线消息服务端ACK发送异常 - clientMsgId: {}, msgId: {}, from: {}, error: {}", 
+                log.error("【C2CSendMsgHandler-ACK重试异常】在线消息服务端ACK(MQ重试)异常 - clientMsgId: {}, msgId: {}, from: {}, error: {}", 
                     dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), throwable.getMessage(), throwable);
                 return null;
             });

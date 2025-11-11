@@ -146,6 +146,8 @@ public interface ImConstant {
         public static final int FRIEND_REQUEST_PUSH = 60;
         //好友申请处理结果推送
         public static final int FRIEND_REQUEST_HANDLE_PUSH = 70;
+        //ServerAck重试消息
+        public static final int SERVER_ACK_RETRY = 80;
     }
 
 
