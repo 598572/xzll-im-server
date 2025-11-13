@@ -9,6 +9,7 @@ import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ChatIdUtils;
 import com.xzll.common.util.NettyAttrUtil;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.utils.RedissonUtils;
 import com.xzll.common.config.GrpcClientConfig;
 import com.xzll.common.grpc.SmartGrpcClientManager;
@@ -85,10 +86,10 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             // 解析 C2CSendReq
             C2CSendReq req = C2CSendReq.parseFrom(protoRequest.getPayload());
             
-            // 打印消息详细内容（双轨制）
-            log.debug("{}【步骤1-接收消息】clientMsgId: {}, msgId: {}, from: {}, to: {}, format: {}, chatId: {}, time: {}, contentLength: {}",
-                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo(), req.getFormat(), 
-                req.getChatId(), req.getTime(), req.getContent().length());
+            // 打印消息详细内容（优化后：chatId已删除，ID改为long）
+            log.debug("{}【步骤1-接收消息】clientMsgId(UUID bytes): {}, msgId: {}, from: {}, to: {}, format: {}, time: {}, contentLength: {}",
+                TAG, ProtoConverterUtil.bytesToUuidString(req.getClientMsgId()), req.getMsgId(), req.getFrom(), req.getTo(), req.getFormat(), 
+                req.getTime(), req.getContent().length());
             
             C2CSendMsgAO packet = convertToAO(req);
             
@@ -137,20 +138,20 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                     MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(
                         stubWrapper.getChannelInfo().getChannel());
                     
-                    // 构建 C2CSendReq（双轨制：传递两个ID）
+                    // 构建 C2CSendReq（优化后：使用fixed64和bytes，chatId已删除）
                     C2CSendReq c2cReq = C2CSendReq.newBuilder()
-                        .setClientMsgId(packet.getClientMsgId()) // 客户端消息ID
-                        .setMsgId(packet.getMsgId()) // 服务端消息ID
-                        .setFrom(packet.getFromUserId())
-                        .setTo(packet.getToUserId())
+                        .setClientMsgId(ProtoConverterUtil.uuidStringToBytes(packet.getClientMsgId())) // UUID -> bytes
+                        .setMsgId(ProtoConverterUtil.snowflakeStringToLong(packet.getMsgId())) // string -> fixed64
+                        .setFrom(ProtoConverterUtil.snowflakeStringToLong(packet.getFromUserId())) // string -> fixed64
+                        .setTo(ProtoConverterUtil.snowflakeStringToLong(packet.getToUserId())) // string -> fixed64
                         .setFormat(packet.getMsgFormat())
                         .setContent(packet.getMsgContent())
                         .setTime(packet.getMsgCreateTime())
-                        .setChatId(packet.getChatId())
+                        // chatId 已删除，服务端根据from+to动态拼接
                         .build();
                     
                     log.info("{}【跨服务器转发-构建请求】目标IP: {}, 转发数据 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
-                        TAG, targetIp, c2cReq.getClientMsgId(), c2cReq.getMsgId(), c2cReq.getFrom(), c2cReq.getTo());
+                        TAG, targetIp, packet.getClientMsgId(), packet.getMsgId(), packet.getFromUserId(), packet.getToUserId());
                     
                     // 构建 ImProtoRequest（直接传递，无额外包装）
                     ImProtoRequest forwardRequest = ImProtoRequest.newBuilder()
@@ -191,7 +192,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             // 解析 C2CSendReq
             C2CSendReq req = C2CSendReq.parseFrom(protoRequest.getPayload());
             log.info("{}【receiveAndSendMsg-解析】接收到转发消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
-                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo());
+                TAG, ProtoConverterUtil.bytesToUuidString(req.getClientMsgId()), req.getMsgId(), req.getFrom(), req.getTo());
             
             C2CSendMsgAO packet = convertToAO(req);
             
@@ -226,40 +227,51 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     }
     
     /**
-     * 将 C2CSendReq 转换为 C2CSendMsgAO
+     * 将 C2CSendReq 转换为 C2CSendMsgAO（优化后：适配fixed64和bytes）
      */
     private C2CSendMsgAO convertToAO(C2CSendReq req) {
         C2CSendMsgAO ao = new C2CSendMsgAO();
-        ao.setClientMsgId(req.getClientMsgId()); // 双轨制：保留客户端消息ID
         
-        // 服务端消息ID生成逻辑：雪花算法
-        String msgId = snowflakeIdService.generateSimpleMessageId();
-        log.info("{}客户端msgId为空，服务端生成新msgId: {}", TAG, msgId);
+        // UUID bytes -> string
+        ao.setClientMsgId(ProtoConverterUtil.bytesToUuidString(req.getClientMsgId()));
+        
+        // fixed64 -> string（如果客户端传了msgId则使用，否则服务端生成）
+        String msgId;
+        if (req.getMsgId() > 0) {
+            msgId = ProtoConverterUtil.longToSnowflakeString(req.getMsgId());
+            log.debug("{}使用客户端传递的msgId: {}", TAG, msgId);
+        } else {
+            msgId = snowflakeIdService.generateSimpleMessageId();
+            log.info("{}客户端msgId为空，服务端生成新msgId: {}", TAG, msgId);
+        }
         ao.setMsgId(msgId);
         
-        ao.setFromUserId(req.getFrom());
-        ao.setToUserId(req.getTo());
+        // fixed64 -> string
+        ao.setFromUserId(ProtoConverterUtil.longToSnowflakeString(req.getFrom()));
+        ao.setToUserId(ProtoConverterUtil.longToSnowflakeString(req.getTo()));
         ao.setMsgFormat(req.getFormat());
         ao.setMsgContent(req.getContent());
-        ao.setMsgCreateTime(req.getTime() > 0 ? req.getTime() : System.currentTimeMillis()); // 以服务器时间为准
-        ao.setChatId(StringUtils.isNotBlank(req.getChatId()) ? req.getChatId() : 
-            ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, Long.valueOf(req.getFrom()), Long.valueOf(req.getTo())));
+        ao.setMsgCreateTime(req.getTime() > 0 ? req.getTime() : System.currentTimeMillis());
+        
+        // chatId 在proto中已删除，服务端根据from+to动态生成
+        ao.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, req.getFrom(), req.getTo()));
+        
         return ao;
     }
     
     /**
-     * 构建推送消息响应
+     * 构建推送消息响应（优化后：使用fixed64和bytes，chatId已删除）
      */
     private C2CMsgPush buildPushMsgResp(C2CSendMsgAO packet) {
         return C2CMsgPush.newBuilder()
-            .setClientMsgId(packet.getClientMsgId()) // 双轨制：传递客户端消息ID
-            .setMsgId(packet.getMsgId()) // 服务端消息ID
-            .setFrom(packet.getFromUserId())
-            .setTo(packet.getToUserId())
+            .setClientMsgId(ProtoConverterUtil.uuidStringToBytes(packet.getClientMsgId())) // string UUID -> bytes
+            .setMsgId(ProtoConverterUtil.snowflakeStringToLong(packet.getMsgId())) // string -> fixed64
+            .setFrom(ProtoConverterUtil.snowflakeStringToLong(packet.getFromUserId())) // string -> fixed64
+            .setTo(ProtoConverterUtil.snowflakeStringToLong(packet.getToUserId())) // string -> fixed64
             .setFormat(packet.getMsgFormat())
             .setContent(packet.getMsgContent())
             .setTime(packet.getMsgCreateTime())
-            .setChatId(packet.getChatId())
+            // chatId 已删除，客户端根据from+to动态拼接
             .build();
     }
     
@@ -268,8 +280,8 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
      */
     private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg) {
         try {
-            log.debug("{}【sendProtoMsg】开始发送消息到客户端 - clientMsgId: {}, msgId: {}, to: {}",
-                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo());
+            log.debug("{}【sendProtoMsg】开始发送消息到客户端 - clientMsgId(bytes): {}, msgId: {}, to: {}",
+                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo());
             
             ImProtoResponse response = ImProtoResponse.newBuilder()
                 .setType(MsgType.C2C_MSG_PUSH)
@@ -281,11 +293,11 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             ByteBuf buf = Unpooled.wrappedBuffer(bytes);
             channel.writeAndFlush(new BinaryWebSocketFrame(buf));
             
-            log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId: {}, msgId: {}, to: {}, payloadSize: {} bytes",
-                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo(), bytes.length);
+            log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId(bytes): {}, msgId: {}, to: {}, payloadSize: {} bytes",
+                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), bytes.length);
         } catch (Exception e) {
-            log.error("{}【sendProtoMsg异常】发送 protobuf 消息失败 - clientMsgId: {}, msgId: {}, to: {}, error: {}", 
-                TAG, pushMsg.getClientMsgId(), pushMsg.getMsgId(), pushMsg.getTo(), e.getMessage(), e);
+            log.error("{}【sendProtoMsg异常】发送 protobuf 消息失败 - clientMsgId(bytes): {}, msgId: {}, to: {}, error: {}", 
+                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), e.getMessage(), e);
         }
     }
     

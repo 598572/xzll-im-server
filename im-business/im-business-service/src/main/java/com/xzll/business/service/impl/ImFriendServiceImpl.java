@@ -82,7 +82,7 @@ public class ImFriendServiceImpl implements ImFriendService {
             }
 
             // 4. 创建好友申请记录
-            String requestId = IdUtil.simpleUUID();
+            String requestId = java.util.UUID.randomUUID().toString(); // 使用标准UUID格式（带横杠）
             ImFriendRequest friendRequest = new ImFriendRequest();
             friendRequest.setRequestId(requestId);
             friendRequest.setFromUserId(ao.getFromUserId());

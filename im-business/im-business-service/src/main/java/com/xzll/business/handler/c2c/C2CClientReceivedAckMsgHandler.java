@@ -6,6 +6,7 @@ import com.xzll.business.service.UnreadCountService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.grpc.SmartGrpcClientManager;
 import com.xzll.common.grpc.GrpcMessageService;
 import com.xzll.common.utils.RedissonUtils;
@@ -59,16 +60,16 @@ public class C2CClientReceivedAckMsgHandler {
 //        long needDeleteMsgId = SnowflakeIdService.getSnowflakeId(dto.getMsgId());
         redissonUtils.removeZSetByScore(ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + dto.getFromUserId(), needDeleteMsgId, needDeleteMsgId);
 
-        //4. 接收方客户端ack发送至发送方（双轨制：包含客户端消息ID）
+        //4. 接收方客户端ack发送至发送方（优化后：string->bytes/fixed64，删除chatId/ackTextDesc）
         if (updateResult) {
             com.xzll.grpc.ClientAckPush ackPush = com.xzll.grpc.ClientAckPush.newBuilder()
-                    .setClientMsgId(dto.getClientMsgId()) // 客户端消息ID
-                    .setMsgId(dto.getMsgId()) // 服务端消息ID
-                    .setChatId(dto.getChatId())
-                    .setToUserId(dto.getToUserId())
-                    .setAckTextDesc(com.xzll.common.constant.MsgStatusEnum.MsgStatus.getNameByCode(dto.getMsgStatus()))
+                    .setClientMsgId(ProtoConverterUtil.uuidStringToBytes(dto.getClientMsgId())) // string -> bytes
+                    .setMsgId(ProtoConverterUtil.snowflakeStringToLong(dto.getMsgId())) // string -> fixed64
+                    // chatId已从proto删除
+                    .setToUserId(ProtoConverterUtil.snowflakeStringToLong(dto.getToUserId())) // string -> fixed64
+                    // ackTextDesc已从proto删除
                     .setMsgReceivedStatus(dto.getMsgStatus())
-                    .setReceiveTime(System.currentTimeMillis())
+                    .setReceiveTime(System.currentTimeMillis()) // long -> fixed64（proto定义）
                     .build();
             // 使用gRPC发送客户端ACK - 异步方式
             CompletableFuture<Boolean> future = grpcMessageService.sendClientAck(ackPush);

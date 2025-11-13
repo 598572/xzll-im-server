@@ -39,12 +39,6 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
     
     // 存储每个连接的主动心跳任务
     private static final ConcurrentHashMap<String, ScheduledFuture<?>> activeHeartbeatTasks = new ConcurrentHashMap<>();
-    
-    // 最大心跳失败次数，超过后关闭连接
-    private static final int MAX_HEARTBEAT_FAILURES = 3;
-    
-    // 主动心跳发送间隔（秒）
-    private static final int ACTIVE_HEARTBEAT_INTERVAL = 30;
 
     @Override
     public void process(ChannelHandlerContext ctx) {
@@ -94,14 +88,17 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
      * 处理心跳超时
      */
     private void handleHeartbeatTimeout(ChannelHandlerContext ctx, String userId, String channelId, long timeSinceLastRead) {
+        // 获取配置的最大失败次数
+        int maxFailures = imConnectServerConfig.getMaxHeartbeatFailures();
+        
         // 增加失败计数
         int failureCount = heartbeatFailureCount.getOrDefault(channelId, 0) + 1;
         heartbeatFailureCount.put(channelId, failureCount);
         
-        log.warn("心跳超时检测：channelId={}, userId={}, 超时时长={}ms, 失败次数={}", 
-            channelId, userId, timeSinceLastRead, failureCount);
+        log.warn("心跳超时检测：channelId={}, userId={}, 超时时长={}ms, 失败次数={}/{}", 
+            channelId, userId, timeSinceLastRead, failureCount, maxFailures);
         
-        if (failureCount >= MAX_HEARTBEAT_FAILURES) {
+        if (failureCount >= maxFailures) {
             // 超过最大失败次数，关闭连接
             closeConnectionDueToHeartbeatFailure(ctx, userId, channelId, timeSinceLastRead);
         } else {
@@ -114,9 +111,10 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
      * 由于心跳失败关闭连接
      */
     private void closeConnectionDueToHeartbeatFailure(ChannelHandlerContext ctx, String userId, String channelId, long timeSinceLastRead) {
+        int maxFailures = imConnectServerConfig.getMaxHeartbeatFailures();
         if (StringUtils.isNotBlank(userId)) {
             log.warn("客户端[{}]心跳超时[{}]ms，连续失败{}次，关闭连接！channelId={}", 
-                userId, timeSinceLastRead, MAX_HEARTBEAT_FAILURES, channelId);
+                userId, timeSinceLastRead, maxFailures, channelId);
         } else {
             log.warn("未认证客户端心跳超时[{}]ms，关闭连接！channelId={}", 
                 timeSinceLastRead, channelId);
@@ -160,6 +158,9 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         // 如果已经有任务在运行，先停止
         stopActiveHeartbeat(channelId);
         
+        // 获取配置的主动心跳间隔
+        int heartbeatInterval = imConnectServerConfig.getActiveHeartbeatInterval();
+        
         // 启动新的主动心跳任务
         ScheduledFuture<?> task = ctx.channel().eventLoop().scheduleAtFixedRate(
             () -> {
@@ -169,14 +170,14 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
                     stopActiveHeartbeat(channelId);
                 }
             },
-            ACTIVE_HEARTBEAT_INTERVAL,
-            ACTIVE_HEARTBEAT_INTERVAL,
+            heartbeatInterval,
+            heartbeatInterval,
             TimeUnit.SECONDS
         );
         
         activeHeartbeatTasks.put(channelId, task);
         log.debug("启动主动心跳任务：channelId={}, userId={}, 间隔={}秒", 
-            channelId, userId, ACTIVE_HEARTBEAT_INTERVAL);
+            channelId, userId, heartbeatInterval);
     }
 
     /**
@@ -232,8 +233,8 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         sb.append("活跃心跳任务数: ").append(activeHeartbeatTasks.size()).append("\n");
         sb.append("心跳失败连接数: ").append(heartbeatFailureCount.size()).append("\n");
         sb.append("心跳超时时间: ").append(imConnectServerConfig.getHeartBeatTime()).append("秒\n");
-        sb.append("最大失败次数: ").append(MAX_HEARTBEAT_FAILURES).append("\n");
-        sb.append("主动心跳间隔: ").append(ACTIVE_HEARTBEAT_INTERVAL).append("秒\n");
+        sb.append("最大失败次数: ").append(imConnectServerConfig.getMaxHeartbeatFailures()).append("\n");
+        sb.append("主动心跳间隔: ").append(imConnectServerConfig.getActiveHeartbeatInterval()).append("秒\n");
         
         if (!heartbeatFailureCount.isEmpty()) {
             sb.append("\n失败连接详情:\n");
@@ -251,7 +252,8 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
      */
     public boolean isHeartbeatHealthy(String channelId) {
         int failureCount = heartbeatFailureCount.getOrDefault(channelId, 0);
-        return failureCount < MAX_HEARTBEAT_FAILURES;
+        int maxFailures = imConnectServerConfig.getMaxHeartbeatFailures();
+        return failureCount < maxFailures;
     }
 
     /**
