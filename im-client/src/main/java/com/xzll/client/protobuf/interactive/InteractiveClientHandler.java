@@ -36,12 +36,12 @@ import org.springframework.util.CollectionUtils;
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
 
-    public static final String IP = "127.0.0.1";
-    public static final String PORT = "8083";
+//    public static final String IP = "127.0.0.1";
+//    public static final String PORT = "8083";
 
 
-//    public static final String IP = "120.46.85.43";
-//    public static final String PORT = "80";
+    public static final String IP = "120.46.85.43";
+    public static final String PORT = "80";
 
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
@@ -336,7 +336,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             
             // 类型转换：fixed64 -> String
             String toUserId = ProtoConverterUtil.longToSnowflakeString(request.getToUserId());
-            String requestId = ProtoConverterUtil.longToSnowflakeString(request.getRequestId());
+            String requestId = ProtoConverterUtil.bytesToUuidString(request.getRequestId());
             String fromUserId = ProtoConverterUtil.longToSnowflakeString(request.getFromUserId());
             
             // 保存待处理的好友请求（使用转换后的requestId）
@@ -370,7 +370,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             
             // 类型转换：fixed64 -> String
             String toUserId = ProtoConverterUtil.longToSnowflakeString(response.getToUserId());
-            String requestId = ProtoConverterUtil.longToSnowflakeString(response.getRequestId());
+            String requestId = ProtoConverterUtil.bytesToUuidString(response.getRequestId());
             String fromUserId = ProtoConverterUtil.longToSnowflakeString(response.getFromUserId());
             
             String resultText = response.getStatus() == 1 ? "✅ 已同意" : "❌ 已拒绝";
