@@ -6,6 +6,7 @@ import com.xzll.business.service.UnreadCountService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.common.util.ProtoConverterUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -75,20 +76,20 @@ public class C2CSendMsgHandler {
             log.info("【C2CSendMsgHandler-构建ACK】开始构建服务端ACK - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
                 dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
             
-            // 发送server_ack（双轨制：包含客户端消息ID和服务端消息ID）
+            // 发送server_ack（优化后：使用fixed64和bytes，删除chatId和ackTextDesc）
             com.xzll.grpc.ServerAckPush ackPush = com.xzll.grpc.ServerAckPush.newBuilder()
-                    .setClientMsgId(dto.getClientMsgId()) // 客户端消息ID（用于客户端匹配）
-                    .setMsgId(dto.getMsgId()) // 服务端消息ID
-                    .setChatId(dto.getChatId())
+                    .setClientMsgId(ProtoConverterUtil.uuidStringToBytes(dto.getClientMsgId())) // UUID string -> bytes
+                    .setMsgId(ProtoConverterUtil.snowflakeStringToLong(dto.getMsgId())) // string -> fixed64
                     //此时toUser是消息发送方 所以这里是fromUserId
-                    .setToUserId(dto.getFromUserId())
-                    .setAckTextDesc("SERVER_RECEIVED")
+                    .setToUserId(ProtoConverterUtil.snowflakeStringToLong(dto.getFromUserId())) // string -> fixed64
+                    // chatId 已删除，客户端根据from+to动态拼接
+                    // ackTextDesc 已删除，客户端本地化显示
                     .setMsgReceivedStatus(com.xzll.common.constant.MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())
                     .setReceiveTime(System.currentTimeMillis())
                     .build();
             
             log.info("【C2CSendMsgHandler-ACK构建完成】ServerAckPush构建完成 - clientMsgId: {}, msgId: {}, toUserId: {}, status: {}", 
-                ackPush.getClientMsgId(), ackPush.getMsgId(), ackPush.getToUserId(), ackPush.getMsgReceivedStatus());
+                dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), ackPush.getMsgReceivedStatus());
                     
             // 使用MQ重试serve ack服务
             CompletableFuture<Boolean> future = serverAckSimpleRetryService.sendServerAckWithRetry(ackPush);

@@ -83,165 +83,165 @@ message ImProtoResponse {
 
 // ========== 单聊上行消息（客户端→服务端）==========
 
-// C2C发送消息请求 - 上行
+// C2C发送消息请求 - 上行（优化版）
 message C2CSendReq {
-  string clientMsgId = 1;     // 客户端消息ID（UUID，客户端生成，用于去重）
-  string msgId = 2;           // 服务端消息ID（雪花算法生成）
-  string from = 3;            // 发送人ID
-  string to = 4;              // 接收人ID
+  bytes clientMsgId = 1;      // 客户端消息ID（UUID 16字节，优化：string 36B -> bytes 16B）
+  fixed64 msgId = 2;          // 服务端消息ID（雪花算法，优化：string 19B -> fixed64 8B）
+  fixed64 from = 3;           // 发送人ID（雪花算法，优化：string 12B -> fixed64 8B）
+  fixed64 to = 4;             // 接收人ID（雪花算法，优化：string 12B -> fixed64 8B）
   int32 format = 5;           // 消息格式（1:文本,2:图片,3:语音等）
   string content = 6;         // 消息内容
-  int64 time = 7;             // 客户端时间戳（毫秒）
-  string chatId = 8;          // 会话ID
+  fixed64 time = 7;           // 客户端时间戳（毫秒，优化：int64 -> fixed64）
+  // chatId 已删除！服务端/客户端根据 from + to 动态拼接（节省 31+2=33 字节）
 }
 
-// C2C消息确认请求 - 上行
+// C2C消息确认请求 - 上行（优化版）
 message C2CAckReq {
-  string clientMsgId = 1;     // 客户端消息ID（UUID，用于精确匹配）
-  string msgId = 2;           // 服务端消息ID
-  string from = 3;            // 发送人ID
-  string to = 4;              // 接收人ID
+  bytes clientMsgId = 1;      // 客户端消息ID（UUID 16字节）
+  fixed64 msgId = 2;          // 服务端消息ID（雪花算法）
+  fixed64 from = 3;           // 发送人ID（雪花算法）
+  fixed64 to = 4;             // 接收人ID（雪花算法）
   int32 status = 5;           // 消息状态（3:未读，4:已读）
-  string chatId = 6;          // 会话ID
+  // chatId 已删除
 }
 
-// C2C撤回消息请求 - 上行
+// C2C撤回消息请求 - 上行（优化版）
 message C2CWithdrawReq {
-  string msgId = 1;           // 要撤回的消息ID
-  string from = 2;            // 发送人ID
-  string to = 3;              // 接收人ID
-  string chatId = 4;          // 会话ID
+  fixed64 msgId = 1;          // 要撤回的消息ID（雪花算法）
+  fixed64 from = 2;           // 发送人ID（雪花算法）
+  fixed64 to = 3;             // 接收人ID（雪花算法）
+  // chatId 已删除
 }
 
-// 批量获取消息ID请求 - 上行
+// 批量获取消息ID请求 - 上行（优化版）
 message GetBatchMsgIdsReq {
-  string userId = 1;          // 用户ID
+  fixed64 userId = 1;         // 用户ID（雪花算法）
 }
 
 // ========== 单聊下行消息（服务端→客户端）==========
 
-// 服务端推送C2C消息 - 下行
+// 服务端推送C2C消息 - 下行（优化版）
 message C2CMsgPush {
-  string clientMsgId = 1;     // 客户端消息ID（UUID，用于去重）
-  string msgId = 2;           // 服务端消息ID（雪花算法生成）
-  string from = 3;            // 发送人ID
-  string to = 4;              // 接收人ID
+  bytes clientMsgId = 1;      // 客户端消息ID（UUID 16字节）
+  fixed64 msgId = 2;          // 服务端消息ID（雪花算法）
+  fixed64 from = 3;           // 发送人ID（雪花算法）
+  fixed64 to = 4;             // 接收人ID（雪花算法）
   int32 format = 5;           // 消息格式
   string content = 6;         // 消息内容
-  int64 time = 7;             // 服务器时间戳（毫秒）
-  string chatId = 8;          // 会话ID
+  fixed64 time = 7;           // 服务器时间戳（毫秒）
+  // chatId 已删除
 }
 
-// 批量消息ID推送 - 下行
+// 批量消息ID推送 - 下行（优化版）
 message BatchMsgIdsPush {
-  repeated string msgIds = 1; // 消息ID列表
+  repeated fixed64 msgIds = 1; // 消息ID列表（雪花算法）
 } 
 
-// 服务端ACK推送 - 下行（gRPC专用）
+// 服务端ACK推送 - 下行（gRPC专用，优化版）
 message ServerAckPush {
-  string toUserId = 1;
-  string clientMsgId = 2;      // 客户端消息ID（用于客户端匹配）
-  string msgId = 3;            // 服务端消息ID
-  string chatId = 4;
+  fixed64 toUserId = 1;        // 接收人ID（雪花算法）
+  bytes clientMsgId = 2;       // 客户端消息ID（UUID 16字节）
+  fixed64 msgId = 3;           // 服务端消息ID（雪花算法）
+  // chatId 已删除（可根据消息上下文或from+to拼接）
   int32 msgReceivedStatus = 5; // 1=SERVER_RECEIVED
-  string ackTextDesc = 6;
-  int64 receiveTime = 7;
+  // ackTextDesc 已删除（客户端本地化显示，节省 21+2=23 字节）
+  fixed64 receiveTime = 7;     // 接收时间戳（毫秒）
 }
 
-// 客户端ACK推送 - 下行（gRPC专用）
+// 客户端ACK推送 - 下行（gRPC专用，优化版）
 message ClientAckPush {
-  string toUserId = 1;
-  string clientMsgId = 2;      // 客户端消息ID（用于客户端匹配）
-  string msgId = 3;            // 服务端消息ID
-  string chatId = 4;
+  fixed64 toUserId = 1;        // 接收人ID（雪花算法）
+  bytes clientMsgId = 2;       // 客户端消息ID（UUID 16字节）
+  fixed64 msgId = 3;           // 服务端消息ID（雪花算法）
+  // chatId 已删除
   int32 msgReceivedStatus = 5; // 3=UN_READ, 4=READED
-  string ackTextDesc = 6;
-  int64 receiveTime = 7;
+  // ackTextDesc 已删除
+  fixed64 receiveTime = 7;     // 接收时间戳（毫秒）
 }
 
-// 撤回消息推送 - 下行（gRPC专用）
+// 撤回消息推送 - 下行（gRPC专用，优化版）
 message WithdrawPush {
-  string toUserId = 1;
-  string msgId = 2;
-  string chatId = 3;
-  string fromUserId = 4;
+  fixed64 toUserId = 1;        // 接收人ID（雪花算法）
+  fixed64 msgId = 2;           // 消息ID（雪花算法）
+  // chatId 已删除
+  fixed64 fromUserId = 4;      // 发送人ID（雪花算法）
 }
 
-// 好友请求推送 - 下行（gRPC专用）
+// 好友请求推送 - 下行（gRPC专用，优化版）
 message FriendRequestPush {
-  string toUserId = 1;              // 接收人ID
-  string requestId = 2;             // 请求ID
-  string fromUserId = 3;            // 申请人ID
+  fixed64 toUserId = 1;             // 接收人ID（雪花算法）
+  fixed64 requestId = 2;            // 请求ID（雪花算法）
+  fixed64 fromUserId = 3;           // 申请人ID（雪花算法）
   string fromUserName = 4;          // 申请人昵称
   string fromUserAvatar = 5;        // 申请人头像
   string requestMessage = 6;        // 申请消息
   int32 status = 7;                 // 状态：0=待处理, 1=已同意, 2=已拒绝
-  int64 createTime = 8;             // 创建时间（毫秒）
+  fixed64 createTime = 8;           // 创建时间（毫秒）
   string pushTitle = 9;             // 推送标题
   string pushContent = 10;          // 推送内容
 }
 
-// 好友响应推送 - 下行（gRPC专用，用于通知申请人结果）
+// 好友响应推送 - 下行（gRPC专用，优化版）
 message FriendResponsePush {
-  string toUserId = 1;              // 接收人ID（原申请人）
-  string requestId = 2;             // 请求ID
-  string fromUserId = 3;            // 响应人ID（原接收人）
+  fixed64 toUserId = 1;             // 接收人ID（雪花算法）
+  fixed64 requestId = 2;            // 请求ID（雪花算法）
+  fixed64 fromUserId = 3;           // 响应人ID（雪花算法）
   string fromUserName = 4;          // 响应人昵称
   string fromUserAvatar = 5;        // 响应人头像
   int32 status = 6;                 // 状态：1=已同意, 2=已拒绝
-  int64 responseTime = 7;           // 响应时间（毫秒）
+  fixed64 responseTime = 7;         // 响应时间（毫秒）
   string pushTitle = 8;             // 推送标题
   string pushContent = 9;           // 推送内容
 }
 
 // ================= 群聊相关消息（预留，暂未实现业务逻辑） =================
 
-// 群聊发送消息请求 - 上行
+// 群聊发送消息请求 - 上行（优化版，预留）
 message GroupSendReq {
-  string msgId = 1;           // 消息ID
-  string from = 2;            // 发送人ID
-  string groupId = 3;         // 群ID
+  fixed64 msgId = 1;          // 消息ID（雪花算法）
+  fixed64 from = 2;           // 发送人ID（雪花算法）
+  fixed64 groupId = 3;        // 群ID（雪花算法）
   int32 format = 4;           // 消息格式（1:文本,2:图片,3:语音等）
   string content = 5;         // 消息内容
-  int64 time = 6;             // 客户端时间戳（毫秒）
+  fixed64 time = 6;           // 客户端时间戳（毫秒）
 }
 
-// 群聊消息推送 - 下行
+// 群聊消息推送 - 下行（优化版，预留）
 message GroupMsgPush {
-  string msgId = 1;           // 消息ID
-  string from = 2;            // 发送人ID
+  fixed64 msgId = 1;          // 消息ID（雪花算法）
+  fixed64 from = 2;           // 发送人ID（雪花算法）
   string fromNickname = 3;    // 发送人昵称（群聊显示用）
   string fromAvatar = 4;      // 发送人头像（群聊显示用）
-  string groupId = 5;         // 群ID
+  fixed64 groupId = 5;        // 群ID（雪花算法）
   string groupName = 6;       // 群名称
   int32 format = 7;           // 消息格式
   string content = 8;         // 消息内容
-  int64 time = 9;             // 服务器时间戳（毫秒）
+  fixed64 time = 9;           // 服务器时间戳（毫秒）
   int32 memberCount = 10;     // 群成员数（可选）
 }
 
-// 群聊消息确认请求 - 上行
+// 群聊消息确认请求 - 上行（优化版，预留）
 message GroupAckReq {
-  string msgId = 1;           // 消息ID
-  string userId = 2;          // 确认人ID
-  string groupId = 3;         // 群ID
+  fixed64 msgId = 1;          // 消息ID（雪花算法）
+  fixed64 userId = 2;         // 确认人ID（雪花算法）
+  fixed64 groupId = 3;        // 群ID（雪花算法）
   int32 status = 4;           // 消息状态（3:未读，4:已读）
 }
 
-// 群聊撤回消息请求 - 上行
+// 群聊撤回消息请求 - 上行（优化版，预留）
 message GroupWithdrawReq {
-  string msgId = 1;           // 要撤回的消息ID
-  string from = 2;            // 发送人ID（或管理员ID）
-  string groupId = 3;         // 群ID
-  int64 withdrawTime = 4;     // 撤回时间戳
+  fixed64 msgId = 1;          // 要撤回的消息ID（雪花算法）
+  fixed64 from = 2;           // 发送人ID（雪花算法）
+  fixed64 groupId = 3;        // 群ID（雪花算法）
+  fixed64 withdrawTime = 4;   // 撤回时间戳
 }
 
-// 群聊撤回消息推送 - 下行
+// 群聊撤回消息推送 - 下行（优化版，预留）
 message GroupWithdrawPush {
-  string msgId = 1;           // 被撤回的消息ID
-  string from = 2;            // 撤回操作人ID
-  string groupId = 3;         // 群ID
+  fixed64 msgId = 1;          // 被撤回的消息ID（雪花算法）
+  fixed64 from = 2;           // 撤回操作人ID（雪花算法）
+  fixed64 groupId = 3;        // 群ID（雪花算法）
   string operatorNickname = 4;// 操作人昵称（用于显示"XXX撤回了一条消息"）
-  int64 withdrawTime = 5;     // 撤回时间戳
+  fixed64 withdrawTime = 5;   // 撤回时间戳
   bool isAdmin = 6;           // 是否为管理员撤回（true=管理员撤回他人消息）
 }

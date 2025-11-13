@@ -5,6 +5,7 @@ import com.xzll.business.cluster.mq.RocketMqProducerWrap;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.grpc.GrpcMessageService;
 import com.xzll.common.rocketmq.ClusterEvent;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.grpc.ServerAckPush;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -140,8 +141,8 @@ public class ServerAckSimpleRetryService {
             clusterEvent.setData(JSONUtil.toJsonStr(retryEvent));
             clusterEvent.setCreateTime(new java.util.Date());
             
-            // 使用clientMsgId作为balanceId，保证同一客户端消息的重试顺序
-            String balanceId = ackPush.getClientMsgId();
+            // 使用clientMsgId作为balanceId，保证同一客户端消息的重试顺序（bytes -> string）
+            String balanceId = ProtoConverterUtil.bytesToUuidString(ackPush.getClientMsgId());
             
             // 获取延迟时间
             int delaySeconds = retryDelays[retryCount - 1];
@@ -156,9 +157,9 @@ public class ServerAckSimpleRetryService {
             
             if (sent) {
                 log.info("{}MQ延迟重试任务已提交 - clientMsgId: {}, 第{}次重试, {}s后执行", 
-                    TAG, ackPush.getClientMsgId(), retryCount, delaySeconds);
+                    TAG, ProtoConverterUtil.bytesToUuidString(ackPush.getClientMsgId()), retryCount, delaySeconds);
             } else {
-                log.error("{}MQ延迟重试任务提交失败 - clientMsgId: {}", TAG, ackPush.getClientMsgId());
+                log.error("{}MQ延迟重试任务提交失败 - clientMsgId: {}", TAG, ProtoConverterUtil.bytesToUuidString(ackPush.getClientMsgId()));
             }
             
             return sent;
@@ -342,29 +343,32 @@ public class ServerAckSimpleRetryService {
         private int msgReceivedStatus;
         private long receiveTime;
         
-        // 从Protobuf对象转换
+        // 从Protobuf对象转换（优化后：适配bytes/fixed64，chatId/ackTextDesc已删除）
         public static ServerAckPushData fromProtobuf(ServerAckPush push) {
             ServerAckPushData data = new ServerAckPushData();
-            data.setToUserId(push.getToUserId());
-            data.setClientMsgId(push.getClientMsgId());
-            data.setMsgId(push.getMsgId());
-            data.setChatId(push.getChatId());
-            data.setAckTextDesc(push.getAckTextDesc());
+            data.setToUserId(ProtoConverterUtil.longToSnowflakeString(push.getToUserId())); // fixed64 -> string
+            data.setClientMsgId(ProtoConverterUtil.bytesToUuidString(push.getClientMsgId())); // bytes -> string
+            data.setMsgId(ProtoConverterUtil.longToSnowflakeString(push.getMsgId())); // fixed64 -> string
+            data.setChatId(""); // chatId已从proto删除，设为空串
+            data.setAckTextDesc(""); // ackTextDesc已从proto删除，设为空串
             data.setMsgReceivedStatus(push.getMsgReceivedStatus());
             data.setReceiveTime(push.getReceiveTime());
             return data;
         }
         
-        // 转换为Protobuf对象
+        // 转换为Protobuf对象（优化后：适配bytes/fixed64，chatId/ackTextDesc已删除）
         public ServerAckPush toProtobuf() {
             return ServerAckPush.newBuilder()
-                .setToUserId(toUserId != null ? toUserId : "")
-                .setClientMsgId(clientMsgId != null ? clientMsgId : "")
-                .setMsgId(msgId != null ? msgId : "")
-                .setChatId(chatId != null ? chatId : "")
-                .setAckTextDesc(ackTextDesc != null ? ackTextDesc : "")
+                .setToUserId(toUserId != null && !toUserId.isEmpty() ? 
+                    ProtoConverterUtil.snowflakeStringToLong(toUserId) : 0L) // string -> fixed64
+                .setClientMsgId(clientMsgId != null && !clientMsgId.isEmpty() ? 
+                    ProtoConverterUtil.uuidStringToBytes(clientMsgId) : com.google.protobuf.ByteString.EMPTY) // string -> bytes
+                .setMsgId(msgId != null && !msgId.isEmpty() ? 
+                    ProtoConverterUtil.snowflakeStringToLong(msgId) : 0L) // string -> fixed64
+                // chatId已从proto删除
+                // ackTextDesc已从proto删除
                 .setMsgReceivedStatus(msgReceivedStatus)
-                .setReceiveTime(receiveTime)
+                .setReceiveTime(receiveTime) // long -> fixed64（proto定义）
                 .build();
         }
         

@@ -3,6 +3,7 @@ package com.xzll.business.service.impl;
 import com.xzll.business.entity.mysql.ImFriendRequest;
 import com.xzll.business.service.FriendRequestPushService;
 import com.xzll.common.grpc.GrpcMessageService;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.pojo.entity.ImUserDO;
 import com.xzll.grpc.FriendRequestPush;
 import com.xzll.grpc.FriendResponsePush;
@@ -36,11 +37,11 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                     fromUser.getUserFullName() : friendRequest.getFromUserId();
             String fromUserAvatar = fromUser != null && org.apache.commons.lang3.StringUtils.isNotBlank(fromUser.getHeadImage()) ? fromUser.getHeadImage() : org.apache.commons.lang3.StringUtils.EMPTY;
             
-            // 构建 Protobuf Push 消息
+            // 构建 Protobuf Push 消息（优化后：string -> fixed64）
             FriendRequestPush push = FriendRequestPush.newBuilder()
-                    .setToUserId(friendRequest.getToUserId())
-                    .setRequestId(friendRequest.getRequestId())
-                    .setFromUserId(friendRequest.getFromUserId())
+                    .setToUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getToUserId())) // string -> fixed64
+                    .setRequestId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getRequestId())) // string -> fixed64
+                    .setFromUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getFromUserId())) // string -> fixed64
                     .setFromUserName(fromUserName)
                     .setFromUserAvatar(fromUserAvatar)
                     .setRequestMessage(friendRequest.getRequestMessage() != null ? friendRequest.getRequestMessage() : "")
@@ -95,11 +96,11 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                 pushContent = "您的好友申请状态已更新";
             }
             
-            // 构建 Protobuf Push 消息（推送给申请人）
+            // 构建 Protobuf Push 消息（推送给申请人，优化后：string -> fixed64）
             FriendResponsePush push = FriendResponsePush.newBuilder()
-                    .setToUserId(friendRequest.getFromUserId())  // 接收人是原申请人
-                    .setRequestId(friendRequest.getRequestId())
-                    .setFromUserId(friendRequest.getToUserId())  // 响应人是原接收人
+                    .setToUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getFromUserId()))  // 接收人是原申请人（string -> fixed64）
+                    .setRequestId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getRequestId())) // string -> fixed64
+                    .setFromUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getToUserId()))  // 响应人是原接收人（string -> fixed64）
                     .setFromUserName(toUserName)
                     .setFromUserAvatar(toUserAvatar)
                     .setStatus(friendRequest.getStatus())

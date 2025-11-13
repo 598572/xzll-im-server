@@ -3,6 +3,8 @@ package com.xzll.connect.strategy.impl.c2c;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
 import com.xzll.common.util.ChatIdUtils;
+import com.xzll.common.util.ProtoConverterUtil;
+import com.xzll.common.constant.ImConstant;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.connect.strategy.ProtoMsgHandlerStrategy;
 import com.xzll.grpc.C2CAckReq;
@@ -43,12 +45,12 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
             log.info("{}收到客户端消息 - 消息类型: {}, Payload大小: {} bytes", 
                 TAG, protoRequest.getType(), protoRequest.getPayload().size());
             
-            // 解析 C2CAckReq
+            // 解析 C2CAckReq（优化后：clientMsgId=bytes, msgId/from/to=fixed64，chatId已删除）
             C2CAckReq req = C2CAckReq.parseFrom(protoRequest.getPayload());
             
-            // 打印消息详细内容（双轨制：显示两个ID）
-            log.info("{}消息详情 - clientMsgId: {}, serverMsgId: {}, from: {}, to: {}, status: {}, chatId: {}", 
-                TAG, req.getClientMsgId(), req.getMsgId(), req.getFrom(), req.getTo(), req.getStatus(), req.getChatId());
+            // 打印消息详细内容（双轨制：显示两个ID，chatId已删除）
+            log.info("{}消息详情 - clientMsgId: {}, serverMsgId: {}, from: {}, to: {}, status: {}", 
+                TAG, ProtoConverterUtil.bytesToUuidString(req.getClientMsgId()), req.getMsgId(), req.getFrom(), req.getTo(), req.getStatus());
             
             // 转换为内部 AO 对象
             C2CReceivedMsgAckAO packet = convertToAO(req);
@@ -63,19 +65,20 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
     }
     
     /**
-     * 将 C2CAckReq 转换为 C2CReceivedMsgAckAO（双轨制：保留 clientMsgId）
+     * 将 C2CAckReq 转换为 C2CReceivedMsgAckAO（优化后：适配bytes/fixed64，chatId动态生成）
      */
     private C2CReceivedMsgAckAO convertToAO(C2CAckReq req) {
         C2CReceivedMsgAckAO ao = new C2CReceivedMsgAckAO();
-        ao.setClientMsgId(req.getClientMsgId()); // ✅ 双轨制：保留客户端消息ID
-        ao.setMsgId(req.getMsgId()); // 服务端消息ID
-        ao.setFromUserId(req.getFrom());
-        ao.setToUserId(req.getTo());
+        // bytes -> string（UUID）
+        ao.setClientMsgId(ProtoConverterUtil.bytesToUuidString(req.getClientMsgId()));
+        // fixed64 -> string
+        ao.setMsgId(ProtoConverterUtil.longToSnowflakeString(req.getMsgId()));
+        ao.setFromUserId(ProtoConverterUtil.longToSnowflakeString(req.getFrom()));
+        ao.setToUserId(ProtoConverterUtil.longToSnowflakeString(req.getTo()));
         ao.setMsgStatus(req.getStatus());
-        ao.setMsgIds(Collections.singletonList(req.getMsgId()));
-        ao.setChatId(req.getChatId().isEmpty() ? 
-            ChatIdUtils.buildC2CChatId(null, Long.valueOf(req.getFrom()), Long.valueOf(req.getTo())) : 
-            req.getChatId());
+        ao.setMsgIds(Collections.singletonList(ProtoConverterUtil.longToSnowflakeString(req.getMsgId())));
+        // chatId在proto中已删除，服务端根据from+to动态生成
+        ao.setChatId(ChatIdUtils.buildC2CChatId(ImConstant.DEFAULT_BIZ_TYPE, req.getFrom(), req.getTo()));
         return ao;
     }
 }
