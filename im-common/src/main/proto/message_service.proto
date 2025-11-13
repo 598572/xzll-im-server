@@ -170,7 +170,7 @@ message WithdrawPush {
 // 好友请求推送 - 下行（gRPC专用，优化版）
 message FriendRequestPush {
   fixed64 toUserId = 1;             // 接收人ID（雪花算法）
-  fixed64 requestId = 2;            // 请求ID（雪花算法）
+  bytes requestId = 2;              // 请求ID（UUID，16字节）
   fixed64 fromUserId = 3;           // 申请人ID（雪花算法）
   string fromUserName = 4;          // 申请人昵称
   string fromUserAvatar = 5;        // 申请人头像
@@ -184,7 +184,7 @@ message FriendRequestPush {
 // 好友响应推送 - 下行（gRPC专用，优化版）
 message FriendResponsePush {
   fixed64 toUserId = 1;             // 接收人ID（雪花算法）
-  fixed64 requestId = 2;            // 请求ID（雪花算法）
+  bytes requestId = 2;              // 请求ID（UUID，16字节）
   fixed64 fromUserId = 3;           // 响应人ID（雪花算法）
   string fromUserName = 4;          // 响应人昵称
   string fromUserAvatar = 5;        // 响应人头像

@@ -37,10 +37,10 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                     fromUser.getUserFullName() : friendRequest.getFromUserId();
             String fromUserAvatar = fromUser != null && org.apache.commons.lang3.StringUtils.isNotBlank(fromUser.getHeadImage()) ? fromUser.getHeadImage() : org.apache.commons.lang3.StringUtils.EMPTY;
             
-            // 构建 Protobuf Push 消息（优化后：string -> fixed64）
+            // 构建 Protobuf Push 消息（优化后：userId=fixed64, requestId=bytes(UUID)）
             FriendRequestPush push = FriendRequestPush.newBuilder()
                     .setToUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getToUserId())) // string -> fixed64
-                    .setRequestId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getRequestId())) // string -> fixed64
+                    .setRequestId(ProtoConverterUtil.uuidStringToBytes(friendRequest.getRequestId())) // UUID string -> bytes
                     .setFromUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getFromUserId())) // string -> fixed64
                     .setFromUserName(fromUserName)
                     .setFromUserAvatar(fromUserAvatar)
@@ -96,10 +96,10 @@ public class FriendRequestPushServiceImpl implements FriendRequestPushService {
                 pushContent = "您的好友申请状态已更新";
             }
             
-            // 构建 Protobuf Push 消息（推送给申请人，优化后：string -> fixed64）
+            // 构建 Protobuf Push 消息（推送给申请人，优化后：userId=fixed64, requestId=bytes(UUID)）
             FriendResponsePush push = FriendResponsePush.newBuilder()
                     .setToUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getFromUserId()))  // 接收人是原申请人（string -> fixed64）
-                    .setRequestId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getRequestId())) // string -> fixed64
+                    .setRequestId(ProtoConverterUtil.uuidStringToBytes(friendRequest.getRequestId())) // UUID string -> bytes
                     .setFromUserId(ProtoConverterUtil.snowflakeStringToLong(friendRequest.getToUserId()))  // 响应人是原接收人（string -> fixed64）
                     .setFromUserName(toUserName)
                     .setFromUserAvatar(toUserAvatar)
