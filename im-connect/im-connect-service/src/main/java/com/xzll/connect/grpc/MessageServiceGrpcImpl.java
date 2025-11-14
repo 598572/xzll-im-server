@@ -54,7 +54,7 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             Assert.isTrue(Objects.nonNull(request), "参数错误");
             Assert.isTrue(request.getToUserId() > 0, "发送服务端ack时缺少必填参数");
             
-            // ✅ 测试模式：模拟ServerAck发送失败（用于测试重试机制）
+            //  测试模式：模拟ServerAck发送失败（用于测试重试机制）
             if (failRate > 0 && new Random().nextInt(100) < failRate) {
                 log.warn("【测试模式】模拟ServerAck发送失败 - clientMsgId: {}, msgId: {}, failRate: {}%", 
                     ProtoConverterUtil.bytesToUuidString(request.getClientMsgId()), request.getMsgId(), failRate);
@@ -117,8 +117,8 @@ public class MessageServiceGrpcImpl extends com.xzll.grpc.MessageServiceGrpc.Mes
             // 按新协议：构建 C2CAckReq（未读/已读），type=C2C_ACK（优化后：bytes/fixed64，chatId已删除）
             // 双轨制：包含 clientMsgId 和 serverMsgId
             C2CAckReq ackReq = C2CAckReq.newBuilder()
-                    .setClientMsgId(request.getClientMsgId()) // ✅ 客户端消息ID（bytes）
-                    .setMsgId(request.getMsgId()) // ✅ 服务端消息ID（fixed64）
+                    .setClientMsgId(request.getClientMsgId()) // 客户端消息ID（bytes）
+                    .setMsgId(request.getMsgId()) // 服务端消息ID（fixed64）
                     .setFrom(0L) // ClientAck场景下from为空
                     .setTo(request.getToUserId()) // fixed64
                     .setStatus(request.getMsgReceivedStatus())

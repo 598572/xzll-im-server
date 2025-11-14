@@ -192,9 +192,15 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
     }
 
     /**
-     * 记录心跳响应（在收到Pong时调用）
+     * 记录心跳响应
+     * 在以下场景调用：
+     * 1. 收到客户端主动发送的Ping时
+     * 2. 收到客户端回复的Pong时（服务端发送Ping后）
+     * 
+     * @param ctx ChannelHandlerContext
+     * @param heartbeatType 心跳类型："ping" 表示客户端主动发送的ping，"pong" 表示客户端回复的pong
      */
-    public void recordHeartbeatResponse(ChannelHandlerContext ctx) {
+    public void recordHeartbeatResponse(ChannelHandlerContext ctx, String heartbeatType) {
         String channelId = ctx.channel().id().asLongText();
         String userId = ctx.channel().attr(ImConstant.USER_ID_KEY).get();
         
@@ -204,7 +210,23 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         // 重置失败计数
         heartbeatFailureCount.remove(channelId);
         
-        log.debug("收到心跳响应：channelId={}, userId={}", channelId, userId);
+        // 根据心跳类型输出不同的日志
+        if ("ping".equalsIgnoreCase(heartbeatType)) {
+            log.debug("收到客户端主动心跳ping：channelId={}, userId={}", channelId, userId);
+        } else if ("pong".equalsIgnoreCase(heartbeatType)) {
+            log.debug("收到客户端心跳响应pong：channelId={}, userId={}", channelId, userId);
+        } else {
+            log.debug("收到心跳消息：channelId={}, userId={}, 类型={}", channelId, userId, heartbeatType);
+        }
+    }
+    
+    /**
+     * 记录心跳响应（兼容旧版本，默认类型为"unknown"）
+     * @deprecated 建议使用 recordHeartbeatResponse(ctx, heartbeatType) 明确指定心跳类型
+     */
+    @Deprecated
+    public void recordHeartbeatResponse(ChannelHandlerContext ctx) {
+        recordHeartbeatResponse(ctx, "unknown");
     }
 
     /**

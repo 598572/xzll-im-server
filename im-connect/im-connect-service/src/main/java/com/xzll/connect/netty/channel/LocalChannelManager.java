@@ -60,7 +60,7 @@ public class LocalChannelManager {
         
         // 启动连接统计任务，每10秒输出一次统计信息
         cleanupExecutor.scheduleAtFixedRate(LocalChannelManager::logConnectionStats, 
-            10, 10, TimeUnit.SECONDS);
+            60, 60, TimeUnit.SECONDS);
     }
 
     /**

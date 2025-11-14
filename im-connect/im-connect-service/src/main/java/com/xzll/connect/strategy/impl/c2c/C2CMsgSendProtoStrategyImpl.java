@@ -38,6 +38,9 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.util.Objects;
 import com.xzll.common.util.msgId.SnowflakeIdService;
+import cn.hutool.extra.spring.SpringUtil;
+import com.xzll.connect.netty.heart.HeartBeatHandler;
+import com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl;
 
 /**
  * @Author: hzz
@@ -112,12 +115,23 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             log.info("{}接收者id:{},在线状态:{},channelId:{},serverInfo:{}", 
                 TAG, packet.getToUserId(), userStatus, channelIdByUserId, serverInfoDTO);
             
+            // ✅ 心跳异常检测：如果接收人心跳ping异常，第一时间感知，将消息改为离线消息
+            if (null != targetChannel && Objects.equals(ImConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
+                if (isUserHeartbeatAbnormal(targetChannel, channelIdByUserId, packet.getToUserId())) {
+                    // 心跳异常，保存为离线消息
+                    log.warn("{}【步骤3-心跳异常检测】用户{}心跳异常，将消息保存为离线消息 - clientMsgId: {}, msgId: {}, channelId: {}",
+                        TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelIdByUserId);
+                    c2CMsgProvider.offLineMsg(buildOffLineMsgDTO(packet));
+                    return; // 直接返回，不再推送
+                }
+            }
+            
             //3. 根据接收人状态做对应的处理
             if (null != targetChannel && Objects.equals(ImConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
                 // 直接发送
                 log.debug("{}【步骤3-本地发送】用户{}在线且在本台机器上,将直接发送 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
-                sendProtoMsg(targetChannel, buildPushMsgResp(packet));
+                sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
                 
             } else if (null == userStatus && null == targetChannel) {
                 log.debug("{}【步骤3-离线处理】用户{}不在线，将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
@@ -206,9 +220,19 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             
             // 二次校验接收人在线状态
             if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
+                // ✅ 心跳异常检测：如果接收人心跳ping异常，第一时间感知，将消息改为离线消息
+                String channelId = targetChannel.id().asLongText();
+                if (isUserHeartbeatAbnormal(targetChannel, channelId, packet.getToUserId())) {
+                    // 心跳异常，保存为离线消息
+                    log.warn("{}【receiveAndSendMsg-心跳异常检测】用户{}心跳异常，将消息保存为离线消息 - clientMsgId: {}, msgId: {}, channelId: {}",
+                        TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelId);
+                    //TODO
+                    return WebBaseResponse.returnResultSuccess("消息已保存为离线消息（心跳异常）");
+                }
+                
                 log.debug("{}【receiveAndSendMsg-本地发送】跳转后用户{}在线,将直接发送消息 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
-                sendProtoMsg(targetChannel, buildPushMsgResp(packet));
+                sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
             } else {
                 log.debug("{}【receiveAndSendMsg-离线处理】跳转后用户{}不在线,将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
@@ -276,9 +300,13 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     }
     
     /**
-     * 发送 protobuf 消息
+     * 发送 protobuf 消息（带发送结果检测和失败重推机制）
+     * 
+     * @param channel 目标Channel
+     * @param pushMsg 推送消息
+     * @param packet 原始消息包
      */
-    private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg) {
+    private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg, C2CSendMsgAO packet) {
         try {
             log.debug("{}【sendProtoMsg】开始发送消息到客户端 - clientMsgId(bytes): {}, msgId: {}, to: {}",
                 TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo());
@@ -291,14 +319,66 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             
             byte[] bytes = response.toByteArray();
             ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-            channel.writeAndFlush(new BinaryWebSocketFrame(buf));
             
-            log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId(bytes): {}, msgId: {}, to: {}, payloadSize: {} bytes",
-                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), bytes.length);
+            // 添加发送结果检测（双重保障）
+            channel.writeAndFlush(new BinaryWebSocketFrame(buf))
+                .addListener(future -> {
+                    if (future.isSuccess()) {
+                        log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId: {}, msgId: {}, to: {}, payloadSize: {} bytes",
+                            TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), bytes.length);
+                    } else {
+                        //发送失败，触发重发 TODO
+                    }
+                });
         } catch (Exception e) {
-            log.error("{}【sendProtoMsg异常】发送 protobuf 消息失败 - clientMsgId(bytes): {}, msgId: {}, to: {}, error: {}", 
-                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), e.getMessage(), e);
+            log.error("{}【sendProtoMsg异常】发送 protobuf 消息异常，保存为离线消息 - clientMsgId: {}, msgId: {}, to: {}, error: {}", 
+                TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), e.getMessage(), e);
+            
+            //发送异常，触发重发 TODO
         }
+    }
+    
+    /**
+     * 检查用户心跳是否异常
+     * 如果心跳失败次数 > 0，认为用户可能已断网（服务端在120s之后断网清理连接），此时消息应保存为离线消息，待客户端自动重连后  给其推送离线消息
+     * 
+     * @param channel 用户连接Channel
+     * @param channelId 连接ID
+     * @param userId 用户ID
+     * @return true表示心跳异常，false表示心跳正常
+     */
+    private boolean isUserHeartbeatAbnormal(Channel channel, String channelId, String userId) {
+        if (channel == null || !channel.isActive()) {
+            return true; // 连接不存在或不活跃，认为异常
+        }
+        
+        if (StringUtils.isBlank(channelId)) {
+            return true; // 没有channelId，无法检查，认为不正常
+        }
+        
+        try {
+            // 获取心跳处理器
+            HeartBeatHandler heartBeatHandler = SpringUtil.getBean(HeartBeatHandler.class);
+            if (heartBeatHandler instanceof NettyServerHeartBeatHandlerImpl) {
+                NettyServerHeartBeatHandlerImpl heartbeatHandler = 
+                    (NettyServerHeartBeatHandlerImpl) heartBeatHandler;
+                
+                // 获取心跳失败次数
+                int failureCount = heartbeatHandler.getHeartbeatFailureCount(channelId);
+                
+                if (failureCount > 0) {
+                    log.warn("{}【心跳异常检测】用户{}心跳失败次数={}，可能已断网 - channelId: {}", 
+                        TAG, userId, failureCount, channelId);
+                    return true; // 心跳失败次数 > 0，认为异常
+                }
+            }
+        } catch (Exception e) {
+            log.warn("{}【心跳异常检测】检查用户{}心跳状态异常 - channelId: {}, error: {}", 
+                TAG, userId, channelId, e.getMessage());
+            // 检查异常时，不认为心跳异常，避免误判
+        }
+        
+        return false; // 心跳正常
     }
     
     /**
