@@ -296,7 +296,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             // 记录心跳响应（客户端主动发送ping）
             if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
                 ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
-                    .recordHeartbeatResponse(ctx);
+                    .recordHeartbeatResponse(ctx, "ping");
             }
             // 修复内存泄漏：使用try-with-resources或者手动管理引用计数
             try {
@@ -316,7 +316,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             // ✅ 记录心跳响应（客户端回复pong）
             if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
                 ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
-                    .recordHeartbeatResponse(ctx);
+                    .recordHeartbeatResponse(ctx, "pong");
             }
             return;
         }
