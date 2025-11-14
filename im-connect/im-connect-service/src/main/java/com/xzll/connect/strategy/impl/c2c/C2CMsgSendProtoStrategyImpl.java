@@ -226,7 +226,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                     // 心跳异常，保存为离线消息
                     log.warn("{}【receiveAndSendMsg-心跳异常检测】用户{}心跳异常，将消息保存为离线消息 - clientMsgId: {}, msgId: {}, channelId: {}",
                         TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelId);
-                    c2CMsgProvider.offLineMsg(buildOffLineMsgDTO(packet));
+                    //TODO
                     return WebBaseResponse.returnResultSuccess("消息已保存为离线消息（心跳异常）");
                 }
                 
