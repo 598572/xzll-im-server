@@ -286,8 +286,18 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         
         //判断是否为ping消息
         if (frame instanceof PingWebSocketFrame) {
-            log.debug("[WebSocketServerHandler]_消息类型: ping");
-            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            long currentTime = System.currentTimeMillis();
+            Long lastReadTime = NettyAttrUtil.getReaderTime(ctx.channel());
+            long timeSinceLastRead = lastReadTime != null ? (currentTime - lastReadTime) : 0;
+            
+            log.debug("[WebSocketServerHandler]_消息类型: ping, 距离上次读取={}ms", timeSinceLastRead);
+            
+            NettyAttrUtil.updateReaderTime(ctx.channel(), currentTime);
+            // 记录心跳响应（客户端主动发送ping）
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .recordHeartbeatResponse(ctx);
+            }
             // 修复内存泄漏：使用try-with-resources或者手动管理引用计数
             try {
                 ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
@@ -295,6 +305,18 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 // 如果发送失败，需要释放retain的内容
                 ReferenceCountUtil.release(frame.content());
                 log.error("发送Pong消息失败", e);
+            }
+            return;
+        }
+        
+        // ✅ 处理客户端回复的Pong消息（服务器发送Ping后，客户端回复Pong）
+        if (frame instanceof PongWebSocketFrame) {
+            log.debug("[WebSocketServerHandler]_消息类型: pong");
+            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            // ✅ 记录心跳响应（客户端回复pong）
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .recordHeartbeatResponse(ctx);
             }
             return;
         }
@@ -309,6 +331,10 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         // Protobuf 二进制消息处理（唯一支持的格式）
         if (frame instanceof BinaryWebSocketFrame) {
             log.debug("[WebSocketServerHandler]_消息类型: protobuf 二进制");
+            
+            // ✅ 更新读取时间（任何消息都应该更新，包括业务消息）
+            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            
             ByteBuf content = ((BinaryWebSocketFrame) frame).content();
             
             // 消息长度检查

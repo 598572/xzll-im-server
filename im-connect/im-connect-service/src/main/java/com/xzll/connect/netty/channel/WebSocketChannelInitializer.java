@@ -46,8 +46,11 @@ public class WebSocketChannelInitializer extends ChannelInitializer<SocketChanne
         pipeline.addLast(new ChunkedWriteHandler());
         // 支持WebSocket数据压缩
         pipeline.addLast(new WebSocketServerCompressionHandler());
-        //设置心跳 - 根据IM场景调整为30秒读超时
-        pipeline.addLast("heart-notice", new IdleStateHandler(30, 0, 0, TimeUnit.SECONDS));
+        //设置心跳 - 从配置读取IdleStateHandler检测周期
+        // 注意：idleStateCheckInterval < heartBeatTime，提供容错余量
+        int idleCheckInterval = imConnectServerConfig.getIdleStateCheckInterval();
+        pipeline.addLast("heart-notice", new IdleStateHandler(idleCheckInterval, 0, 0, TimeUnit.SECONDS));
+        log.debug("IdleStateHandler检测周期已设置为: {}秒", idleCheckInterval);
 
         //添加安全和统计相关handler
         // 使用Spring管理的Bean，支持@Sharable单例模式

@@ -36,12 +36,12 @@ import org.springframework.util.CollectionUtils;
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
 
-//    public static final String IP = "127.0.0.1";
-//    public static final String PORT = "8083";
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "8083";
 
 
-    public static final String IP = "120.46.85.43";
-    public static final String PORT = "80";
+//    public static final String IP = "120.46.85.43";
+//    public static final String PORT = "80";
 
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
