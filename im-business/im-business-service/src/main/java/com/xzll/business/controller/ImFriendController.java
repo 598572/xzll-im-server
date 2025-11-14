@@ -1,6 +1,7 @@
 package com.xzll.business.controller;
 
 import com.xzll.business.service.ImFriendService;
+import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.pojo.request.*;
 import com.xzll.common.pojo.response.FriendInfoVO;
@@ -20,7 +21,7 @@ import java.util.List;
 @RequestMapping("/api/friend")
 @CrossOrigin
 @Slf4j
-public class ImFriendController {
+public class ImFriendController extends BaseController {
 
     @Resource
     private ImFriendService imFriendService;
@@ -33,6 +34,12 @@ public class ImFriendController {
         log.info("发送好友申请_入参:{}", ao);
         
         try {
+            String fromUserId = getCurrentUserIdWithValidation();
+            if (fromUserId == null) {
+                return  WebBaseResponse.returnResultError("用户未登录或token无效");
+            }
+            ao.setFromUserId(fromUserId);
+            
             String requestId = imFriendService.sendFriendRequest(ao);
             log.info("发送好友申请成功，申请ID:{}", requestId);
             return WebBaseResponse.returnResultSuccess(requestId);
@@ -54,6 +61,12 @@ public class ImFriendController {
     public WebBaseResponse<Boolean> handleFriendRequest(@RequestBody FriendRequestHandleAO ao) {
         log.info("处理好友申请_入参:{}", ao);
         
+        String userId = getCurrentUserIdWithValidation();
+        if (userId == null) {
+            return  WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
+        ao.setUserId(userId);
+
         try {
             boolean result = imFriendService.handleFriendRequest(ao);
             log.info("处理好友申请成功，申请ID:{}, 处理结果:{}", ao.getRequestId(), ao.getHandleResult());
@@ -76,6 +89,14 @@ public class ImFriendController {
     public WebBaseResponse<List<FriendRequestVO>> findFriendRequestList(@RequestBody FriendRequestListAO ao) {
         log.info("查询好友申请列表_入参:{}", ao);
         
+        // 从请求头获取当前用户ID
+        String userId = getCurrentUserIdWithValidation();
+        if (userId == null) {
+            return WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
+
+        ao.setUserId(userId);
+
         try {
             // 参数校验和设置默认值
             if (ao.getCurrentPage() == null || ao.getCurrentPage() <= 0) {
@@ -112,6 +133,15 @@ public class ImFriendController {
     public WebBaseResponse<List<FriendInfoVO>> findFriendList(@RequestBody FriendListAO ao) {
         log.info("查询好友列表_入参:{}", ao);
         
+        // 从请求头获取当前用户ID
+        String userId = getCurrentUserIdWithValidation();
+        if (userId == null) {
+            return WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
+        
+        // 设置用户ID
+        ao.setUserId(userId);
+
         try {
             // 参数校验和设置默认值
             if (ao.getCurrentPage() == null || ao.getCurrentPage() <= 0) {
@@ -142,9 +172,15 @@ public class ImFriendController {
      * 删除好友
      */
     @PostMapping("/delete")
-    public WebBaseResponse<Boolean> deleteFriend(@RequestParam String userId, @RequestParam String friendId) {
+    public WebBaseResponse<Boolean> deleteFriend(@RequestParam String friendId) {
+        String userId = getCurrentUserIdWithValidation();
+        if (userId == null) {
+            return WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
+
         log.info("删除好友，用户ID:{}, 好友ID:{}", userId, friendId);
-        
+
+
         try {
             // 参数校验
             if (userId == null || userId.trim().isEmpty()) {
@@ -175,11 +211,16 @@ public class ImFriendController {
      * 拉黑/取消拉黑好友
      */
     @PostMapping("/block")
-    public WebBaseResponse<Boolean> blockFriend(@RequestParam String userId, 
-                                                @RequestParam String friendId, 
+    public WebBaseResponse<Boolean> blockFriend(@RequestParam String friendId, 
                                                 @RequestParam Boolean blackFlag) {
-        log.info("{}好友，用户ID:{}, 好友ID:{}", blackFlag ? "拉黑" : "取消拉黑", userId, friendId);
+        String userId = getCurrentUserIdWithValidation();
+        if (userId == null) {
+            return WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
         
+        log.info("拉黑好友请求 - 用户ID: {}, 好友ID: {}, 拉黑标志: {}", userId, friendId, blackFlag);
+
+
         try {
             // 参数校验
             if (userId == null || userId.trim().isEmpty()) {
