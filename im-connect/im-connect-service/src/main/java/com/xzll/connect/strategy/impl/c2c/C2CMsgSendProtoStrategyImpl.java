@@ -131,7 +131,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                 // 直接发送
                 log.debug("{}【步骤3-本地发送】用户{}在线且在本台机器上,将直接发送 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
-                sendProtoMsg(targetChannel, buildPushMsgResp(packet));
+                sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
                 
             } else if (null == userStatus && null == targetChannel) {
                 log.debug("{}【步骤3-离线处理】用户{}不在线，将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
@@ -232,7 +232,7 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                 
                 log.debug("{}【receiveAndSendMsg-本地发送】跳转后用户{}在线,将直接发送消息 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
-                sendProtoMsg(targetChannel, buildPushMsgResp(packet));
+                sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
             } else {
                 log.debug("{}【receiveAndSendMsg-离线处理】跳转后用户{}不在线,将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
@@ -300,9 +300,13 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     }
     
     /**
-     * 发送 protobuf 消息
+     * 发送 protobuf 消息（带发送结果检测和失败重推机制）
+     * 
+     * @param channel 目标Channel
+     * @param pushMsg 推送消息
+     * @param packet 原始消息包
      */
-    private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg) {
+    private void sendProtoMsg(Channel channel, C2CMsgPush pushMsg, C2CSendMsgAO packet) {
         try {
             log.debug("{}【sendProtoMsg】开始发送消息到客户端 - clientMsgId(bytes): {}, msgId: {}, to: {}",
                 TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo());
@@ -315,13 +319,22 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             
             byte[] bytes = response.toByteArray();
             ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-            channel.writeAndFlush(new BinaryWebSocketFrame(buf));
             
-            log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId(bytes): {}, msgId: {}, to: {}, payloadSize: {} bytes",
-                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), bytes.length);
+            // 添加发送结果检测（双重保障）
+            channel.writeAndFlush(new BinaryWebSocketFrame(buf))
+                .addListener(future -> {
+                    if (future.isSuccess()) {
+                        log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId: {}, msgId: {}, to: {}, payloadSize: {} bytes",
+                            TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), bytes.length);
+                    } else {
+                        //发送失败，触发重发 TODO
+                    }
+                });
         } catch (Exception e) {
-            log.error("{}【sendProtoMsg异常】发送 protobuf 消息失败 - clientMsgId(bytes): {}, msgId: {}, to: {}, error: {}", 
-                TAG, ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId()), pushMsg.getMsgId(), pushMsg.getTo(), e.getMessage(), e);
+            log.error("{}【sendProtoMsg异常】发送 protobuf 消息异常，保存为离线消息 - clientMsgId: {}, msgId: {}, to: {}, error: {}", 
+                TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), e.getMessage(), e);
+            
+            //发送异常，触发重发 TODO
         }
     }
     

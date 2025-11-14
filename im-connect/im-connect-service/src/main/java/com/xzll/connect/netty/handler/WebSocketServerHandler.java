@@ -309,11 +309,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             return;
         }
         
-        // ✅ 处理客户端回复的Pong消息（服务器发送Ping后，客户端回复Pong）
+        // 处理客户端回复的Pong消息（服务器发送Ping后，客户端回复Pong）
         if (frame instanceof PongWebSocketFrame) {
             log.debug("[WebSocketServerHandler]_消息类型: pong");
             NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
-            // ✅ 记录心跳响应（客户端回复pong）
+            // 记录心跳响应（客户端回复pong）
             if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
                 ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
                     .recordHeartbeatResponse(ctx, "pong");
@@ -332,7 +332,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         if (frame instanceof BinaryWebSocketFrame) {
             log.debug("[WebSocketServerHandler]_消息类型: protobuf 二进制");
             
-            // ✅ 更新读取时间（任何消息都应该更新，包括业务消息）
+            // 更新读取时间（任何消息都应该更新，包括业务消息）
             NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
             
             ByteBuf content = ((BinaryWebSocketFrame) frame).content();
