@@ -220,14 +220,16 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             
             // 二次校验接收人在线状态
             if (StringUtils.isNotBlank(userStatus) && null != targetChannel) {
-                // ✅ 心跳异常检测：如果接收人心跳ping异常，第一时间感知，将消息改为离线消息
+                // 心跳异常检测：如果接收人心跳ping异常，第一时间感知
+                // 注意：消息已经在exchange方法中入库（初始状态为"未读"），这里不应该再次保存为离线消息
+                // 应该直接返回，不推送，让服务端重推机制来处理（延迟队列会重试推送）
                 String channelId = targetChannel.id().asLongText();
                 if (isUserHeartbeatAbnormal(targetChannel, channelId, packet.getToUserId())) {
-                    // 心跳异常，保存为离线消息
-                    log.warn("{}【receiveAndSendMsg-心跳异常检测】用户{}心跳异常，将消息保存为离线消息 - clientMsgId: {}, msgId: {}, channelId: {}",
+                    // 心跳异常，不推送，直接返回
+                    // 消息已在exchange方法中入库，状态为"服务器已收到"，等待重推机制处理，重推机制重试3次后 仍旧收不到接收方ack，则判定为离线消息
+                    log.warn("{}【receiveAndSendMsg-心跳异常检测】用户{}心跳异常，跳过推送，等待重推机制处理 - clientMsgId: {}, msgId: {}, channelId: {}",
                         TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelId);
-                    //TODO
-                    return WebBaseResponse.returnResultSuccess("消息已保存为离线消息（心跳异常）");
+                    return WebBaseResponse.returnResultSuccess("心跳异常，已跳过推送，等待重推机制处理");
                 }
                 
                 log.debug("{}【receiveAndSendMsg-本地发送】跳转后用户{}在线,将直接发送消息 - clientMsgId: {}, msgId: {}",

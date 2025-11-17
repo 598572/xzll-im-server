@@ -4,6 +4,7 @@ import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.constant.MsgStatusEnum;
+import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.grpc.GrpcMessageService;
@@ -37,28 +38,34 @@ public class C2COffLineMsgHandler {
 
 
     /**
-     * 离线消息处理 - 入库并发送服务端ACK
+     * 离线消息处理 - 更新消息状态为离线并发送服务端ACK
+     * 
+     * 注意：离线消息本质上是一个更新消息状态的操作，消息已经在exchange方法中保存（初始状态为"未读"）
+     * 这里只需要更新消息状态为"离线"，而不是重新保存消息
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void sendC2CMsgDeal(C2CSendMsgAO dto) {
-        log.debug("【C2COffLineMsgHandler开始】处理离线消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
-            dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
+    public void sendC2CMsgDeal(C2COffLineMsgAO dto) {
+        log.debug("【C2COffLineMsgHandler开始】处理离线消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}, status: {}",
+            dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId(), dto.getMsgStatus());
         
-        boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
+        // 更新会话记录（如果需要）
+        C2CSendMsgAO sendMsgAO = convertToC2CSendMsgAO(dto);
+        boolean writeChat = imChatService.saveOrUpdateC2CChat(sendMsgAO);
         log.debug("【C2COffLineMsgHandler-会话保存】会话保存结果: {} - clientMsgId: {}, msgId: {}",
             writeChat, dto.getClientMsgId(), dto.getMsgId());
         
-        boolean writeMsg = true;
+        // 更新消息状态为离线
+        boolean updateMsg = true;
         if (imC2CMsgRecordHBaseService != null) {
-            writeMsg = imC2CMsgRecordHBaseService.saveC2CMsg(dto);
-            log.debug("【C2COffLineMsgHandler-消息保存】HBase消息保存结果: {} - clientMsgId: {}, msgId: {}",
-                writeMsg, dto.getClientMsgId(), dto.getMsgId());
+            updateMsg = imC2CMsgRecordHBaseService.updateC2CMsgOffLineStatus(dto);
+            log.debug("【C2COffLineMsgHandler-消息状态更新】HBase消息状态更新结果: {} - clientMsgId: {}, msgId: {}, status: {}",
+                updateMsg, dto.getClientMsgId(), dto.getMsgId(), dto.getMsgStatus());
         } else {
-            log.warn("【C2COffLineMsgHandler-跳过HBase】HBase服务未启用，跳过离线消息存储到HBase - clientMsgId: {}, msgId: {}", 
+            log.warn("【C2COffLineMsgHandler-跳过HBase】HBase服务未启用，跳过离线消息状态更新到HBase - clientMsgId: {}, msgId: {}", 
                 dto.getClientMsgId(), dto.getMsgId());
         }
         
-        if (writeChat && writeMsg) {
+        if (writeChat && updateMsg) {
             log.debug("【C2COffLineMsgHandler-构建ACK】开始构建服务端ACK - clientMsgId: {}, msgId: {}, from: {}, to: {}",
                 dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
             
@@ -91,12 +98,28 @@ public class C2COffLineMsgHandler {
                 }
             });
         } else {
-            log.error("【C2COffLineMsgHandler-存储失败】消息或会话存储失败 - clientMsgId: {}, msgId: {}, writeChat: {}, writeMsg: {}", 
-                dto.getClientMsgId(), dto.getMsgId(), writeChat, writeMsg);
+            log.error("【C2COffLineMsgHandler-更新失败】消息或会话更新失败 - clientMsgId: {}, msgId: {}, writeChat: {}, updateMsg: {}", 
+                dto.getClientMsgId(), dto.getMsgId(), writeChat, updateMsg);
         }
         
         log.info("【C2COffLineMsgHandler完成】离线消息处理完成 - clientMsgId: {}, msgId: {}", 
             dto.getClientMsgId(), dto.getMsgId());
+    }
+    
+    /**
+     * 将C2COffLineMsgAO转换为C2CSendMsgAO（用于会话保存）
+     */
+    private C2CSendMsgAO convertToC2CSendMsgAO(C2COffLineMsgAO offLineMsgAO) {
+        C2CSendMsgAO sendMsgAO = new C2CSendMsgAO();
+        sendMsgAO.setClientMsgId(offLineMsgAO.getClientMsgId());
+        sendMsgAO.setMsgId(offLineMsgAO.getMsgId());
+        sendMsgAO.setFromUserId(offLineMsgAO.getFromUserId());
+        sendMsgAO.setToUserId(offLineMsgAO.getToUserId());
+        sendMsgAO.setMsgFormat(offLineMsgAO.getMsgFormat());
+        sendMsgAO.setMsgContent(offLineMsgAO.getMsgContent());
+        sendMsgAO.setMsgCreateTime(offLineMsgAO.getMsgCreateTime());
+        sendMsgAO.setChatId(offLineMsgAO.getChatId());
+        return sendMsgAO;
     }
 
 }
