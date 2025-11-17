@@ -480,6 +480,74 @@ public class RedissonUtils {
         }
     }
 
+    /**
+     * 根据分数范围获取ZSet元素（用于扫描到期消息）
+     */
+    public Collection<String> getZSetRangeByScore(String key, double minScore, double maxScore) {
+        try {
+            Collection<Object> objects = redissonClient.getScoredSortedSet(key)
+                .valueRange(minScore, true, maxScore, true);
+            Collection<String> result = new ArrayList<>();
+            for (Object obj : objects) {
+                result.add(obj.toString());
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("根据分数范围获取ZSet元素失败: key={}, minScore={}, maxScore={}", key, minScore, maxScore, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 根据分数范围获取ZSet元素（使用Long类型的score）
+     */
+    public Collection<String> getZSetRangeByScore(String key, long minScore, long maxScore) {
+        return getZSetRangeByScore(key, (double) minScore, (double) maxScore);
+    }
+
+    /**
+     * 根据分数范围获取ZSet元素（带LIMIT限制，用于批量处理）
+     * @param key ZSet的key
+     * @param minScore 最小分数
+     * @param maxScore 最大分数
+     * @param limit 限制返回数量（避免一次性返回太多数据）
+     * @return 元素集合
+     */
+    public Collection<String> getZSetRangeByScore(String key, double minScore, double maxScore, int limit) {
+        try {
+            Collection<Object> objects = redissonClient.getScoredSortedSet(key)
+                .valueRange(minScore, true, maxScore, true, 0, limit - 1);
+            Collection<String> result = new ArrayList<>();
+            for (Object obj : objects) {
+                result.add(obj.toString());
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("根据分数范围获取ZSet元素失败: key={}, minScore={}, maxScore={}, limit={}", 
+                key, minScore, maxScore, limit, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 根据分数范围获取ZSet元素（使用Long类型的score，带LIMIT限制）
+     */
+    public Collection<String> getZSetRangeByScore(String key, long minScore, long maxScore, int limit) {
+        return getZSetRangeByScore(key, (double) minScore, (double) maxScore, limit);
+    }
+
+    /**
+     * 删除ZSet中的指定元素（用于删除特定消息）
+     */
+    public boolean removeZSetValue(String key, String value) {
+        try {
+            return redissonClient.getScoredSortedSet(key).remove(value);
+        } catch (Exception e) {
+            log.error("删除ZSet元素失败: key={}, value={}", key, value, e);
+            throw e;
+        }
+    }
+
     // ==================== 高级功能 ====================
 
     /**

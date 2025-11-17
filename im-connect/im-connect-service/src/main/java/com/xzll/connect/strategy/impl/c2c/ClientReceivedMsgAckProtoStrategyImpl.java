@@ -30,6 +30,8 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
 
     @Resource
     private C2CMsgProvider c2CMsgProvider;
+    @Resource
+    private com.xzll.connect.service.C2CMsgRetryService c2CMsgRetryService;
 
     @Override
     public MsgType supportMsgType() {
@@ -57,6 +59,10 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
             
             //1. 修改数据库中消息的状态，并push消息至接收方，此处：修改db与发ack消息为同步。设计原则：要么第一步存消息就失败，要么：消息新增成功后，后边的状态流转一定要正确所以需要同步
             c2CMsgProvider.clientResponseAck(packet);
+            
+            //新增：删除重试消息（从Redis删除，定时任务扫描时会判断）
+            String clientMsgId = ProtoConverterUtil.bytesToUuidString(req.getClientMsgId());
+            c2CMsgRetryService.removeFromRetryQueue(clientMsgId);
             
             log.debug("{}结束", TAG);
         } catch (InvalidProtocolBufferException e) {

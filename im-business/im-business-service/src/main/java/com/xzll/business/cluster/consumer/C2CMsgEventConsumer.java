@@ -108,9 +108,8 @@ public class C2CMsgEventConsumer implements InitializingBean {
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_OFF_LINE_MSG:
                 C2COffLineMsgAO c2COffLineMsgAo = JSONUtil.toBean(clusterEvent.getData(), C2COffLineMsgAO.class);
-                // 转换为C2CSendMsgAO进行处理
-                C2CSendMsgAO c2CSendMsgAO = convertToC2CSendMsgAO(c2COffLineMsgAo);
-                c2COffLineMsgHandler.sendC2CMsgDeal(c2CSendMsgAO);
+                //接传递C2COffLineMsgAO，离线消息处理应该更新状态而不是保存新消息
+                c2COffLineMsgHandler.sendC2CMsgDeal(c2COffLineMsgAo);
                 return;
             case ImConstant.ClusterEventTypeConstant.C2C_CLIENT_RECEIVED_ACK_MSG:
                 C2CReceivedMsgAckAO c2CReceivedMsgAckAo = JSONUtil.toBean(clusterEvent.getData(), C2CReceivedMsgAckAO.class);
@@ -123,29 +122,5 @@ public class C2CMsgEventConsumer implements InitializingBean {
             default:
                 log.warn("不适配的事件类型:{},请检查", clusterEvent);
         }
-    }
-    
-    /**
-     * 将C2COffLineMsgAO转换为C2CSendMsgAO
-     */
-    private C2CSendMsgAO convertToC2CSendMsgAO(C2COffLineMsgAO offLineMsgAO) {
-        log.debug("【C2CMsgEventConsumer-转换开始】离线消息转换 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
-            offLineMsgAO.getClientMsgId(), offLineMsgAO.getMsgId(), offLineMsgAO.getFromUserId(), offLineMsgAO.getToUserId());
-        
-        C2CSendMsgAO sendMsgAO = new C2CSendMsgAO();
-        sendMsgAO.setClientMsgId(offLineMsgAO.getClientMsgId()); // 修复：设置客户端消息ID
-        sendMsgAO.setFromUserId(offLineMsgAO.getFromUserId());
-        sendMsgAO.setToUserId(offLineMsgAO.getToUserId());
-        sendMsgAO.setMsgContent(offLineMsgAO.getMsgContent());
-        sendMsgAO.setMsgFormat(offLineMsgAO.getMsgFormat());
-        sendMsgAO.setMsgId(offLineMsgAO.getMsgId());
-        sendMsgAO.setChatId(offLineMsgAO.getChatId());
-        sendMsgAO.setUrl(offLineMsgAO.getUrl());
-        sendMsgAO.setMsgCreateTime(offLineMsgAO.getMsgCreateTime());
-        
-        log.debug("【C2CMsgEventConsumer-转换完成】转换结果 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
-            sendMsgAO.getClientMsgId(), sendMsgAO.getMsgId(), sendMsgAO.getFromUserId(), sendMsgAO.getToUserId());
-        
-        return sendMsgAO;
     }
 }
