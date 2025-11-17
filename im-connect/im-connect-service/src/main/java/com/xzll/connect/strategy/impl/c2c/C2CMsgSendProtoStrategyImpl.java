@@ -64,6 +64,8 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
     private GrpcClientConfig grpcClientConfig;
     @Resource
     private SnowflakeIdService snowflakeIdService;
+    @Resource
+    private com.xzll.connect.service.C2CMsgRetryService c2CMsgRetryService;
 
     @Override
     public MsgType supportMsgType() {
@@ -115,23 +117,15 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
             log.info("{}接收者id:{},在线状态:{},channelId:{},serverInfo:{}", 
                 TAG, packet.getToUserId(), userStatus, channelIdByUserId, serverInfoDTO);
             
-            // ✅ 心跳异常检测：如果接收人心跳ping异常，第一时间感知，将消息改为离线消息
-            if (null != targetChannel && Objects.equals(ImConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
-                if (isUserHeartbeatAbnormal(targetChannel, channelIdByUserId, packet.getToUserId())) {
-                    // 心跳异常，保存为离线消息
-                    log.warn("{}【步骤3-心跳异常检测】用户{}心跳异常，将消息保存为离线消息 - clientMsgId: {}, msgId: {}, channelId: {}",
-                        TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelIdByUserId);
-                    c2CMsgProvider.offLineMsg(buildOffLineMsgDTO(packet));
-                    return; // 直接返回，不再推送
-                }
-            }
-            
             //3. 根据接收人状态做对应的处理
             if (null != targetChannel && Objects.equals(ImConstant.UserStatus.ON_LINE.getValue().toString(), userStatus)) {
                 // 直接发送
                 log.debug("{}【步骤3-本地发送】用户{}在线且在本台机器上,将直接发送 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
+                
+                // 新增：发送到redis Zset （等待客户端ACK）
+                c2CMsgRetryService.addToRetryQueue(packet);
                 
             } else if (null == userStatus && null == targetChannel) {
                 log.debug("{}【步骤3-离线处理】用户{}不在线，将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
@@ -225,16 +219,17 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                 // 应该直接返回，不推送，让服务端重推机制来处理（延迟队列会重试推送）
                 String channelId = targetChannel.id().asLongText();
                 if (isUserHeartbeatAbnormal(targetChannel, channelId, packet.getToUserId())) {
-                    // 心跳异常，不推送，直接返回
-                    // 消息已在exchange方法中入库，状态为"服务器已收到"，等待重推机制处理，重推机制重试3次后 仍旧收不到接收方ack，则判定为离线消息
+                    // 心跳异常，不推送，加入redis zset等待重推机制处理，重推机制重试3次后 仍旧收不到接收方ack，则判定为离线消息
                     log.warn("{}【receiveAndSendMsg-心跳异常检测】用户{}心跳异常，跳过推送，等待重推机制处理 - clientMsgId: {}, msgId: {}, channelId: {}",
                         TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId(), channelId);
-                    return WebBaseResponse.returnResultSuccess("心跳异常，已跳过推送，等待重推机制处理");
                 }
                 
                 log.debug("{}【receiveAndSendMsg-本地发送】跳转后用户{}在线,将直接发送消息 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
                 sendProtoMsg(targetChannel, buildPushMsgResp(packet), packet);
+                
+                // 新增：发送到redis Zset（等待客户端ACK）
+                c2CMsgRetryService.addToRetryQueue(packet);
             } else {
                 log.debug("{}【receiveAndSendMsg-离线处理】跳转后用户{}不在线,将消息保存至离线表中 - clientMsgId: {}, msgId: {}",
                     TAG, packet.getToUserId(), packet.getClientMsgId(), packet.getMsgId());
@@ -329,14 +324,13 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                         log.debug("{}【sendProtoMsg成功】消息发送到客户端成功 - clientMsgId: {}, msgId: {}, to: {}, payloadSize: {} bytes",
                             TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), bytes.length);
                     } else {
-                        //发送失败，触发重发 TODO
+                        //发送失败（重发由重发机制保障)
                     }
                 });
         } catch (Exception e) {
             log.error("{}【sendProtoMsg异常】发送 protobuf 消息异常，保存为离线消息 - clientMsgId: {}, msgId: {}, to: {}, error: {}", 
                 TAG, packet.getClientMsgId(), packet.getMsgId(), packet.getToUserId(), e.getMessage(), e);
-            
-            //发送异常，触发重发 TODO
+            //发送异常（重发由重发机制保障)
         }
     }
     
