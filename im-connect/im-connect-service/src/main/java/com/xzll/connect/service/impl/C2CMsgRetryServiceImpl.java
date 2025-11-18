@@ -144,6 +144,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             long executeTime = System.currentTimeMillis() + retryDelays[0] * 1000;
             
             //  使用Lua脚本原子性添加（同时添加到ZSet和Hash）
+            // 使用 msgId（雪花算法）作为 Hash 的 key
             Long result = redissonUtils.executeLuaScriptAsLong(
                 addToRetryQueueScript,
                 Arrays.asList(
@@ -152,7 +153,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                 ),
                 value,
                 String.valueOf(executeTime),
-                packet.getClientMsgId()
+                packet.getMsgId()
             );
             
             if (result > 0) {
@@ -171,27 +172,30 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
     /**
      * 从延迟队列删除消息（收到客户端ACK时）
      * 使用Lua脚本保证原子性：同时从ZSet和Hash删除
+     * 
+     * @param msgId 服务端消息ID（雪花算法）
      */
     @Override
-    public void removeFromRetryQueue(String clientMsgId) {
+    public void removeFromRetryQueue(String msgId) {
         try {
             //  使用Lua脚本原子性删除（同时从ZSet和Hash删除）
+            // 使用 msgId（雪花算法）作为 Hash 的 key
             Long result = redissonUtils.executeLuaScriptAsLong(
                 removeFromRetryQueueScript,
                 Arrays.asList(
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
                 ),
-                clientMsgId
+                msgId
             );
             
             if (result > 0) {
-                log.info("{}收到客户端ACK，从延迟队列删除消息 - clientMsgId: {}", TAG, clientMsgId);
+                log.info("{}收到客户端ACK，从延迟队列删除消息 - msgId: {}", TAG, msgId);
             } else {
-                log.debug("{}重试消息不存在（可能已过期或已处理） - clientMsgId: {}", TAG, clientMsgId);
+                log.debug("{}重试消息不存在（可能已过期或已处理） - msgId: {}", TAG, msgId);
             }
         } catch (Exception e) {
-            log.error("{}从延迟队列删除消息异常 - clientMsgId: {}", TAG, clientMsgId, e);
+            log.error("{}从延迟队列删除消息异常 - msgId: {}", TAG, msgId, e);
         }
     }
     
@@ -301,10 +305,10 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                         );
                     }
                     
-                    // 2.2 检查是否已收到客户端ACK
+                    // 2.2 检查是否已收到客户端ACK（使用 msgId 作为 Hash 的 key）
                     String indexValue = redissonUtils.getHash(
                         ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, 
-                        retryEvent.getClientMsgId()
+                        retryEvent.getMsgId()
                     );
                     if (indexValue == null) {
                         log.debug("{}消息已收到客户端ACK，取消重试 - clientMsgId: {}, msgId: {}", 
@@ -348,7 +352,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                     // 计算下次执行时间
                     long executeTime = System.currentTimeMillis() + retryDelays[nextRetryCount] * 1000;
                     
-                    //  使用Lua脚本原子性重新添加
+                    //  使用Lua脚本原子性重新添加（使用 msgId 作为 Hash 的 key）
                     String newValue = JSONUtil.toJsonStr(retryEvent);
                     redissonUtils.executeLuaScriptAsLong(
                         addToRetryQueueScript,
@@ -358,7 +362,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                         ),
                         newValue,
                         String.valueOf(executeTime),
-                        retryEvent.getClientMsgId()
+                        retryEvent.getMsgId()  // 使用 msgId（雪花算法
                     );
                     
                     log.debug("{}消息重试成功，已添加下次重试任务 - clientMsgId: {}, msgId: {}, 重试次数: {}, 下次延迟: {}s", 
@@ -384,8 +388,8 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
      */
     private void markAsOffline(C2CMsgRetryEvent retryEvent) {
         try {
-            // 1. 删除Hash索引
-            redissonUtils.deleteHash(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getClientMsgId());
+            // 1. 删除Hash索引（使用 msgId 作为 Hash 的 key）
+            redissonUtils.deleteHash(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getMsgId());
             
             // 2. 构建离线消息
             C2COffLineMsgAO offLineMsg = C2COffLineMsgAO.builder()
