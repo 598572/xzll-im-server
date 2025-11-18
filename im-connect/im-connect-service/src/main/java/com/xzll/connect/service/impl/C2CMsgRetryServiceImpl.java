@@ -7,6 +7,7 @@ import com.xzll.common.constant.ProtoResponseCode;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ProtoConverterUtil;
+import com.xzll.common.utils.CompressionUtil;
 import com.xzll.common.utils.RedissonUtils;
 import com.xzll.connect.cluster.provider.C2CMsgProvider;
 import com.xzll.connect.netty.channel.LocalChannelManager;
@@ -100,6 +101,14 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             retryDelays[i] = Integer.parseInt(delayStrs[i].trim());
         }
         
+        // 【重要】验证配置一致性：maxRetries应该等于retryDelays.length
+        // 否则会导致数组越界或配置不生效
+        if (maxRetries != retryDelays.length) {
+            log.warn("{}配置不一致！maxRetries={} 但 retryDelays.length={}，自动调整 maxRetries 为 {}", 
+                TAG, maxRetries, retryDelays.length, retryDelays.length);
+            maxRetries = retryDelays.length;
+        }
+        
         // 加载Lua脚本
         try {
             addToRetryQueueScript = loadLuaScript(LUA_ADD_TO_RETRY_QUEUE);
@@ -138,26 +147,36 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
         try {
             // 构建重试事件
             C2CMsgRetryEvent retryEvent = buildRetryEvent(packet);
-            String value = JSONUtil.toJsonStr(retryEvent);
+            String jsonValue = JSONUtil.toJsonStr(retryEvent);
+            
+            // LZ4压缩并Base64编码（减少Redis存储空间50-70%）
+            String compressedValue = CompressionUtil.compressToBase64(jsonValue);
             
             // 计算执行时间戳（当前时间 + 延迟时间）
             long executeTime = System.currentTimeMillis() + retryDelays[0] * 1000;
             
-            //  使用Lua脚本原子性添加（同时添加到ZSet和Hash）
-            Long result = redissonUtils.executeLuaScriptAsLong(
+            // 使用Lua脚本原子性添加（StringCodec性能更优）：
+            // 1. ZSet存msgId（轻量级索引，~20字节）
+            // 2. Hash存LZ4压缩后的完整数据（减少50-70%体积）
+            Long result = redissonUtils.executeLuaScriptAsLongUseStringCodec(
                 addToRetryQueueScript,
                 Arrays.asList(
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
                 ),
-                value,
-                String.valueOf(executeTime),
-                packet.getClientMsgId()
+                compressedValue,              // 压缩后的数据
+                String.valueOf(executeTime),  // 执行时间戳
+                packet.getMsgId()             // 消息ID
             );
             
-            if (result > 0) {
-                log.info("{}消息已添加到延迟队列 - clientMsgId: {}, msgId: {}, 执行时间: {}ms后", 
-                    TAG, packet.getClientMsgId(), packet.getMsgId(), retryDelays[0] * 1000);
+            if (result != null && result > 0) {
+                int originalSize = jsonValue.length();
+                int compressedSize = compressedValue.length();
+                double ratio = CompressionUtil.compressionRatio(originalSize, compressedSize);
+                
+                log.info("{}消息已添加到延迟队列 - clientMsgId: {}, msgId: {}, 执行时间: {}ms后, 压缩率: {:.1f}% ({}B -> {}B)", 
+                    TAG, packet.getClientMsgId(), packet.getMsgId(), retryDelays[0] * 1000, 
+                    ratio, originalSize, compressedSize);
             } else {
                 log.warn("{}消息添加到延迟队列失败 - clientMsgId: {}, msgId: {}", 
                     TAG, packet.getClientMsgId(), packet.getMsgId());
@@ -171,27 +190,30 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
     /**
      * 从延迟队列删除消息（收到客户端ACK时）
      * 使用Lua脚本保证原子性：同时从ZSet和Hash删除
+     * 
+     * @param msgId 服务端消息ID（雪花算法）
      */
     @Override
-    public void removeFromRetryQueue(String clientMsgId) {
+    public void removeFromRetryQueue(String msgId) {
         try {
-            //  使用Lua脚本原子性删除（同时从ZSet和Hash删除）
-            Long result = redissonUtils.executeLuaScriptAsLong(
+            // 使用Lua脚本原子性删除（同时从ZSet和Hash删除）
+            // 使用StringCodec性能更优
+            Long result = redissonUtils.executeLuaScriptAsLongUseStringCodec(
                 removeFromRetryQueueScript,
                 Arrays.asList(
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
                 ),
-                clientMsgId
+                msgId
             );
             
-            if (result > 0) {
-                log.info("{}收到客户端ACK，从延迟队列删除消息 - clientMsgId: {}", TAG, clientMsgId);
+            if (result != null && result > 0) {
+                log.info("{}收到客户端ACK，从延迟队列删除消息 - msgId: {}", TAG, msgId);
             } else {
-                log.debug("{}重试消息不存在（可能已过期或已处理） - clientMsgId: {}", TAG, clientMsgId);
+                log.debug("{}重试消息不存在（可能已过期或已处理） - msgId: {}", TAG, msgId);
             }
         } catch (Exception e) {
-            log.error("{}从延迟队列删除消息异常 - clientMsgId: {}", TAG, clientMsgId, e);
+            log.error("{}从延迟队列删除消息异常 - msgId: {}", TAG, msgId, e);
         }
     }
     
@@ -215,17 +237,16 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
         try {
             long currentTime = System.currentTimeMillis();
             
-            //  关键优化1：只获取到期的消息（score <= 当前时间）
-            //  关键优化2：使用 LIMIT 限制每次处理的消息数量，避免一次性处理太多
-            // 即使有大量消息到期，也分批处理，避免系统压力过大
-            Collection<String> expiredValues = redissonUtils.getZSetRangeByScore(
+            // 步骤1：从ZSet获取到期的msgId列表（轻量级，~20字节/条）
+            // 使用StringCodec读取JsonJacksonCodec写入的数据
+            Collection<String> expiredMsgIds = redissonUtils.getZSetRangeByScoreWithStringCodec(
                 ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE, 0L, currentTime, batchSize);
             
-            if (expiredValues == null || expiredValues.isEmpty()) {
+            if (expiredMsgIds == null || expiredMsgIds.isEmpty()) {
                 return; // 没有到期的消息，直接返回
             }
             
-            int processedCount = expiredValues.size();
+            int processedCount = expiredMsgIds.size();
             log.debug("{}扫描到{}条到期消息（本次处理上限: {}）", TAG, processedCount, batchSize);
             
             // 如果达到批量上限，记录警告（可能有更多消息待处理）
@@ -234,16 +255,34 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                     TAG, batchSize);
             }
             
-            //  优化：按 toUserId 分组，批量处理同一用户的消息
-            Map<String, List<C2CMsgRetryEvent>> groupedByUserId = expiredValues.stream()
-                .map(value -> {
+            // 步骤2：从Hash批量获取完整数据（LZ4压缩，减少50-70%体积）
+            // 使用StringCodec读取Lua脚本写入的数据
+            Map<String, String> compressedDataMap = redissonUtils.batchGetHashWithStringCodec(
+                ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, 
+                new ArrayList<>(expiredMsgIds)
+            );
+            
+            // 步骤3：解压并解析消息，按toUserId分组
+            Map<String, List<C2CMsgRetryEvent>> groupedByUserId = expiredMsgIds.stream()
+                .map(msgId -> {
                     try {
-                        C2CMsgRetryEvent retryEvent = JSONUtil.toBean(value, C2CMsgRetryEvent.class);
-                        // 保存原始 value，用于从ZSet删除
-                        retryEvent.setOriginalValue(value);
+                        String compressedData = compressedDataMap.get(msgId);
+                        if (compressedData == null) {
+                            log.warn("{}消息数据不存在 - msgId: {}", TAG, msgId);
+                            return null;
+                        }
+                        
+                        // LZ4解压
+                        String jsonValue = CompressionUtil.decompressFromBase64(compressedData);
+                        
+                        // JSON解析
+                        C2CMsgRetryEvent retryEvent = JSONUtil.toBean(jsonValue, C2CMsgRetryEvent.class);
+                        // 保存msgId，用于从ZSet和Hash删除
+                        retryEvent.setMsgId(msgId);
+                        
                         return retryEvent;
                     } catch (Exception e) {
-                        log.error("{}解析到期消息异常: {}", TAG, value, e);
+                        log.error("{}解析到期消息异常 - msgId: {}", TAG, msgId, e);
                         return null;
                     }
                 })
@@ -293,18 +332,18 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             
             for (C2CMsgRetryEvent retryEvent : retryEvents) {
                 try {
-                    // 2.1 从ZSet删除（避免重复处理）
-                    if (retryEvent.getOriginalValue() != null) {
-                        redissonUtils.removeZSetValue(
-                            ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE, 
-                            retryEvent.getOriginalValue()
-                        );
-                    }
+                    // 2.1 从ZSet删除msgId（避免重复处理）
+                    // 现在ZSet存的是msgId而不是完整value，直接用msgId删除
+                    redissonUtils.removeZSetValueWithStringCodec(
+                        ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE, 
+                        retryEvent.getMsgId()
+                    );
                     
-                    // 2.2 检查是否已收到客户端ACK
-                    String indexValue = redissonUtils.getHash(
+                    // 2.2 检查是否已收到客户端ACK（使用 msgId 作为 Hash 的 key）
+                    // 使用StringCodec读取Lua脚本写入的数据
+                    String indexValue = redissonUtils.getHashWithStringCodec(
                         ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, 
-                        retryEvent.getClientMsgId()
+                        retryEvent.getMsgId()
                     );
                     if (indexValue == null) {
                         log.debug("{}消息已收到客户端ACK，取消重试 - clientMsgId: {}, msgId: {}", 
@@ -340,25 +379,48 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                 for (C2CMsgRetryEvent retryEvent : needRetry) {
                     sendProtoMsg(targetChannel, retryEvent);
                     
-                    // 更新重试次数并重新添加到延迟队列
+                    // 更新重试次数
                     int nextRetryCount = retryEvent.getRetryCount() + 1;
                     retryEvent.setRetryCount(nextRetryCount);
                     retryEvent.setCreateTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     
+                    // 【关键修复】检查是否还有下次重试的延迟配置
+                    // 如果nextRetryCount超出数组范围，说明这是最后一次重试
+                    if (nextRetryCount >= retryDelays.length) {
+                        log.warn("{}消息已达最大重试次数（{}次），标记为离线消息 - clientMsgId: {}, msgId: {}", 
+                            TAG, nextRetryCount, retryEvent.getClientMsgId(), retryEvent.getMsgId());
+                        
+                        // 1. 从延迟队列中移除
+                        redissonUtils.executeLuaScriptAsLongUseStringCodec(
+                            removeFromRetryQueueScript,
+                            Arrays.asList(
+                                ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
+                                ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
+                            ),
+                            retryEvent.getMsgId()
+                        );
+                        
+                        // 2. 标记为离线消息
+                        markAsOffline(retryEvent);
+                        
+                        continue; // 不再添加到延迟队列
+                    }
+                    
                     // 计算下次执行时间
                     long executeTime = System.currentTimeMillis() + retryDelays[nextRetryCount] * 1000;
                     
-                    //  使用Lua脚本原子性重新添加
-                    String newValue = JSONUtil.toJsonStr(retryEvent);
-                    redissonUtils.executeLuaScriptAsLong(
+                    // 使用Lua脚本原子性重新添加（StringCodec性能更优）
+                    String jsonValue = JSONUtil.toJsonStr(retryEvent);
+                    String compressedValue = CompressionUtil.compressToBase64(jsonValue);
+                    redissonUtils.executeLuaScriptAsLongUseStringCodec(
                         addToRetryQueueScript,
                         Arrays.asList(
                             ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
                             ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
                         ),
-                        newValue,
+                        compressedValue,
                         String.valueOf(executeTime),
-                        retryEvent.getClientMsgId()
+                        retryEvent.getMsgId()
                     );
                     
                     log.debug("{}消息重试成功，已添加下次重试任务 - clientMsgId: {}, msgId: {}, 重试次数: {}, 下次延迟: {}s", 
@@ -384,8 +446,9 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
      */
     private void markAsOffline(C2CMsgRetryEvent retryEvent) {
         try {
-            // 1. 删除Hash索引
-            redissonUtils.deleteHash(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getClientMsgId());
+            // 1. 删除Hash索引（使用 msgId 作为 Hash 的 key）
+            // 使用StringCodec删除Lua脚本写入的数据
+            redissonUtils.deleteHashWithStringCodec(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getMsgId());
             
             // 2. 构建离线消息
             C2COffLineMsgAO offLineMsg = C2COffLineMsgAO.builder()

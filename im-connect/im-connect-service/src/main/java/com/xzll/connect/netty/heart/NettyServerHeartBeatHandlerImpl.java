@@ -112,6 +112,23 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
      */
     private void closeConnectionDueToHeartbeatFailure(ChannelHandlerContext ctx, String userId, String channelId, long timeSinceLastRead) {
         int maxFailures = imConnectServerConfig.getMaxHeartbeatFailures();
+        
+        // 【重要】关闭前再次确认是否真的超时，防止误杀刚重连的用户
+        Long lastReadTime = NettyAttrUtil.getReaderTime(ctx.channel());
+        long currentTime = System.currentTimeMillis();
+        long heartBeatTimeMs = imConnectServerConfig.getHeartBeatTime() * 1000;
+        
+        if (lastReadTime != null) {
+            long actualTimeSinceLastRead = currentTime - lastReadTime;
+            if (actualTimeSinceLastRead < heartBeatTimeMs) {
+                // 用户可能刚重连，取消关闭，重置失败计数
+                log.info("检测到用户{}可能刚重连（实际超时{}ms < {}ms），取消关闭连接，channelId={}", 
+                    userId, actualTimeSinceLastRead, heartBeatTimeMs, channelId);
+                heartbeatFailureCount.remove(channelId);
+                return;
+            }
+        }
+        
         if (StringUtils.isNotBlank(userId)) {
             log.warn("客户端[{}]心跳超时[{}]ms，连续失败{}次，关闭连接！channelId={}", 
                 userId, timeSinceLastRead, maxFailures, channelId);
@@ -209,6 +226,9 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         
         // 重置失败计数
         heartbeatFailureCount.remove(channelId);
+        
+        // 【简化】心跳只负责保活，状态管理交给握手阶段
+        // 原因：握手阶段已同步设置状态，正常情况下不需要心跳恢复
         
         // 根据心跳类型输出不同的日志
         if ("ping".equalsIgnoreCase(heartbeatType)) {

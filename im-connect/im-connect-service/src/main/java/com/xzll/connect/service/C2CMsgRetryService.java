@@ -26,7 +26,7 @@ public interface C2CMsgRetryService {
      * 从延迟队列删除消息（收到客户端ACK时）
      * 使用Lua脚本保证原子性：同时从ZSet和Hash删除
      *
-     * @param clientMsgId 客户端消息ID
+     * @param msgId 服务端消息ID（雪花算法）
      */
-    void removeFromRetryQueue(String clientMsgId);
+    void removeFromRetryQueue(String msgId);
 }

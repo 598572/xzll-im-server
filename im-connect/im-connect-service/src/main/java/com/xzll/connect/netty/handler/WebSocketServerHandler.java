@@ -138,22 +138,50 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 log.info("客户端断开连接：{}, 用户ID: {}", channelId, uid);
             }
             
-            // 异步清理用户状态，避免阻塞IO线程
-            if (uid != null) {
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        LocalChannelManager.removeUserChannel(uid);
-                        userStatusManagerService.userDisconnectAfter(uid);
-                    } catch (Exception e) {
-                        log.error("用户断开连接后处理异常, uid: {}", uid, e);
-                    }
-                }, threadPoolTaskExecutor);
+            // 清理心跳失败计数，防止误杀重连用户
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .cleanup(channelId);
+                log.debug("已清理channelId={}的心跳数据", channelId);
             }
             
-            connectionCount.decrement();
+            // 【改为同步】清理用户状态
+            // 原因：异步清理存在时序问题，可能误删用户重连后的新状态
+            // Redis操作通常1-5ms，同步清理不会造成明显的性能问题
+            if (uid != null) {
+                try {
+                    // 【重要】验证是否为当前用户的Channel，避免误删新连接
+                    Channel currentChannel = LocalChannelManager.getChannelByUserId(uid);
+                    if (currentChannel != null) {
+                        String currentChannelId = currentChannel.id().asLongText();
+                        if (!currentChannelId.equals(channelId)) {
+                            // 用户已重连，旧连接清理时跳过
+                            log.info("用户{}已重连，跳过旧连接的状态清理，旧channelId: {}, 新channelId: {}", 
+                                uid, channelId, currentChannelId);
+                            return; // 直接返回，不清理任何状态
+                        }
+                    }
+                    
+                    // 只有在以下情况才清理：
+                    // 1. currentChannel == null（用户已离线）
+                    // 2. currentChannelId == channelId（是当前连接）
+                    
+                    // 清理LocalChannelManager映射
+                    LocalChannelManager.removeUserChannel(uid);
+                    
+                    // 清理Redis状态
+                    userStatusManagerService.userDisconnectAfter(uid);
+                    
+                    log.info("用户{}状态清理完成，channelId: {}", uid, channelId);
+                } catch (Exception e) {
+                    log.error("用户断开连接后清理状态异常, uid: {}, channelId: {}", uid, channelId, e);
+                }
+            }
         } catch (Exception e) {
             log.error("处理连接断开异常", e);
         } finally {
+            // 【重要】在finally中减少计数，确保旧连接断开时也会统计
+            connectionCount.decrement();
             super.channelInactive(ctx);
         }
     }
@@ -239,11 +267,27 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 if (future.isSuccess()) {
                     log.info("WebSocket握手成功, uid: {}", uidStr);
                     
-                    // 异步处理用户上线和离线消息推送，避免阻塞握手流程
+                    // 【重要】同步设置用户状态，确保后续心跳和消息处理时状态已就绪
+                    // 顺序：先设置LocalChannelManager，再设置Redis状态
+                    try {
+                        // 1. 设置本地Channel映射
+                        LocalChannelManager.addUserChannel(uidStr, ctx.channel());
+                        log.debug("用户{}本地Channel映射设置完成", uidStr);
+                        
+                        // 2. 设置Redis在线状态和路由信息
+                        userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
+                        log.debug("用户{}Redis在线状态设置完成", uidStr);
+                    } catch (Exception e) {
+                        log.error("设置用户{}在线状态失败", uidStr, e);
+                        // 状态设置失败，清理已设置的映射，关闭连接让用户重连
+                        LocalChannelManager.removeUserChannel(uidStr);
+                        ctx.close();
+                        return;
+                    }
+                    
+                    // 【异步】推送离线消息，避免阻塞握手流程
                     CompletableFuture.runAsync(() -> {
                         try {
-                            userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
-                            
                             // 推送离线消息
                             pushOfflineMessages(ctx, uid);
                             
@@ -253,7 +297,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                             // 推送离线好友响应
                             pushOfflineFriendResponses(ctx, uid);
                         } catch (Exception e) {
-                            log.error("用户上线后处理异常, uid: {}", uidStr, e);
+                            log.error("推送离线消息异常, uid: {}", uidStr, e);
                         }
                     }, threadPoolTaskExecutor);
                 } else {

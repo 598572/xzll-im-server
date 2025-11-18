@@ -61,8 +61,9 @@ public class ClientReceivedMsgAckProtoStrategyImpl implements ProtoMsgHandlerStr
             c2CMsgProvider.clientResponseAck(packet);
             
             //新增：删除重试消息（从Redis删除，定时任务扫描时会判断）
-            String clientMsgId = ProtoConverterUtil.bytesToUuidString(req.getClientMsgId());
-            c2CMsgRetryService.removeFromRetryQueue(clientMsgId);
+            // 使用 msgId（雪花算法）作为 Hash 的 key
+            String msgId = ProtoConverterUtil.longToSnowflakeString(req.getMsgId());
+            c2CMsgRetryService.removeFromRetryQueue(msgId);
             
             log.debug("{}结束", TAG);
         } catch (InvalidProtocolBufferException e) {
