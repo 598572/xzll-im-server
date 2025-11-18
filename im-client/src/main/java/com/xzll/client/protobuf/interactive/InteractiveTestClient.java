@@ -73,10 +73,10 @@ public class InteractiveTestClient {
         try {
             // WebSocket URI (需要带上 userId 参数)
             URI uri = new URI("ws://" + IP + ":" + PORT + "/websocket?userId=" + currentUserId);
-            
+
             // 设置 HTTP Headers
             DefaultHttpHeaders headers = new DefaultHttpHeaders();
-            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzM3NzI5NSwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiZDkyOTdlY2UtNTdhMi00ZThhLTkyYjEtYTE5MWRkYjk5YjJlIiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.rF_tT9uLgX6tUPyzMv7v9qftVwrgXZoIWuP7EvtxRq6-YdkZmPTabBpEk7t1Muzc9gFIUbE9QgDeT4d9dR2pmJ-JpHG722IoBaGUKwvTJCpyhPDwR7kFNAk_qlS_wz7HbxKKGarDtU9qFFJOhLtsGmR-jbyU4QBz5ZRr0YZ_Kd1DW9bnmv2Z6Gf16e7LTkon_PcZIaGaS95T_SFerPovKyydU7yU_BzdsSGvo8Ar9tVZM2t6DU69lou6te1eTfiiuPN5lhPHlSBautjAFpDWaDGN8fT3fH2w7i6SP3svDcOw8tlivCtmao749LkbTLI4NjOT7PDGkFGYj2jLcyihZg");
+            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzQzMjk4OCwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiYWVkNDQ0ODEtZDYwYy00N2ZiLWJhMjktMWRlNWUyNGU1NDg5IiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.KW6cT_wH0aAwdLUiOv0IgORutH_Rb5j4a2XaidCjruAmpqtKc7sogKF8MSe7Pem_-kIGsY-EfO_E1hJ45dki_trMeyqrWgQt6QOhNoLQkvaMhx5vNJ_0w4Ijxe6sPzJ5fSaqYIWrLfDaErGrA_MadW7p6OIPj-Uc8OvcAUXFIQmMKrod1ax5GedGkOAe5IfeOX_LWISd4zk7y2hB6vtzN-D9XtddJANg4l_5v4ebAS8H3O8BIxJUD5CPh1UQrNjkfr9YQwqgGuPsMZ-Fe-OoLnZMP21NousntPjTC9c_3cygtdE75J3Xky5ftaHFd_s5EDxgqOro4z49lSVbDZHpNw");
             headers.set("uid", currentUserId);
             
             // 创建 WebSocket 握手器

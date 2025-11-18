@@ -1,6 +1,7 @@
 local zset_key = KEYS[1]      -- C2C_MSG_RETRY_QUEUE (ZSet)
 local hash_key = KEYS[2]      -- C2C_MSG_RETRY_INDEX (Hash)
-local msg_id = tostring(ARGV[1]) -- 服务端消息ID（雪花算法，确保是字符串）
+-- JsonJacksonCodec传递的参数需要用cjson.decode解码
+local msg_id = cjson.decode(ARGV[1])
 
 -- 从Hash索引获取value
 local value = redis.call('HGET', hash_key, msg_id)

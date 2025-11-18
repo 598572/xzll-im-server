@@ -143,7 +143,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             // 计算执行时间戳（当前时间 + 延迟时间）
             long executeTime = System.currentTimeMillis() + retryDelays[0] * 1000;
             
-            //  使用Lua脚本原子性添加（同时添加到ZSet和Hash）
+            // 使用Lua脚本原子性添加（同时添加到ZSet和Hash）
             // 使用 msgId（雪花算法）作为 Hash 的 key
             Long result = redissonUtils.executeLuaScriptAsLong(
                 addToRetryQueueScript,
@@ -156,7 +156,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                 packet.getMsgId()
             );
             
-            if (result > 0) {
+            if (result != null && result > 0) {
                 log.info("{}消息已添加到延迟队列 - clientMsgId: {}, msgId: {}, 执行时间: {}ms后", 
                     TAG, packet.getClientMsgId(), packet.getMsgId(), retryDelays[0] * 1000);
             } else {
@@ -178,7 +178,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
     @Override
     public void removeFromRetryQueue(String msgId) {
         try {
-            //  使用Lua脚本原子性删除（同时从ZSet和Hash删除）
+            // 使用Lua脚本原子性删除（同时从ZSet和Hash删除）
             // 使用 msgId（雪花算法）作为 Hash 的 key
             Long result = redissonUtils.executeLuaScriptAsLong(
                 removeFromRetryQueueScript,
@@ -189,7 +189,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                 msgId
             );
             
-            if (result > 0) {
+            if (result != null && result > 0) {
                 log.info("{}收到客户端ACK，从延迟队列删除消息 - msgId: {}", TAG, msgId);
             } else {
                 log.debug("{}重试消息不存在（可能已过期或已处理） - msgId: {}", TAG, msgId);
@@ -352,7 +352,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                     // 计算下次执行时间
                     long executeTime = System.currentTimeMillis() + retryDelays[nextRetryCount] * 1000;
                     
-                    //  使用Lua脚本原子性重新添加（使用 msgId 作为 Hash 的 key）
+                    // 使用Lua脚本原子性重新添加（使用 msgId 作为 Hash 的 key）
                     String newValue = JSONUtil.toJsonStr(retryEvent);
                     redissonUtils.executeLuaScriptAsLong(
                         addToRetryQueueScript,
@@ -362,7 +362,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                         ),
                         newValue,
                         String.valueOf(executeTime),
-                        retryEvent.getMsgId()  // 使用 msgId（雪花算法
+                        retryEvent.getMsgId()
                     );
                     
                     log.debug("{}消息重试成功，已添加下次重试任务 - clientMsgId: {}, msgId: {}, 重试次数: {}, 下次延迟: {}s", 

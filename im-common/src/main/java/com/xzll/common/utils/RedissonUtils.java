@@ -822,6 +822,7 @@ public class RedissonUtils {
 
     /**
      * 执行Lua脚本（返回Long类型）
+     * 使用JsonJacksonCodec确保参数正确序列化为JSON格式，Lua脚本可以正常处理
      * @param script Lua脚本内容
      * @param keys 脚本中使用的key列表
      * @param args 脚本参数
@@ -830,10 +831,33 @@ public class RedissonUtils {
     public Long executeLuaScriptAsLong(String script, List<String> keys, Object... args) {
         try {
             List<Object> keyObjects = new ArrayList<>(keys);
-            return redissonClient.getScript().eval(org.redisson.api.RScript.Mode.READ_WRITE, script, 
+            // 使用JsonJacksonCodec替代默认的MarshallingCodec
+            // 这样Lua脚本可以正常处理JSON字符串参数
+            return redissonClient.getScript(org.redisson.codec.JsonJacksonCodec.INSTANCE).eval(
+                    org.redisson.api.RScript.Mode.READ_WRITE, script, 
                     org.redisson.api.RScript.ReturnType.INTEGER, keyObjects, args);
         } catch (Exception e) {
             log.error("执行Lua脚本失败: script={}, keys={}, args={}", script, keys, Arrays.toString(args), e);
+            throw e;
+        }
+    }
+
+    /**
+     * 执行Lua脚本（使用StringCodec，返回Long类型）
+     * 使用StringCodec确保所有参数都以字符串形式传递到Lua脚本
+     * @param script Lua脚本内容
+     * @param keys 脚本中使用的key列表
+     * @param args 脚本参数（建议全部使用String类型）
+     * @return 执行结果
+     */
+    public Long executeLuaScriptAsLongWithStringCodec(String script, List<String> keys, Object... args) {
+        try {
+            List<Object> keyObjects = new ArrayList<>(keys);
+            return redissonClient.getScript(org.redisson.client.codec.StringCodec.INSTANCE)
+                    .eval(org.redisson.api.RScript.Mode.READ_WRITE, script, 
+                    org.redisson.api.RScript.ReturnType.INTEGER, keyObjects, args);
+        } catch (Exception e) {
+            log.error("执行Lua脚本失败(StringCodec): script={}, keys={}, args={}", script, keys, Arrays.toString(args), e);
             throw e;
         }
     }
