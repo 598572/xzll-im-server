@@ -145,6 +145,37 @@ public class RedissonUtils {
     }
 
     /**
+     * 批量获取Hash字段值（HMGET）
+     * 用于一次性获取多个字段，性能优于多次HGET
+     * 
+     * @param key Hash的key
+     * @param fields 字段列表
+     * @return 字段-值映射（不存在的字段返回null）
+     */
+    public Map<String, String> batchGetHash(String key, List<String> fields) {
+        try {
+            if (fields == null || fields.isEmpty()) {
+                return new HashMap<>();
+            }
+            
+            RMap<Object, Object> map = redissonClient.getMap(key);
+            Map<Object, Object> values = map.getAll(new HashSet<>(fields));
+            
+            Map<String, String> result = new HashMap<>(fields.size());
+            for (String field : fields) {
+                Object value = values.get(field);
+                if (value != null) {
+                    result.put(field, value.toString());
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("批量获取Hash字段失败: key={}, fields size={}", key, fields.size(), e);
+            throw e;
+        }
+    }
+
+    /**
      * 获取Hash所有字段
      */
     public Map<String, String> getAllHash(String key) {
@@ -537,6 +568,32 @@ public class RedissonUtils {
     }
 
     /**
+     * 根据分数范围获取ZSet元素（使用StringCodec，用于读取JsonJacksonCodec写入的数据）
+     * @param key ZSet的key
+     * @param minScore 最小分数
+     * @param maxScore 最大分数
+     * @param limit 限制返回数量
+     * @return 元素集合
+     */
+    public Collection<String> getZSetRangeByScoreWithStringCodec(String key, double minScore, double maxScore, int limit) {
+        try {
+            RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return zset.valueRange(minScore, true, maxScore, true, 0, limit - 1);
+        } catch (Exception e) {
+            log.error("根据分数范围获取ZSet元素失败(StringCodec): key={}, minScore={}, maxScore={}, limit={}", 
+                key, minScore, maxScore, limit, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 根据分数范围获取ZSet元素（使用StringCodec + Long类型的score）
+     */
+    public Collection<String> getZSetRangeByScoreWithStringCodec(String key, long minScore, long maxScore, int limit) {
+        return getZSetRangeByScoreWithStringCodec(key, (double) minScore, (double) maxScore, limit);
+    }
+
+    /**
      * 删除ZSet中的指定元素（用于删除特定消息）
      */
     public boolean removeZSetValue(String key, String value) {
@@ -544,6 +601,19 @@ public class RedissonUtils {
             return redissonClient.getScoredSortedSet(key).remove(value);
         } catch (Exception e) {
             log.error("删除ZSet元素失败: key={}, value={}", key, value, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 删除ZSet中的指定元素（使用StringCodec，用于删除JsonJacksonCodec写入的数据）
+     */
+    public boolean removeZSetValueWithStringCodec(String key, String value) {
+        try {
+            RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return zset.remove(value);
+        } catch (Exception e) {
+            log.error("删除ZSet元素失败(StringCodec): key={}, value={}", key, value, e);
             throw e;
         }
     }
@@ -831,6 +901,28 @@ public class RedissonUtils {
         }
     }
 
+
+    /**
+     * 执行Lua脚本（返回Long类型，使用StringCodec）
+     * 适合传递字符串参数，性能优于JsonJacksonCodec（无需JSON序列化/反序列化）
+     * @param script Lua脚本内容
+     * @param keys 脚本中使用的key列表
+     * @param args 脚本参数（建议传递字符串）
+     * @return 执行结果
+     */
+    public Long executeLuaScriptAsLongUseStringCodec(String script, List<String> keys, Object... args) {
+        try {
+            List<Object> keyObjects = new ArrayList<>(keys);
+            // 使用StringCodec，参数直接作为字符串传递，无需JSON序列化
+            // Lua脚本中直接使用ARGV[1]，不需要cjson.decode
+            return redissonClient.getScript(org.redisson.client.codec.StringCodec.INSTANCE).eval(
+                    org.redisson.api.RScript.Mode.READ_WRITE, script, 
+                    org.redisson.api.RScript.ReturnType.INTEGER, keyObjects, args);
+        } catch (Exception e) {
+            log.error("执行Lua脚本失败(StringCodec): script={}, keys={}, args={}", script, keys, Arrays.toString(args), e);
+            throw e;
+        }
+    }
 
     /**
      * 执行Lua脚本（返回Long类型）
