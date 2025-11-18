@@ -155,11 +155,10 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
             return false;
         }
         
-        // 处理多设备登录
-        handleMultiDeviceLogin(uid, ctx);
-        
-        // 设置用户信息到Channel
-        LocalChannelManager.addUserChannel(uid, ctx.channel());
+        // 【重要】只设置Channel属性，不设置LocalChannelManager映射
+        // 原因：此时还是HTTP阶段，WebSocket握手还未完成，握手可能失败
+        // LocalChannelManager映射将在握手成功后统一设置，确保状态一致性
+        // 多设备登录的处理也在LocalChannelManager.addUserChannel中完成
         ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
         
         log.info("认证成功：IP={}, uid={}, token={}", clientIp, uid, token);
@@ -271,8 +270,7 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
         }
         
         Assert.isTrue(StringUtils.isNotBlank(uid), AnswerCode.TOKEN_INVALID.getMessage());
-        
-        LocalChannelManager.addUserChannel(uid, ctx.channel());
+
         ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
         
         ctx.pipeline().remove(this);
@@ -291,7 +289,7 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
             uid = "whitelist_" + clientIp.replace(".", "_");
         }
         
-        LocalChannelManager.addUserChannel(uid, ctx.channel());
+        //LocalChannelManager.addUserChannel(uid, ctx.channel());
         ctx.channel().attr(ImConstant.USER_ID_KEY).setIfAbsent(uid);
         
         ctx.pipeline().remove(this);
