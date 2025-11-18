@@ -4,7 +4,6 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.extra.spring.SpringUtil;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.answercode.AnswerCode;
-import com.xzll.connect.netty.channel.LocalChannelManager;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -239,20 +238,6 @@ public class AuthHandler extends ChannelInboundHandlerAdapter {
         } catch (Exception e) {
             log.error("检查用户状态异常：{}", uid, e);
             return false;
-        }
-    }
-
-    /**
-     * 处理多设备登录
-     */
-    private void handleMultiDeviceLogin(String uid, ChannelHandlerContext ctx) {
-        // 可以在这里实现多设备登录策略
-        // 例如：踢掉之前的连接、限制连接数等
-        
-        // 简单实现：如果已有连接，关闭旧连接
-        if (LocalChannelManager.isUserOnline(uid)) {
-            log.info("用户{}重复登录，关闭旧连接", uid);
-            // 这里可以发送通知给旧设备，然后关闭连接
         }
     }
 

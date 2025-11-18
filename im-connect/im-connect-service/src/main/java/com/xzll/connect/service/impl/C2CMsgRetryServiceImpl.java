@@ -101,6 +101,14 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             retryDelays[i] = Integer.parseInt(delayStrs[i].trim());
         }
         
+        // 【重要】验证配置一致性：maxRetries应该等于retryDelays.length
+        // 否则会导致数组越界或配置不生效
+        if (maxRetries != retryDelays.length) {
+            log.warn("{}配置不一致！maxRetries={} 但 retryDelays.length={}，自动调整 maxRetries 为 {}", 
+                TAG, maxRetries, retryDelays.length, retryDelays.length);
+            maxRetries = retryDelays.length;
+        }
+        
         // 加载Lua脚本
         try {
             addToRetryQueueScript = loadLuaScript(LUA_ADD_TO_RETRY_QUEUE);
@@ -371,10 +379,32 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                 for (C2CMsgRetryEvent retryEvent : needRetry) {
                     sendProtoMsg(targetChannel, retryEvent);
                     
-                    // 更新重试次数并重新添加到延迟队列
+                    // 更新重试次数
                     int nextRetryCount = retryEvent.getRetryCount() + 1;
                     retryEvent.setRetryCount(nextRetryCount);
                     retryEvent.setCreateTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    
+                    // 【关键修复】检查是否还有下次重试的延迟配置
+                    // 如果nextRetryCount超出数组范围，说明这是最后一次重试
+                    if (nextRetryCount >= retryDelays.length) {
+                        log.warn("{}消息已达最大重试次数（{}次），标记为离线消息 - clientMsgId: {}, msgId: {}", 
+                            TAG, nextRetryCount, retryEvent.getClientMsgId(), retryEvent.getMsgId());
+                        
+                        // 1. 从延迟队列中移除
+                        redissonUtils.executeLuaScriptAsLongUseStringCodec(
+                            removeFromRetryQueueScript,
+                            Arrays.asList(
+                                ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
+                                ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX
+                            ),
+                            retryEvent.getMsgId()
+                        );
+                        
+                        // 2. 标记为离线消息
+                        markAsOffline(retryEvent);
+                        
+                        continue; // 不再添加到延迟队列
+                    }
                     
                     // 计算下次执行时间
                     long executeTime = System.currentTimeMillis() + retryDelays[nextRetryCount] * 1000;
