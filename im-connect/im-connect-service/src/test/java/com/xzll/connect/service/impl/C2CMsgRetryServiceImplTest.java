@@ -451,6 +451,165 @@ public class C2CMsgRetryServiceImplTest {
         log.info("✅ scanRetryQueue - 多条到期消息批量处理测试通过");
     }
 
+    @Test
+    @Order(9)
+    @DisplayName("集成测试 - addToRetryQueue + scanRetryQueue 完整流程")
+    public void testAddAndScanIntegration() throws Exception {
+        log.info("=== 集成测试 - addToRetryQueue + scanRetryQueue 完整流程 ===");
+        
+        // 1. 准备测试消息
+        C2CSendMsgAO packet = createTestPacket();
+        String testMsgId = "integration_test_" + System.currentTimeMillis();
+        packet.setMsgId(testMsgId);
+        
+        // 2. 添加到重试队列（应该会压缩并存储）
+        log.info("步骤1: 添加消息到重试队列");
+        c2CMsgRetryService.addToRetryQueue(packet);
+        Thread.sleep(500); // 等待异步添加完成
+        
+        // 3. 验证ZSet中存在msgId
+        RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(TEST_QUEUE_KEY, org.redisson.client.codec.StringCodec.INSTANCE);
+        assertTrue(zset.contains(testMsgId), "ZSet应该包含msgId");
+        log.info("步骤2: 验证ZSet - msgId存在 ✓");
+        
+        // 4. 验证Hash中存在压缩数据
+        RMap<String, String> hash = redissonClient.getMap(TEST_INDEX_KEY, org.redisson.client.codec.StringCodec.INSTANCE);
+        String compressedData = hash.get(testMsgId);
+        assertNotNull(compressedData, "Hash应该包含压缩数据");
+        log.info("步骤3: 验证Hash - 压缩数据存在，长度: {}", compressedData.length());
+        
+        // 5. 验证数据可以正确解压
+        String decompressedJson = CompressionUtil.decompressFromBase64(compressedData);
+        assertNotNull(decompressedJson, "应该能正确解压");
+        C2CMsgRetryEvent event = JSONUtil.toBean(decompressedJson, C2CMsgRetryEvent.class);
+        assertEquals(testMsgId, event.getMsgId(), "解压后的msgId应该匹配");
+        assertEquals(packet.getClientMsgId(), event.getClientMsgId(), "clientMsgId应该匹配");
+        log.info("步骤4: 验证压缩/解压 - 数据完整性 ✓");
+        
+        // 6. 修改score为过去时间（模拟到期）
+        double pastScore = System.currentTimeMillis() - 5000;
+        zset.addScore(testMsgId, pastScore - zset.getScore(testMsgId));
+        log.info("步骤5: 修改score为过去时间 - 模拟消息到期");
+        
+        // 7. 调用scanRetryQueue（应该扫描到这条消息）
+        log.info("步骤6: 调用scanRetryQueue扫描到期消息");
+        c2CMsgRetryService.scanRetryQueue();
+        
+        // 8. 等待异步处理
+        Thread.sleep(2000);
+        
+        log.info("✅ 集成测试 - 完整流程测试通过");
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("压缩测试 - 验证LZ4压缩效果")
+    public void testCompressionEfficiency() throws Exception {
+        log.info("=== 压缩测试 - 验证LZ4压缩效果 ===");
+        
+        // 1. 创建较大的测试消息
+        C2CSendMsgAO packet = createTestPacket();
+        packet.setMsgId("compression_test_" + System.currentTimeMillis());
+        packet.setMsgContent("这是一条用于测试压缩效果的较长消息内容。".repeat(10)); // 重复10次
+        
+        // 2. 添加到重试队列
+        c2CMsgRetryService.addToRetryQueue(packet);
+        Thread.sleep(500);
+        
+        // 3. 获取原始JSON和压缩后数据
+        C2CMsgRetryEvent retryEvent = new C2CMsgRetryEvent();
+        retryEvent.setMsgId(packet.getMsgId());
+        retryEvent.setClientMsgId(packet.getClientMsgId());
+        retryEvent.setFromUserId(packet.getFromUserId());
+        retryEvent.setToUserId(packet.getToUserId());
+        retryEvent.setChatId(packet.getChatId());
+        retryEvent.setMsgContent(packet.getMsgContent());
+        retryEvent.setMsgFormat(packet.getMsgFormat());
+        retryEvent.setMsgCreateTime(packet.getMsgCreateTime());
+        retryEvent.setCreateTime(DateUtil.now());
+        retryEvent.setRetryCount(0);
+        retryEvent.setMaxRetries(3);
+        
+        String originalJson = JSONUtil.toJsonStr(retryEvent);
+        int originalSize = originalJson.length();
+        
+        // 4. 从Redis获取压缩数据
+        RMap<String, String> hash = redissonClient.getMap(TEST_INDEX_KEY, org.redisson.client.codec.StringCodec.INSTANCE);
+        String compressedData = hash.get(packet.getMsgId());
+        assertNotNull(compressedData, "应该能获取到压缩数据");
+        int compressedSize = compressedData.length();
+        
+        // 5. 计算压缩率
+        double compressionRatio = CompressionUtil.compressionRatio(originalSize, compressedSize);
+        log.info("原始大小: {} bytes", originalSize);
+        log.info("压缩后大小: {} bytes", compressedSize);
+        log.info("压缩率: {:.1f}%", compressionRatio);
+        
+        // 6. 验证压缩确实减少了体积
+        assertTrue(compressedSize < originalSize, "压缩后体积应该小于原始体积");
+        assertTrue(compressionRatio < 90, "压缩率应该小于90%");
+        
+        // 7. 验证解压后数据完整性
+        String decompressed = CompressionUtil.decompressFromBase64(compressedData);
+        assertEquals(originalJson.length(), decompressed.length(), "解压后长度应该与原始一致");
+        
+        log.info("✅ 压缩测试通过 - 压缩率: {:.1f}%", compressionRatio);
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("数据一致性测试 - ZSet和Hash同步")
+    public void testDataConsistency() throws Exception {
+        log.info("=== 数据一致性测试 - ZSet和Hash同步 ===");
+        
+        // 1. 添加多条消息
+        List<String> msgIds = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            C2CSendMsgAO packet = createTestPacket();
+            String msgId = "consistency_test_" + i + "_" + System.currentTimeMillis();
+            packet.setMsgId(msgId);
+            msgIds.add(msgId);
+            
+            c2CMsgRetryService.addToRetryQueue(packet);
+        }
+        Thread.sleep(1000);
+        
+        // 2. 验证ZSet和Hash中都有相同的msgId
+        RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(TEST_QUEUE_KEY, org.redisson.client.codec.StringCodec.INSTANCE);
+        RMap<String, String> hash = redissonClient.getMap(TEST_INDEX_KEY, org.redisson.client.codec.StringCodec.INSTANCE);
+        
+        for (String msgId : msgIds) {
+            assertTrue(zset.contains(msgId), "ZSet应该包含msgId: " + msgId);
+            assertNotNull(hash.get(msgId), "Hash应该包含msgId: " + msgId);
+            
+            // 验证可以解压
+            String compressed = hash.get(msgId);
+            String decompressed = CompressionUtil.decompressFromBase64(compressed);
+            C2CMsgRetryEvent event = JSONUtil.toBean(decompressed, C2CMsgRetryEvent.class);
+            assertNotNull(event, "应该能解析出事件对象");
+        }
+        
+        log.info("✅ 数据一致性测试通过 - ZSet和Hash数据同步");
+        
+        // 3. 删除一条消息
+        String msgIdToRemove = msgIds.get(0);
+        c2CMsgRetryService.removeFromRetryQueue(msgIdToRemove);
+        Thread.sleep(100);
+        
+        // 4. 验证ZSet和Hash都已删除
+        assertFalse(zset.contains(msgIdToRemove), "ZSet应该已删除msgId");
+        assertNull(hash.get(msgIdToRemove), "Hash应该已删除msgId");
+        
+        // 5. 验证其他消息未受影响
+        for (int i = 1; i < msgIds.size(); i++) {
+            String msgId = msgIds.get(i);
+            assertTrue(zset.contains(msgId), "其他msgId应该仍在ZSet中");
+            assertNotNull(hash.get(msgId), "其他msgId应该仍在Hash中");
+        }
+        
+        log.info("✅ 删除操作一致性测试通过");
+    }
+
     /**
      * 创建测试用的消息包
      */

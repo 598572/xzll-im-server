@@ -158,17 +158,9 @@ public class RedissonUtils {
                 return new HashMap<>();
             }
             
-            RMap<Object, Object> map = redissonClient.getMap(key);
-            Map<Object, Object> values = map.getAll(new HashSet<>(fields));
-            
-            Map<String, String> result = new HashMap<>(fields.size());
-            for (String field : fields) {
-                Object value = values.get(field);
-                if (value != null) {
-                    result.put(field, value.toString());
-                }
-            }
-            return result;
+            // 使用StringCodec读取数据（与写入时的Codec保持一致）
+            RMap<String, String> map = redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return map.getAll(new HashSet<>(fields));
         } catch (Exception e) {
             log.error("批量获取Hash字段失败: key={}, fields size={}", key, fields.size(), e);
             throw e;
