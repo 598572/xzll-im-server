@@ -176,6 +176,11 @@ public class C2CMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract implem
                     log.error("{}【跨服务器转发-异常】gRPC转发消息失败 - clientMsgId: {}, msgId: {}, error: {}", 
                         TAG, packet.getClientMsgId(), packet.getMsgId(), e.getMessage(), e);
                 }
+            } else {
+                // 【新增】捕获异常状态，帮助诊断问题
+                log.warn("{}【步骤3-异常状态】用户{}状态不一致 - targetChannel: {}, userStatus: {}, ipPortStr: {} - clientMsgId: {}, msgId: {}",
+                    TAG, packet.getToUserId(), (targetChannel != null ? "存在" : "null"), 
+                    userStatus, ipPortStr, packet.getClientMsgId(), packet.getMsgId());
             }
             
             log.debug("{}客户端发送单聊消息_结束", TAG);

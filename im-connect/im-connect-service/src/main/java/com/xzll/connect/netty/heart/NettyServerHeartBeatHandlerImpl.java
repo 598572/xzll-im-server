@@ -3,6 +3,8 @@ package com.xzll.connect.netty.heart;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.config.IMConnectServerConfig;
+import com.xzll.connect.service.UserStatusManagerService;
+import com.xzll.common.utils.RedissonUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -33,6 +35,12 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
 
     @Resource
     private IMConnectServerConfig imConnectServerConfig;
+    
+    @Resource
+    private RedissonUtils redissonUtils;
+    
+    @Resource
+    private UserStatusManagerService userStatusManagerService;
 
     // 存储每个连接的心跳失败次数
     private static final ConcurrentHashMap<String, Integer> heartbeatFailureCount = new ConcurrentHashMap<>();
@@ -210,6 +218,11 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         // 重置失败计数
         heartbeatFailureCount.remove(channelId);
         
+        // 【重要】检查并恢复Redis中的在线状态（修复重连后状态不一致问题）
+        if (StringUtils.isNotBlank(userId)) {
+            checkAndRestoreOnlineStatus(userId);
+        }
+        
         // 根据心跳类型输出不同的日志
         if ("ping".equalsIgnoreCase(heartbeatType)) {
             log.debug("收到客户端主动心跳ping：channelId={}, userId={}", channelId, userId);
@@ -278,6 +291,33 @@ public class NettyServerHeartBeatHandlerImpl implements HeartBeatHandler {
         return failureCount < maxFailures;
     }
 
+    /**
+     * 检查并恢复Redis中的在线状态
+     * 解决用户重连后，本地Channel存在但Redis状态为null的问题
+     * 
+     * @param userId 用户ID
+     */
+    private void checkAndRestoreOnlineStatus(String userId) {
+        try {
+            // 检查Redis中的在线状态
+            String userStatus = redissonUtils.getHash(
+                ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX, userId);
+            
+            // 如果Redis中没有在线状态，说明可能是重连导致的状态丢失，需要恢复
+            if (StringUtils.isBlank(userStatus)) {
+                log.warn("检测到用户{}的Redis在线状态丢失，正在恢复...", userId);
+                
+                // 恢复在线状态
+                userStatusManagerService.userConnectSuccessAfter(
+                    ImConstant.UserStatus.ON_LINE.getValue(), userId);
+                
+                log.info("已恢复用户{}的Redis在线状态", userId);
+            }
+        } catch (Exception e) {
+            log.error("检查并恢复用户{}的在线状态失败", userId, e);
+        }
+    }
+    
     /**
      * 强制清理所有心跳数据（用于服务关闭）
      */
