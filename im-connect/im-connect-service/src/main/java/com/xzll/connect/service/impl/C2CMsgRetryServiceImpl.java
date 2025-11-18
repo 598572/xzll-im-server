@@ -248,7 +248,8 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             }
             
             // 步骤2：从Hash批量获取完整数据（LZ4压缩，减少50-70%体积）
-            Map<String, String> compressedDataMap = redissonUtils.batchGetHash(
+            // 使用StringCodec读取Lua脚本写入的数据
+            Map<String, String> compressedDataMap = redissonUtils.batchGetHashWithStringCodec(
                 ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, 
                 new ArrayList<>(expiredMsgIds)
             );
@@ -331,7 +332,8 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                     );
                     
                     // 2.2 检查是否已收到客户端ACK（使用 msgId 作为 Hash 的 key）
-                    String indexValue = redissonUtils.getHash(
+                    // 使用StringCodec读取Lua脚本写入的数据
+                    String indexValue = redissonUtils.getHashWithStringCodec(
                         ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, 
                         retryEvent.getMsgId()
                     );
@@ -415,7 +417,8 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
     private void markAsOffline(C2CMsgRetryEvent retryEvent) {
         try {
             // 1. 删除Hash索引（使用 msgId 作为 Hash 的 key）
-            redissonUtils.deleteHash(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getMsgId());
+            // 使用StringCodec删除Lua脚本写入的数据
+            redissonUtils.deleteHashWithStringCodec(ImConstant.RedisKeyConstant.C2C_MSG_RETRY_INDEX, retryEvent.getMsgId());
             
             // 2. 构建离线消息
             C2COffLineMsgAO offLineMsg = C2COffLineMsgAO.builder()

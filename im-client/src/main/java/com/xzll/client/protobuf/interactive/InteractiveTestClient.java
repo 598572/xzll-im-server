@@ -76,7 +76,7 @@ public class InteractiveTestClient {
 
             // 设置 HTTP Headers
             DefaultHttpHeaders headers = new DefaultHttpHeaders();
-            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzQzMjk4OCwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiYWVkNDQ0ODEtZDYwYy00N2ZiLWJhMjktMWRlNWUyNGU1NDg5IiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.KW6cT_wH0aAwdLUiOv0IgORutH_Rb5j4a2XaidCjruAmpqtKc7sogKF8MSe7Pem_-kIGsY-EfO_E1hJ45dki_trMeyqrWgQt6QOhNoLQkvaMhx5vNJ_0w4Ijxe6sPzJ5fSaqYIWrLfDaErGrA_MadW7p6OIPj-Uc8OvcAUXFIQmMKrod1ax5GedGkOAe5IfeOX_LWISd4zk7y2hB6vtzN-D9XtddJANg4l_5v4ebAS8H3O8BIxJUD5CPh1UQrNjkfr9YQwqgGuPsMZ-Fe-OoLnZMP21NousntPjTC9c_3cygtdE75J3Xky5ftaHFd_s5EDxgqOro4z49lSVbDZHpNw");
+            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzQ0NzczMSwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiZTg4ZmJiMjEtY2VjYy00MDIyLWI4OWYtNTk2ZjMwMTI4MmJkIiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.SweSc20vLNhCThNLbd8KZaWI31Ffc7RpR-LWy2871rYNWDGCTcjk8EL9fp0SY3r_wyoTN_wfLlKu3GblmxQNZkFJgOUPpCXATnWSsQ6HzNaV7bh2sh579lf3SdJbtJ2rikDMPpVT9WivUS_ldLgHzWN35_gIYNkcILV7ODNYo7jYkD_-E9RyxrUWzf2qJ0Ofq5A6a99MYuKcNrrcXfuJcxWt7ORY2l2v3ra6PDJpoHmyyzZQgVwDyt2s7fdi6Ut2qx2X6tVR2jzJhjfA5OGKAMyisvMgWdlZDW3MpGuMwgr9-KeLaovPKF_Dv4VUthYLaqmBOIiplXyBndTVv4LQ2Q");
             headers.set("uid", currentUserId);
             
             // 创建 WebSocket 握手器

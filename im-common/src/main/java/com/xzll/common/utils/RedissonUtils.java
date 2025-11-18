@@ -109,7 +109,7 @@ public class RedissonUtils {
     // ==================== Hash类型操作 ====================
 
     /**
-     * 设置Hash字段
+     * 设置Hash字段（默认Codec）
      */
     public void setHash(String key, String field, String value) {
         try {
@@ -121,7 +121,19 @@ public class RedissonUtils {
     }
 
     /**
-     * 批量设置Hash字段
+     * 设置Hash字段（使用StringCodec，用于Lua脚本写入的数据）
+     */
+    public void setHashWithStringCodec(String key, String field, String value) {
+        try {
+            redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE).put(field, value);
+        } catch (Exception e) {
+            log.error("设置Hash字段失败(StringCodec): key={}, field={}, value={}", key, field, value, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 批量设置Hash字段（默认Codec）
      */
     public void setHash(String key, Map<String, String> map) {
         try {
@@ -133,7 +145,19 @@ public class RedissonUtils {
     }
 
     /**
-     * 获取Hash字段值
+     * 批量设置Hash字段（使用StringCodec，用于Lua脚本写入的数据）
+     */
+    public void setHashWithStringCodec(String key, Map<String, String> map) {
+        try {
+            redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE).putAll(map);
+        } catch (Exception e) {
+            log.error("批量设置Hash字段失败(StringCodec): key={}, map={}", key, map, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 获取Hash字段值（默认Codec）
      */
     public String getHash(String key, String field) {
         try {
@@ -145,7 +169,20 @@ public class RedissonUtils {
     }
 
     /**
-     * 批量获取Hash字段值（HMGET）
+     * 获取Hash字段值（使用StringCodec，用于读取Lua脚本写入的数据）
+     */
+    public String getHashWithStringCodec(String key, String field) {
+        try {
+            RMap<String, String> map = redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return map.get(field);
+        } catch (Exception e) {
+            log.error("获取Hash字段失败(StringCodec): key={}, field={}", key, field, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 批量获取Hash字段值（HMGET，默认Codec）
      * 用于一次性获取多个字段，性能优于多次HGET
      * 
      * @param key Hash的key
@@ -158,9 +195,17 @@ public class RedissonUtils {
                 return new HashMap<>();
             }
             
-            // 使用StringCodec读取数据（与写入时的Codec保持一致）
-            RMap<String, String> map = redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE);
-            return map.getAll(new HashSet<>(fields));
+            RMap<Object, Object> map = redissonClient.getMap(key);
+            Map<Object, Object> values = map.getAll(new HashSet<>(fields));
+            
+            Map<String, String> result = new HashMap<>(fields.size());
+            for (String field : fields) {
+                Object value = values.get(field);
+                if (value != null) {
+                    result.put(field, value.toString());
+                }
+            }
+            return result;
         } catch (Exception e) {
             log.error("批量获取Hash字段失败: key={}, fields size={}", key, fields.size(), e);
             throw e;
@@ -168,7 +213,24 @@ public class RedissonUtils {
     }
 
     /**
-     * 获取Hash所有字段
+     * 批量获取Hash字段值（HMGET，使用StringCodec，用于读取Lua脚本写入的数据）
+     */
+    public Map<String, String> batchGetHashWithStringCodec(String key, List<String> fields) {
+        try {
+            if (fields == null || fields.isEmpty()) {
+                return new HashMap<>();
+            }
+            
+            RMap<String, String> map = redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return map.getAll(new HashSet<>(fields));
+        } catch (Exception e) {
+            log.error("批量获取Hash字段失败(StringCodec): key={}, fields size={}", key, fields.size(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * 获取Hash所有字段（默认Codec）
      */
     public Map<String, String> getAllHash(String key) {
         try {
@@ -185,7 +247,20 @@ public class RedissonUtils {
     }
 
     /**
-     * 删除Hash字段
+     * 获取Hash所有字段（使用StringCodec，用于读取Lua脚本写入的数据）
+     */
+    public Map<String, String> getAllHashWithStringCodec(String key) {
+        try {
+            RMap<String, String> map = redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE);
+            return map.readAllMap();
+        } catch (Exception e) {
+            log.error("获取Hash所有字段失败(StringCodec): key={}", key, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 删除Hash字段（默认Codec）
      */
     public long deleteHash(String key, String... fields) {
         try {
@@ -197,7 +272,19 @@ public class RedissonUtils {
     }
 
     /**
-     * 检查Hash字段是否存在
+     * 删除Hash字段（使用StringCodec，用于Lua脚本写入的数据）
+     */
+    public long deleteHashWithStringCodec(String key, String... fields) {
+        try {
+            return redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE).fastRemove(fields);
+        } catch (Exception e) {
+            log.error("删除Hash字段失败(StringCodec): key={}, fields={}", key, Arrays.toString(fields), e);
+            throw e;
+        }
+    }
+
+    /**
+     * 检查Hash字段是否存在（默认Codec）
      */
     public boolean existsHash(String key, String field) {
         try {
@@ -209,13 +296,37 @@ public class RedissonUtils {
     }
 
     /**
-     * 获取Hash字段数量
+     * 检查Hash字段是否存在（使用StringCodec，用于Lua脚本写入的数据）
+     */
+    public boolean existsHashWithStringCodec(String key, String field) {
+        try {
+            return redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE).containsKey(field);
+        } catch (Exception e) {
+            log.error("检查Hash字段存在失败(StringCodec): key={}, field={}", key, field, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 获取Hash字段数量（默认Codec）
      */
     public long sizeHash(String key) {
         try {
             return redissonClient.getMap(key).size();
         } catch (Exception e) {
             log.error("获取Hash字段数量失败: key={}", key, e);
+            throw e;
+        }
+    }
+
+    /**
+     * 获取Hash字段数量（使用StringCodec，用于Lua脚本写入的数据）
+     */
+    public long sizeHashWithStringCodec(String key) {
+        try {
+            return redissonClient.getMap(key, org.redisson.client.codec.StringCodec.INSTANCE).size();
+        } catch (Exception e) {
+            log.error("获取Hash字段数量失败(StringCodec): key={}", key, e);
             throw e;
         }
     }
