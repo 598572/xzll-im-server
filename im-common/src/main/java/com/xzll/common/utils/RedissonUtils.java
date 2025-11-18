@@ -820,6 +820,18 @@ public class RedissonUtils {
         }
     }
 
+    public Long executeLuaScriptAsLong(String script, List<String> keys, Object... args) {
+        try {
+            List<Object> keyObjects = new ArrayList<>(keys);
+            return redissonClient.getScript().eval(org.redisson.api.RScript.Mode.READ_WRITE, script,
+                    org.redisson.api.RScript.ReturnType.INTEGER, keyObjects, args);
+        } catch (Exception e) {
+            log.error("执行Lua脚本失败: script={}, keys={}, args={}", script, keys, Arrays.toString(args), e);
+            throw e;
+        }
+    }
+
+
     /**
      * 执行Lua脚本（返回Long类型）
      * 使用JsonJacksonCodec确保参数正确序列化为JSON格式，Lua脚本可以正常处理
@@ -828,7 +840,7 @@ public class RedissonUtils {
      * @param args 脚本参数
      * @return 执行结果
      */
-    public Long executeLuaScriptAsLong(String script, List<String> keys, Object... args) {
+    public Long executeLuaScriptAsLongUseJsonJacksonCodec(String script, List<String> keys, Object... args) {
         try {
             List<Object> keyObjects = new ArrayList<>(keys);
             // 使用JsonJacksonCodec替代默认的MarshallingCodec

@@ -145,7 +145,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
             
             // 使用Lua脚本原子性添加（同时添加到ZSet和Hash）
             // 使用 msgId（雪花算法）作为 Hash 的 key
-            Long result = redissonUtils.executeLuaScriptAsLong(
+            Long result = redissonUtils.executeLuaScriptAsLongUseJsonJacksonCodec(
                 addToRetryQueueScript,
                 Arrays.asList(
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
@@ -180,7 +180,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
         try {
             // 使用Lua脚本原子性删除（同时从ZSet和Hash删除）
             // 使用 msgId（雪花算法）作为 Hash 的 key
-            Long result = redissonUtils.executeLuaScriptAsLong(
+            Long result = redissonUtils.executeLuaScriptAsLongUseJsonJacksonCodec(
                 removeFromRetryQueueScript,
                 Arrays.asList(
                     ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
@@ -354,7 +354,7 @@ public class C2CMsgRetryServiceImpl implements C2CMsgRetryService {
                     
                     // 使用Lua脚本原子性重新添加（使用 msgId 作为 Hash 的 key）
                     String newValue = JSONUtil.toJsonStr(retryEvent);
-                    redissonUtils.executeLuaScriptAsLong(
+                    redissonUtils.executeLuaScriptAsLongUseJsonJacksonCodec(
                         addToRetryQueueScript,
                         Arrays.asList(
                             ImConstant.RedisKeyConstant.C2C_MSG_RETRY_QUEUE,
