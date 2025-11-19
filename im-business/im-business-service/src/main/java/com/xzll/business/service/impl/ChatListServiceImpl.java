@@ -9,6 +9,7 @@ import com.xzll.common.utils.RedissonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -52,6 +53,13 @@ public class ChatListServiceImpl implements ChatListService {
     private static final String UNREAD_SUFFIX = ":unread";
     private static final String CLEAR_TS_SUFFIX = ":clear_ts";  // 清零时间戳
     
+    // Lua脚本：原子递增未读数（适配StringCodec）
+    private static final String LUA_INCR_UNREAD = 
+        "local current = redis.call('HGET', KEYS[1], ARGV[1]); " +
+        "local newVal = (current and tonumber(current) or 0) + 1; " +
+        "redis.call('HSET', KEYS[1], ARGV[1], tostring(newVal)); " +
+        "return newVal";
+    
     /**
      * 更新会话列表元数据（时间戳防护版）
      * 
@@ -65,7 +73,7 @@ public class ChatListServiceImpl implements ChatListService {
         
         try {
             // 1. 检查清零时间戳（防止清零后旧消息递增）
-            RMap<String, String> metaMap = redissonClient.getMap(redisKey);
+            RMap<String, String> metaMap = redissonClient.getMap(redisKey, StringCodec.INSTANCE);
             String clearTsStr = metaMap.get(chatId + CLEAR_TS_SUFFIX);
             Long clearTs = clearTsStr != null ? Long.parseLong(clearTsStr) : null;
             
@@ -91,12 +99,15 @@ public class ChatListServiceImpl implements ChatListService {
             String compressedValue = CompressionUtil.compressToBase64(jsonValue);
             int compressedSize = compressedValue.length();
             
-            // 4. 保存元数据到 {chatId}:meta
-            redissonUtils.setHash(redisKey, chatId + META_SUFFIX, compressedValue);
+            // 4. 保存元数据到 {chatId}:meta（使用StringCodec保持一致性）
+            redissonUtils.setHashWithStringCodec(redisKey, chatId + META_SUFFIX, compressedValue);
             
-            // 5. 【原子递增未读数】到 {chatId}:unread
-            RMap<String, Long> unreadMap = redissonClient.getMap(redisKey);
-            Long newUnread = unreadMap.addAndGet(chatId + UNREAD_SUFFIX, 1L);
+            // 5. 【原子递增未读数】到 {chatId}:unread（使用Lua脚本保证原子性）
+            Long newUnread = redissonUtils.executeLuaScriptAsLongWithStringCodec(
+                LUA_INCR_UNREAD, 
+                java.util.Collections.singletonList(redisKey), 
+                chatId + UNREAD_SUFFIX
+            );
             
             double ratio = CompressionUtil.compressionRatio(originalSize, compressedSize);
             
@@ -120,7 +131,7 @@ public class ChatListServiceImpl implements ChatListService {
         metadata.set("f", fromUserId);
         
         String compressedValue = CompressionUtil.compressToBase64(metadata.toString());
-        redissonUtils.setHash(redisKey, chatId + META_SUFFIX, compressedValue);
+        redissonUtils.setHashWithStringCodec(redisKey, chatId + META_SUFFIX, compressedValue);
         
         log.debug("仅更新元数据（不递增未读数）, userId: {}, chatId: {}", userId, chatId);
     }
@@ -133,7 +144,7 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            Map<String, String> allFields = redissonUtils.getAllHash(redisKey);
+            Map<String, String> allFields = redissonUtils.getAllHashWithStringCodec(redisKey);
             
             if (allFields == null || allFields.isEmpty()) {
                 log.debug("用户{}无会话列表元数据", userId);
@@ -197,16 +208,16 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            // 获取元数据
-            String compressed = redissonUtils.getHash(redisKey, chatId + META_SUFFIX);
+            // 获取元数据（使用StringCodec）
+            String compressed = redissonUtils.getHashWithStringCodec(redisKey, chatId + META_SUFFIX);
             if (compressed == null) {
                 return null;
             }
             
             String metaJson = CompressionUtil.decompressFromBase64(compressed);
             
-            // 获取未读数
-            String unreadStr = redissonUtils.getHash(redisKey, chatId + UNREAD_SUFFIX);
+            // 获取未读数（使用StringCodec）
+            String unreadStr = redissonUtils.getHashWithStringCodec(redisKey, chatId + UNREAD_SUFFIX);
             long unread = unreadStr != null ? Long.parseLong(unreadStr) : 0;
             
             // 合并
@@ -228,14 +239,15 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            // 1. 清零未读数（原子操作）
-            RMap<String, Long> unreadMap = redissonClient.getMap(redisKey);
-            unreadMap.put(chatId + UNREAD_SUFFIX, 0L);
+            // 使用StringCodec避免序列化问题
+            RMap<String, String> map = redissonClient.getMap(redisKey, StringCodec.INSTANCE);
+            
+            // 1. 清零未读数
+            map.put(chatId + UNREAD_SUFFIX, "0");
             
             // 2. 【关键】记录清零时间戳，防止旧消息递增
             long clearTimestamp = System.currentTimeMillis();
-            RMap<String, String> metaMap = redissonClient.getMap(redisKey);
-            metaMap.put(chatId + CLEAR_TS_SUFFIX, String.valueOf(clearTimestamp));
+            map.put(chatId + CLEAR_TS_SUFFIX, String.valueOf(clearTimestamp));
             
             log.info("清零会话未读数（记录时间戳）, userId: {}, chatId: {}, clearTs: {}", 
                 userId, chatId, clearTimestamp);
@@ -253,10 +265,10 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            // 删除元数据、未读数、清零时间戳三个字段
-            redissonUtils.deleteHash(redisKey, chatId + META_SUFFIX);
-            redissonUtils.deleteHash(redisKey, chatId + UNREAD_SUFFIX);
-            redissonUtils.deleteHash(redisKey, chatId + CLEAR_TS_SUFFIX);
+            // 删除元数据、未读数、清零时间戳三个字段（使用StringCodec）
+            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + META_SUFFIX);
+            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + UNREAD_SUFFIX);
+            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + CLEAR_TS_SUFFIX);
             
             log.info("删除会话元数据, userId: {}, chatId: {}", userId, chatId);
         } catch (Exception e) {
