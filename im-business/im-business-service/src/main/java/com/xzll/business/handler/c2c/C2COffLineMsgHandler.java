@@ -1,5 +1,6 @@
 package com.xzll.business.handler.c2c;
 
+import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
@@ -30,31 +31,37 @@ public class C2COffLineMsgHandler {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
     
-    // 替换Dubbo为gRPC
-    @Resource
-    private GrpcMessageService grpcMessageService;
+
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;
+    
+    @Resource
+    private ChatListService chatListService;
 
 
     /**
      * 离线消息处理 - 更新消息状态为离线并发送服务端ACK
      * 
-     * 注意：离线消息本质上是一个更新消息状态的操作，消息已经在exchange方法中保存（初始状态为"未读"）
-     * 这里只需要更新消息状态为"离线"，而不是重新保存消息
+     * 完整流程：
+     * 1. 更新会话记录
+     * 2. 更新HBase消息状态为"离线"
+     * 3. 【新增】更新Redis会话列表元数据（接收方）
+     * 4. 发送服务端ACK给发送方
+     *
+     * 注：不再保存到Redis离线消息队列，客户端登录后主动调用会话列表接口获取
      */
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
     public void sendC2CMsgDeal(C2COffLineMsgAO dto) {
         log.debug("【C2COffLineMsgHandler开始】处理离线消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}, status: {}",
             dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId(), dto.getMsgStatus());
         
-        // 更新会话记录（如果需要）
+        // 1. 更新会话记录（如果需要）
         C2CSendMsgAO sendMsgAO = convertToC2CSendMsgAO(dto);
         boolean writeChat = imChatService.saveOrUpdateC2CChat(sendMsgAO);
         log.debug("【C2COffLineMsgHandler-会话保存】会话保存结果: {} - clientMsgId: {}, msgId: {}",
             writeChat, dto.getClientMsgId(), dto.getMsgId());
         
-        // 更新消息状态为离线
+        // 2. 更新消息状态为离线
         boolean updateMsg = true;
         if (imC2CMsgRecordHBaseService != null) {
             updateMsg = imC2CMsgRecordHBaseService.updateC2CMsgOffLineStatus(dto);
@@ -65,6 +72,23 @@ public class C2COffLineMsgHandler {
                 dto.getClientMsgId(), dto.getMsgId());
         }
         
+        // 3. 【关键】更新Redis会话列表元数据（接收方）
+        try {
+            chatListService.updateChatListMetadata(
+                dto.getToUserId(),  // 接收方
+                dto.getChatId(),
+                dto.getMsgId(),
+                dto.getFromUserId(),
+                dto.getMsgCreateTime()
+            );
+            log.debug("【C2COffLineMsgHandler-会话列表更新】更新接收方会话列表元数据成功 - toUserId: {}, chatId: {}, msgId: {}",
+                dto.getToUserId(), dto.getChatId(), dto.getMsgId());
+        } catch (Exception e) {
+            log.error("【C2COffLineMsgHandler-会话列表失败】更新接收方会话列表元数据失败 - toUserId: {}, chatId: {}, msgId: {}",
+                dto.getToUserId(), dto.getChatId(), dto.getMsgId(), e);
+        }
+        
+        // 4. 发送服务端ACK（只有在会话和消息状态更新成功后）
         if (writeChat && updateMsg) {
             log.debug("【C2COffLineMsgHandler-构建ACK】开始构建服务端ACK - clientMsgId: {}, msgId: {}, from: {}, to: {}",
                 dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());

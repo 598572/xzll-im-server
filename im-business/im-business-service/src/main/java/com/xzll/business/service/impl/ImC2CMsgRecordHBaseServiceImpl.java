@@ -931,4 +931,60 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
         }
     }
 
+    /**
+     * 批量查询消息记录（根据rowKey列表）
+     * 使用HBase批量Get操作，性能优于scan
+     * 
+     * @param rowKeys rowKey列表，格式：chatId_msgId
+     * @return 消息记录映射 Map<rowKey, ImC2CMsgRecord>
+     */
+    @Override
+    public Map<String, ImC2CMsgRecord> batchGetMessages(List<String> rowKeys) {
+        log.info("批量查询消息记录: rowKeys数量={}", rowKeys != null ? rowKeys.size() : 0);
+        Map<String, ImC2CMsgRecord> result = new HashMap<>();
+        
+        if (rowKeys == null || rowKeys.isEmpty()) {
+            return result;
+        }
+        
+        try (Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME))) {
+            // 构建批量Get请求
+            List<Get> gets = new ArrayList<>();
+            for (String rowKey : rowKeys) {
+                if (StringUtils.isNotBlank(rowKey)) {
+                    Get get = new Get(Bytes.toBytes(rowKey));
+                    // 只获取info列族
+                    get.addFamily(Bytes.toBytes(COLUMN_FAMILY));
+                    gets.add(get);
+                }
+            }
+            
+            if (gets.isEmpty()) {
+                return result;
+            }
+            
+            // 执行批量Get
+            Result[] results = table.get(gets);
+            
+            // 转换结果
+            for (int i = 0; i < results.length; i++) {
+                Result hbaseResult = results[i];
+                if (hbaseResult != null && !hbaseResult.isEmpty()) {
+                    String rowKey = rowKeys.get(i);
+                    ImC2CMsgRecord msgRecord = convertResultToImC2CMsgRecord(hbaseResult);
+                    if (msgRecord != null) {
+                        result.put(rowKey, msgRecord);
+                    }
+                }
+            }
+            
+            log.info("批量查询消息完成，请求{}条，返回{}条", rowKeys.size(), result.size());
+            
+        } catch (Exception e) {
+            log.error("批量查询消息失败, rowKeys数量={}", rowKeys.size(), e);
+        }
+        
+        return result;
+    }
+
 }

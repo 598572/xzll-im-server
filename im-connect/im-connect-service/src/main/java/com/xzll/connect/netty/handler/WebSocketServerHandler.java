@@ -27,7 +27,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collection;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -285,11 +285,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                         return;
                     }
                     
-                    // 【异步】推送离线消息，避免阻塞握手流程
+                    // 【异步】推送离线数据，避免阻塞握手流程
                     CompletableFuture.runAsync(() -> {
                         try {
-                            // 推送离线消息
-                            pushOfflineMessages(ctx, uid);
+                            // ❌ 【已移除】推送离线消息 - 客户端登录后会主动调用会话列表接口获取
+                            // pushOfflineMessages(ctx, uid);
                             
                             // 推送离线好友请求
                             pushOfflineFriendRequests(ctx, uid);
@@ -297,7 +297,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                             // 推送离线好友响应
                             pushOfflineFriendResponses(ctx, uid);
                         } catch (Exception e) {
-                            log.error("推送离线消息异常, uid: {}", uidStr, e);
+                            log.error("推送离线数据异常, uid: {}", uidStr, e);
                         }
                     }, threadPoolTaskExecutor);
                 } else {
@@ -422,37 +422,134 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     /**
-     * 异步推送离线消息
+     * 【已废弃】异步推送离线消息（微信模式：每个会话只推送最新1条）
+     * 
+     * 废弃原因：
+     * - 客户端登录后会主动调用会话列表接口获取所有会话信息
+     * - 会话列表接口已包含每个会话的最新消息、时间、未读数
+     * - 不再需要 WebSocket 主动推送离线消息
+     * 
+     * 推送策略：
+     * 1. 每个会话只推送最新1条消息（作为会话列表的概要）
+     * 2. 携带该会话的未读消息数量
+     * 3. 用户点击会话后，调用HTTP接口拉取完整历史消息
+     * 
+     * 优点：
+     * - 登录速度快（只推送少量消息）
+     * - 用户体验好（类似微信、钉钉）
+     * - 按需加载（进入会话才拉取完整历史）
      */
-    private void pushOfflineMessages(ChannelHandlerContext ctx, Object uid) {
-        try {
-            Collection<String> lastOffLineMsgs = redissonUtils.getZSetRevRange(
-                ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 
-                0, 
-                imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount()
-            );
-            
-            if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
-                log.info("推送离线消息, uid: {}, count: {}", uid, lastOffLineMsgs.size());
-                
-                for (String msg : lastOffLineMsgs) {
-                    if (ctx.channel().isActive()) {
-                        ctx.channel().writeAndFlush(new TextWebSocketFrame(msg))
-                            .addListener(future -> {
-                                if (!future.isSuccess()) {
-                                    log.error("发送离线消息失败, uid: {}", uid, future.cause());
-                                }
-                            });
-                    } else {
-                        log.warn("连接已断开，停止推送离线消息, uid: {}", uid);
-                        break;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("推送离线消息异常, uid: {}", uid, e);
-        }
-    }
+//    @Deprecated
+//    private void pushOfflineMessages(ChannelHandlerContext ctx, Object uid) {
+//        try {
+//            // 1. 读取所有离线消息（最多1000条，避免内存溢出）
+//            int maxFetchCount = Math.max(imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount(), 1000);
+//            Collection<String> compressedMsgs = redissonUtils.getZSetRevRange(
+//                ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid,
+//                0,
+//                maxFetchCount - 1
+//            );
+//
+//            if (CollectionUtils.isEmpty(compressedMsgs)) {
+//                log.debug("没有离线消息需要推送, uid: {}", uid);
+//                return;
+//            }
+//
+//            log.info("开始处理离线消息, uid: {}, 总数: {}", uid, compressedMsgs.size());
+//
+//            // 2. 按会话分组（chatId -> 消息列表）
+//            Map<String, List<OfflineMessageWrapper>> chatMessagesMap = new LinkedHashMap<>();
+//            int totalCount = 0;
+//
+//            for (String compressedMsg : compressedMsgs) {
+//                try {
+//                    // 解压消息
+//                    String decompressedMsg = CompressionUtil.decompressFromBase64(compressedMsg);
+//
+//                    // 解析JSON获取chatId
+//                    cn.hutool.json.JSONObject msgJson = JSONUtil.parseObj(decompressedMsg);
+//                    String chatId = msgJson.getStr("chatId");
+//
+//                    if (chatId == null) {
+//                        log.warn("离线消息缺少chatId，跳过, uid: {}", uid);
+//                        continue;
+//                    }
+//
+//                    // 按chatId分组
+//                    chatMessagesMap.computeIfAbsent(chatId, k -> new ArrayList<>())
+//                        .add(new OfflineMessageWrapper(decompressedMsg, msgJson));
+//
+//                    totalCount++;
+//                } catch (Exception e) {
+//                    log.error("解析离线消息失败, uid: {}", uid, e);
+//                }
+//            }
+//
+//            log.info("离线消息分组完成, uid: {}, 会话数: {}, 总消息数: {}",
+//                uid, chatMessagesMap.size(), totalCount);
+//
+//            // 3. 每个会话只推送最新1条消息 + 未读数量
+//            int successCount = 0;
+//            int failCount = 0;
+//
+//            for (Map.Entry<String, List<OfflineMessageWrapper>> entry : chatMessagesMap.entrySet()) {
+//                if (!ctx.channel().isActive()) {
+//                    log.warn("连接已断开，停止推送离线消息, uid: {}, 已推送: {}/{}",
+//                        uid, successCount, chatMessagesMap.size());
+//                    break;
+//                }
+//
+//                String chatId = entry.getKey();
+//                List<OfflineMessageWrapper> messages = entry.getValue();
+//                int unreadCount = messages.size();
+//
+//                // 取最新的1条消息（列表第一条就是最新的，因为ZSet是倒序）
+//                OfflineMessageWrapper latestMsg = messages.get(0);
+//
+//                try {
+//                    // 构建推送消息（添加未读数量）
+//                    cn.hutool.json.JSONObject pushMsg = latestMsg.jsonObject;
+//                    pushMsg.set("unreadCount", unreadCount); // 标记该会话的未读数量
+//                    pushMsg.set("isLatestOnly", true);       // 标记这是会话概要，需要调用历史接口拉取完整消息
+//
+//                    String pushMsgStr = pushMsg.toString();
+//
+//                    // 推送消息
+//                    ctx.channel().writeAndFlush(new TextWebSocketFrame(pushMsgStr))
+//                        .addListener(future -> {
+//                            if (!future.isSuccess()) {
+//                                log.error("推送离线消息失败, uid: {}, chatId: {}", uid, chatId, future.cause());
+//                            }
+//                        });
+//
+//                    successCount++;
+//
+//                    log.debug("推送会话概要, uid: {}, chatId: {}, 未读数: {}", uid, chatId, unreadCount);
+//
+//                } catch (Exception e) {
+//                    failCount++;
+//                    log.error("推送离线消息失败, uid: {}, chatId: {}", uid, chatId, e);
+//                }
+//            }
+//
+//            log.info("离线消息推送完成（微信模式）, uid: {}, 会话数: {}, 成功: {}, 失败: {}, 总未读: {}",
+//                uid, chatMessagesMap.size(), successCount, failCount, totalCount);
+//
+//        } catch (Exception e) {
+//            log.error("推送离线消息异常, uid: {}", uid, e);
+//        }
+//    }
+    
+//    /**
+//     * 离线消息包装类（内部使用）
+//     */
+//    private static class OfflineMessageWrapper {
+//        cn.hutool.json.JSONObject jsonObject;
+//
+//        OfflineMessageWrapper(String json, cn.hutool.json.JSONObject jsonObject) {
+//            this.jsonObject = jsonObject;
+//        }
+//    }
     
     /**
      * 推送离线好友请求
