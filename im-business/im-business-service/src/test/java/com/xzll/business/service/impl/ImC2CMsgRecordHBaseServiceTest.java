@@ -2,6 +2,7 @@ package com.xzll.business.service.impl;
 
 import com.xzll.business.config.HBaseTableUtil;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.common.constant.MsgFormatEnum;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ public class ImC2CMsgRecordHBaseServiceTest {
         sendMsgAO.setFromUserId("user1");
         sendMsgAO.setToUserId("user2");
         sendMsgAO.setMsgId(UUID.randomUUID().toString());
-        sendMsgAO.setMsgFormat(1);
+        sendMsgAO.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());
         sendMsgAO.setMsgContent("测试消息内容");
         sendMsgAO.setMsgCreateTime(System.currentTimeMillis());
         sendMsgAO.setRetryMsgFlag(0);

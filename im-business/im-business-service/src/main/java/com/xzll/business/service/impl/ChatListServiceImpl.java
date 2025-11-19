@@ -4,6 +4,7 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.UnreadCountService;
+import com.xzll.common.utils.ChatFieldOptimizer;
 import com.xzll.common.utils.CompressionUtil;
 import com.xzll.common.utils.RedissonUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,11 @@ public class ChatListServiceImpl implements ChatListService {
     private static final String UNREAD_SUFFIX = ":unread";
     private static final String CLEAR_TS_SUFFIX = ":clear_ts";  // 清零时间戳
     
+    // 【混合优化】根据字段类型选择不同优化策略
+    // meta: 可逆压缩 (需要chatId拼接rowkey)
+    // unread/clear_ts: 纯 hash (只需标识即可)
+    // 总体节省: 75字节/chatId (62%空间)
+    
     // Lua脚本：原子递增未读数（适配StringCodec）
     private static final String LUA_INCR_UNREAD = 
         "local current = redis.call('HGET', KEYS[1], ARGV[1]); " +
@@ -74,7 +80,8 @@ public class ChatListServiceImpl implements ChatListService {
         try {
             // 1. 检查清零时间戳（防止清零后旧消息递增）
             RMap<String, String> metaMap = redissonClient.getMap(redisKey, StringCodec.INSTANCE);
-            String clearTsStr = metaMap.get(chatId + CLEAR_TS_SUFFIX);
+            String clearTsField = ChatFieldOptimizer.buildOptimizedField(chatId, CLEAR_TS_SUFFIX);
+            String clearTsStr = metaMap.get(clearTsField);
             Long clearTs = clearTsStr != null ? Long.parseLong(clearTsStr) : null;
             
             // 如果消息时间早于清零时间，说明是旧消息，不递增未读数
@@ -86,11 +93,12 @@ public class ChatListServiceImpl implements ChatListService {
                 return;
             }
             
-            // 2. 构建元数据JSON（不含未读数）
+            // 2. 构建元数据JSON（不含未读数，但包含原始 chatId 用于反向查找）
             JSONObject metadata = new JSONObject();
             metadata.set("m", msgId);      // msgId
             metadata.set("t", timestamp);  // time
             metadata.set("f", fromUserId); // from
+            metadata.set("c", chatId);     // 【新增】原始 chatId（用于 getAllChatListMetadata 反向查找）
             
             String jsonValue = metadata.toString();
             int originalSize = jsonValue.length();
@@ -99,20 +107,28 @@ public class ChatListServiceImpl implements ChatListService {
             String compressedValue = CompressionUtil.compressToBase64(jsonValue);
             int compressedSize = compressedValue.length();
             
-            // 4. 保存元数据到 {chatId}:meta（使用StringCodec保持一致性）
-            redissonUtils.setHashWithStringCodec(redisKey, chatId + META_SUFFIX, compressedValue);
+            // 4. 保存元数据到 {compressed}:meta（可逆压缩，支持rowkey拼接）
+            String metaField = ChatFieldOptimizer.buildOptimizedField(chatId, META_SUFFIX);
+            redissonUtils.setHashWithStringCodec(redisKey, metaField, compressedValue);
             
-            // 5. 【原子递增未读数】到 {chatId}:unread（使用Lua脚本保证原子性）
+            // 5. 【原子递增未读数】到 {hash8}:unread（纯 hash标识）
+            String unreadField = ChatFieldOptimizer.buildOptimizedField(chatId, UNREAD_SUFFIX);
             Long newUnread = redissonUtils.executeLuaScriptAsLongWithStringCodec(
                 LUA_INCR_UNREAD, 
                 java.util.Collections.singletonList(redisKey), 
-                chatId + UNREAD_SUFFIX
+                unreadField
             );
             
             double ratio = CompressionUtil.compressionRatio(originalSize, compressedSize);
             
-            log.info("更新会话列表元数据（时间戳防护）, userId: {}, chatId: {}, msgId: {}, unread: {}, msgTs: {}, 压缩: {}B->{}B ({}%)",
+            // 【混合优化日志】显示优化效果  
+            log.info("更新会话列表元数据（混合优化）, userId: {}, chatId: {}, msgId: {}, unread: {}, msgTs: {}, 压缩: {}B->{}B ({}%)",
                 userId, chatId, msgId, newUnread, timestamp, originalSize, compressedSize, String.format("%.1f", ratio));
+            
+            // 首次优化时显示效果分析
+            if (log.isDebugEnabled()) {
+                log.debug("混合优化效果: \n{}", ChatFieldOptimizer.analyzeOptimization(chatId));
+            }
                 
         } catch (Exception e) {
             log.error("更新会话列表元数据失败, userId: {}, chatId: {}", userId, chatId, e);
@@ -129,9 +145,11 @@ public class ChatListServiceImpl implements ChatListService {
         metadata.set("m", msgId);
         metadata.set("t", timestamp);
         metadata.set("f", fromUserId);
+        metadata.set("c", chatId);  // 【新增】原始 chatId
         
         String compressedValue = CompressionUtil.compressToBase64(metadata.toString());
-        redissonUtils.setHashWithStringCodec(redisKey, chatId + META_SUFFIX, compressedValue);
+        String metaField = ChatFieldOptimizer.buildOptimizedField(chatId, META_SUFFIX);
+        redissonUtils.setHashWithStringCodec(redisKey, metaField, compressedValue);
         
         log.debug("仅更新元数据（不递增未读数）, userId: {}, chatId: {}", userId, chatId);
     }
@@ -151,43 +169,51 @@ public class ChatListServiceImpl implements ChatListService {
                 return new HashMap<>();
             }
             
-            // 解压并合并元数据和未读数
+            // 【混合优化方案】meta字段可逆，unread字段用hash匹配
             Map<String, String> result = new HashMap<>();
-            Map<String, String> unreadMap = new HashMap<>();
+            Map<String, String> hashToUnreadMap = new HashMap<>();  // hash -> unread
             
+            // 第一遍：收集数据
             for (Map.Entry<String, String> entry : allFields.entrySet()) {
                 String field = entry.getKey();
                 String value = entry.getValue();
                 
                 if (field.endsWith(META_SUFFIX)) {
-                    // 元数据字段
-                    String chatId = field.substring(0, field.length() - META_SUFFIX.length());
-                    try {
-                        String decompressed = CompressionUtil.decompressFromBase64(value);
-                        result.put(chatId, decompressed);
-                    } catch (Exception e) {
-                        log.error("解压会话元数据失败, userId: {}, chatId: {}", userId, chatId, e);
+                    // meta字段：可逆压缩 -> 直接反解出chatId
+                    String originalChatId = ChatFieldOptimizer.extractChatIdFromField(field, META_SUFFIX);
+                    if (originalChatId != null) {
+                        try {
+                            String decompressed = CompressionUtil.decompressFromBase64(value);
+                            result.put(originalChatId, decompressed);
+                        } catch (Exception e) {
+                            log.error("解压会话元数据失败, userId: {}, chatId: {}", userId, originalChatId, e);
+                        }
                     }
                 } else if (field.endsWith(UNREAD_SUFFIX)) {
-                    // 未读数字段
-                    String chatId = field.substring(0, field.length() - UNREAD_SUFFIX.length());
-                    unreadMap.put(chatId, value);
+                    // unread字段：纯hash -> 提取hash用于匹配
+                    String hashValue = ChatFieldOptimizer.extractHashFromField(field, UNREAD_SUFFIX);
+                    if (hashValue != null) {
+                        hashToUnreadMap.put(hashValue, value);
+                    }
                 }
                 // 忽略 clear_ts 字段
             }
             
-            // 合并未读数到元数据JSON中
+            // 第二遍：合并未读数到元数据 JSON 中
             for (Map.Entry<String, String> entry : result.entrySet()) {
-                String chatId = entry.getKey();
+                String originalChatId = entry.getKey();
                 String metaJson = entry.getValue();
-                String unread = unreadMap.getOrDefault(chatId, "0");
+                
+                // 通过 chatId 计算 hash，然后查找对应的未读数
+                String hashValue = ChatFieldOptimizer.hashChatId(originalChatId);
+                String unread = hashToUnreadMap.getOrDefault(hashValue, "0");
                 
                 try {
                     JSONObject metadata = JSONUtil.parseObj(metaJson);
                     metadata.set("u", Long.parseLong(unread));
-                    result.put(chatId, metadata.toString());
+                    result.put(originalChatId, metadata.toString());
                 } catch (Exception e) {
-                    log.error("合并未读数失败, userId: {}, chatId: {}", userId, chatId, e);
+                    log.error("合并未读数失败, userId: {}, chatId: {}", userId, originalChatId, e);
                 }
             }
             
@@ -208,16 +234,18 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            // 获取元数据（使用StringCodec）
-            String compressed = redissonUtils.getHashWithStringCodec(redisKey, chatId + META_SUFFIX);
+            // 获取元数据（使用优化的field名称）
+            String metaField = ChatFieldOptimizer.buildOptimizedField(chatId, META_SUFFIX);
+            String compressed = redissonUtils.getHashWithStringCodec(redisKey, metaField);
             if (compressed == null) {
                 return null;
             }
             
             String metaJson = CompressionUtil.decompressFromBase64(compressed);
             
-            // 获取未读数（使用StringCodec）
-            String unreadStr = redissonUtils.getHashWithStringCodec(redisKey, chatId + UNREAD_SUFFIX);
+            // 获取未读数（使用优化的field名称）
+            String unreadField = ChatFieldOptimizer.buildOptimizedField(chatId, UNREAD_SUFFIX);
+            String unreadStr = redissonUtils.getHashWithStringCodec(redisKey, unreadField);
             long unread = unreadStr != null ? Long.parseLong(unreadStr) : 0;
             
             // 合并
@@ -242,12 +270,14 @@ public class ChatListServiceImpl implements ChatListService {
             // 使用StringCodec避免序列化问题
             RMap<String, String> map = redissonClient.getMap(redisKey, StringCodec.INSTANCE);
             
-            // 1. 清零未读数
-            map.put(chatId + UNREAD_SUFFIX, "0");
+            // 1. 清零未读数（使用优化的field名称）
+            String unreadField = ChatFieldOptimizer.buildOptimizedField(chatId, UNREAD_SUFFIX);
+            map.put(unreadField, "0");
             
-            // 2. 【关键】记录清零时间戳，防止旧消息递增
+            // 2. 【关键】记录清零时间戳，防止旧消息递增（使用优化的field名称）
             long clearTimestamp = System.currentTimeMillis();
-            map.put(chatId + CLEAR_TS_SUFFIX, String.valueOf(clearTimestamp));
+            String clearTsField = ChatFieldOptimizer.buildOptimizedField(chatId, CLEAR_TS_SUFFIX);
+            map.put(clearTsField, String.valueOf(clearTimestamp));
             
             log.info("清零会话未读数（记录时间戳）, userId: {}, chatId: {}, clearTs: {}", 
                 userId, chatId, clearTimestamp);
@@ -265,10 +295,14 @@ public class ChatListServiceImpl implements ChatListService {
         String redisKey = CHAT_LIST_KEY_PREFIX + userId;
         
         try {
-            // 删除元数据、未读数、清零时间戳三个字段（使用StringCodec）
-            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + META_SUFFIX);
-            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + UNREAD_SUFFIX);
-            redissonUtils.deleteHashWithStringCodec(redisKey, chatId + CLEAR_TS_SUFFIX);
+            // 删除元数据、未读数、清零时间戳三个字段（使用优化的field名称）
+            String metaField = ChatFieldOptimizer.buildOptimizedField(chatId, META_SUFFIX);
+            String unreadField = ChatFieldOptimizer.buildOptimizedField(chatId, UNREAD_SUFFIX);
+            String clearTsField = ChatFieldOptimizer.buildOptimizedField(chatId, CLEAR_TS_SUFFIX);
+            
+            redissonUtils.deleteHashWithStringCodec(redisKey, metaField);
+            redissonUtils.deleteHashWithStringCodec(redisKey, unreadField);
+            redissonUtils.deleteHashWithStringCodec(redisKey, clearTsField);
             
             log.info("删除会话元数据, userId: {}, chatId: {}", userId, chatId);
         } catch (Exception e) {

@@ -3,6 +3,7 @@ package com.xzll.connect.service.impl;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.MsgFormatEnum;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.utils.CompressionUtil;
 import com.xzll.common.utils.RedissonUtils;
@@ -620,7 +621,7 @@ public class C2CMsgRetryServiceImplTest {
         packet.setFromUserId(testFromUserId);
         packet.setToUserId(testToUserId);
         packet.setMsgContent("测试消息内容");
-        packet.setMsgFormat(1);
+        packet.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());
         packet.setMsgCreateTime(System.currentTimeMillis());
         packet.setChatId("100-1-" + testFromUserId + "-" + testToUserId);
         return packet;

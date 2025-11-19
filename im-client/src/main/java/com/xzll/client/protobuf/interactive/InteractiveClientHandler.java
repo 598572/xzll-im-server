@@ -4,6 +4,7 @@ import cn.hutool.core.lang.Assert;
 import com.alibaba.fastjson.JSONObject;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.MsgFormatEnum;
 import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.grpc.*;
 import io.netty.buffer.ByteBuf;
@@ -409,7 +410,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     .setMsgId(0L)  // 留空（0L），服务端会自动生成
                     .setFrom(ProtoConverterUtil.snowflakeStringToLong(userId))  // String -> fixed64
                     .setTo(ProtoConverterUtil.snowflakeStringToLong(toUserId))  // String -> fixed64
-                    .setFormat(1) // 1=文本
+                    .setFormat(MsgFormatEnum.TEXT_MSG.getCode()) // 文本消息
                     .setContent(content)
                     .setTime(sendTime)  // fixed64
                     // chatId 已从proto删除，服务端会根据from+to动态生成
