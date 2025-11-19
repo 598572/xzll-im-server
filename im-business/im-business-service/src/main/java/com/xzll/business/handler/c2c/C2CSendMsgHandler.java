@@ -1,11 +1,10 @@
 package com.xzll.business.handler.c2c;
 
+import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
-import com.xzll.business.service.UnreadCountService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
-import com.xzll.common.grpc.GrpcMessageService;
 import com.xzll.common.util.ProtoConverterUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,14 +28,10 @@ public class C2CSendMsgHandler {
     
     @Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
-    
-    // 替换Dubbo为gRPC
-    @Resource
-    private GrpcMessageService grpcMessageService;
-    @Resource
-    private UnreadCountService unreadCountService;
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;
+    @Resource
+    private ChatListService chatListService;
 
     /**
      * 单聊消息 - 使用gRPC发送
@@ -62,15 +57,20 @@ public class C2CSendMsgHandler {
                 dto.getClientMsgId(), dto.getMsgId());
         }
         if (writeChat && writeMsg) {
-            // 增加接收方的未读消息数
+            // 【关键】更新Redis会话列表元数据（接收方）
             try {
-                unreadCountService.incrementUnreadCount(dto.getToUserId(), dto.getChatId());
-                log.debug("【C2CSendMsgHandler-未读数增加】未读消息数增加成功 - toUserId: {}, chatId: {}, clientMsgId: {}, msgId: {}",
-                    dto.getToUserId(), dto.getChatId(), dto.getClientMsgId(), dto.getMsgId());
+                chatListService.updateChatListMetadata(
+                    dto.getToUserId(),  // 接收方
+                    dto.getChatId(),
+                    dto.getMsgId(),
+                    dto.getFromUserId(),
+                    dto.getMsgCreateTime()
+                );
+                log.debug("【C2CSendMsgHandler-会话列表更新】更新接收方会话列表元数据成功 - toUserId: {}, chatId: {}, msgId: {}",
+                    dto.getToUserId(), dto.getChatId(), dto.getMsgId());
             } catch (Exception e) {
-                log.error("【C2CSendMsgHandler-未读数失败】未读消息数增加失败 - toUserId: {}, chatId: {}, clientMsgId: {}, msgId: {}, error: {}", 
-                    dto.getToUserId(), dto.getChatId(), dto.getClientMsgId(), dto.getMsgId(), e.getMessage(), e);
-                // 这里不抛异常，避免影响消息发送的主流程
+                log.error("【C2CSendMsgHandler-会话列表失败】更新接收方会话列表元数据失败 - toUserId: {}, chatId: {}, msgId: {}",
+                    dto.getToUserId(), dto.getChatId(), dto.getMsgId(), e);
             }
             
             log.info("【C2CSendMsgHandler-构建ACK】开始构建服务端ACK - clientMsgId: {}, msgId: {}, from: {}, to: {}", 
