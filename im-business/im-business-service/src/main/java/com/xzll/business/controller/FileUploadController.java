@@ -1,11 +1,11 @@
 package com.xzll.business.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import com.xzll.business.config.MinioConfig;
 
 import javax.annotation.Resource;
 import java.util.UUID;
@@ -20,14 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Slf4j
 public class FileUploadController {
 
-    @Value("${minio.endpoint}")
-    private String minioEndpoint;
-    
-    @Value("${minio.bucketName}")
-    private String bucketName;
-    
     @Resource
     private MinioClient minioClient;
+    
+    @Resource
+    private MinioConfig minioConfig;
     
     @Autowired
     private UserProfileController userProfileController;
@@ -67,7 +64,7 @@ public class FileUploadController {
             // 5. 上传到MinIO
             minioClient.putObject(
                 PutObjectArgs.builder()
-                    .bucket(bucketName)
+                    .bucket(minioConfig.getBucketName())
                     .object(fileName)
                     .stream(file.getInputStream(), file.getSize(), -1)
                     .contentType(contentType)
@@ -75,7 +72,7 @@ public class FileUploadController {
             );
             
             // 6. 构建访问URL
-            String avatarUrl = minioEndpoint + "/" + bucketName + "/" + fileName;
+            String avatarUrl = minioConfig.getEndpoint() + "/" + minioConfig.getBucketName() + "/" + fileName;
             
             // 7. 更新用户头像URL到数据库（安全版本，通过上下文验证用户）
             boolean updateSuccess = userProfileController.updateUserAvatar(avatarUrl);
