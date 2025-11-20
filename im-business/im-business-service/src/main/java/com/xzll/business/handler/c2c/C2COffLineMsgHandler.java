@@ -2,13 +2,11 @@ package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
-import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.util.ProtoConverterUtil;
-import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,12 +23,9 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @Component
 public class C2COffLineMsgHandler {
-    @Resource
-    private ImChatService imChatService;
     
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
-    
 
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;
@@ -54,13 +49,7 @@ public class C2COffLineMsgHandler {
     public void sendC2CMsgDeal(C2COffLineMsgAO dto) {
         log.debug("【C2COffLineMsgHandler开始】处理离线消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}, status: {}",
             dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId(), dto.getMsgStatus());
-        
-        // 1. 更新会话记录（如果需要）
-        C2CSendMsgAO sendMsgAO = convertToC2CSendMsgAO(dto);
-        boolean writeChat = imChatService.saveOrUpdateC2CChat(sendMsgAO);
-        log.debug("【C2COffLineMsgHandler-会话保存】会话保存结果: {} - clientMsgId: {}, msgId: {}",
-            writeChat, dto.getClientMsgId(), dto.getMsgId());
-        
+
         // 2. 更新消息状态为离线
         boolean updateMsg = true;
         if (imC2CMsgRecordHBaseService != null) {
@@ -89,7 +78,7 @@ public class C2COffLineMsgHandler {
         }
         
         // 4. 发送服务端ACK（只有在会话和消息状态更新成功后）
-        if (writeChat && updateMsg) {
+        if (updateMsg) {
             log.debug("【C2COffLineMsgHandler-构建ACK】开始构建服务端ACK - clientMsgId: {}, msgId: {}, from: {}, to: {}",
                 dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
             
@@ -122,8 +111,8 @@ public class C2COffLineMsgHandler {
                 }
             });
         } else {
-            log.error("【C2COffLineMsgHandler-更新失败】消息或会话更新失败 - clientMsgId: {}, msgId: {}, writeChat: {}, updateMsg: {}", 
-                dto.getClientMsgId(), dto.getMsgId(), writeChat, updateMsg);
+            log.error("【C2COffLineMsgHandler-更新失败】消息或会话更新失败 - clientMsgId: {}, msgId: {}, updateMsg: {}",
+                dto.getClientMsgId(), dto.getMsgId(), updateMsg);
         }
         
         log.info("【C2COffLineMsgHandler完成】离线消息处理完成 - clientMsgId: {}, msgId: {}", 

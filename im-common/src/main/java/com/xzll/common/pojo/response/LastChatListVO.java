@@ -47,4 +47,24 @@ public class LastChatListVO extends CommonMsgVO {
      * 未读消息数量
      */
     private Integer unReadCount;
+    
+    /**
+     * 对方用户ID (便于客户端映射)
+     */
+    private String otherUserId;
+    
+    /**
+     * 对方用户名 (服务端兜底，客户端缓存失效时使用)
+     */
+    private String otherUserName;
+    
+    /**
+     * 对方用户头像 (服务端兜底，客户端缓存失效时使用)
+     */
+    private String otherUserAvatar;
+    
+    /**
+     * 对方用户全名 (服务端兜底，客户端缓存失效时使用)
+     */
+    private String otherUserFullName;
 }

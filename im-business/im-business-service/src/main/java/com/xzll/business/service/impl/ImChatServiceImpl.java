@@ -10,6 +10,7 @@ import com.xzll.business.entity.mysql.ImChat;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.entity.mysql.ImPersonalChatOpt;
 import com.xzll.business.mapper.ImChatMapper;
+import com.xzll.business.mapper.ImUserMapper;
 import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
@@ -18,6 +19,7 @@ import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.LastChatListAO;
 import com.xzll.common.pojo.response.LastChatListVO;
+import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -49,6 +51,12 @@ public class ImChatServiceImpl implements ImChatService {
     @Resource
     private ChatListService chatListService;
 
+    /**
+     * 此方法为好友申请通过时调用。
+     *
+     * @param dto
+     * @return
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public boolean saveOrUpdateC2CChat(C2CSendMsgAO dto) {
@@ -191,6 +199,23 @@ public class ImChatServiceImpl implements ImChatService {
                     LastChatListVO vo = new LastChatListVO();
                     vo.setChatId(chatId);
                     vo.setUserId(ao.getUserId());
+                    
+                    // 【轻量】只解析获取otherUserId，便于客户端缓存映射
+                    try {
+                        List<String> participantIds = ChatIdUtils.getParticipantUserIds(chatId);
+                        if (!participantIds.isEmpty()) {
+                            String otherUserId = participantIds.stream()
+                                    .filter(id -> !ao.getUserId().equals(id))
+                                    .findFirst()
+                                    .orElse(null);
+                            
+                            if (otherUserId != null) {
+                                vo.setOtherUserId(otherUserId);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("解析会话{}的otherUserId失败: {}", chatId, e.getMessage());
+                    }
                     
                     // 【关键】从Redis元数据获取未读数
                     int unreadCount = metadata != null ? metadata.getInt("u", 0) : 0;  // u = unread
