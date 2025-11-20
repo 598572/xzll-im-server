@@ -197,6 +197,14 @@
             <version>5.2.1</version>
         </dependency>
 
+
+        <!-- MinIO依赖 -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.7</version>
+        </dependency>
+
         <!-- RocketMQ Spring Boot Starter -->
 <!--        <dependency>-->
 <!--            <groupId>org.apache.rocketmq</groupId>-->

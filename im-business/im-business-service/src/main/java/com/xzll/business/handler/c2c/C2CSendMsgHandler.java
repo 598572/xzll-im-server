@@ -43,10 +43,6 @@ public class C2CSendMsgHandler {
         log.debug("【C2CSendMsgHandler开始】处理在线消息 - clientMsgId: {}, msgId: {}, from: {}, to: {}",
             dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId(), dto.getToUserId());
         
-        boolean writeChat = imChatService.saveOrUpdateC2CChat(dto);
-        log.debug("【C2CSendMsgHandler-会话保存】会话保存结果: {} - clientMsgId: {}, msgId: {}",
-            writeChat, dto.getClientMsgId(), dto.getMsgId());
-        
         boolean writeMsg = true;
         if (imC2CMsgRecordService != null) {
             writeMsg = imC2CMsgRecordService.saveC2CMsg(dto);
@@ -56,7 +52,7 @@ public class C2CSendMsgHandler {
             log.warn("【C2CSendMsgHandler-跳过HBase】HBase服务未启用，跳过消息存储到HBase - clientMsgId: {}, msgId: {}", 
                 dto.getClientMsgId(), dto.getMsgId());
         }
-        if (writeChat && writeMsg) {
+        if (writeMsg) {
             // 【关键】更新Redis会话列表元数据（接收方）
             try {
                 chatListService.updateChatListMetadata(
@@ -112,8 +108,8 @@ public class C2CSendMsgHandler {
             log.info("【C2CSendMsgHandler-ACK提交】gRPC服务端ACK发送任务已提交 - clientMsgId: {}, msgId: {}, from: {}", 
                 dto.getClientMsgId(), dto.getMsgId(), dto.getFromUserId());
         } else {
-            log.error("【C2CSendMsgHandler-存储失败】消息或会话存储失败 - clientMsgId: {}, msgId: {}, writeChat: {}, writeMsg: {}", 
-                dto.getClientMsgId(), dto.getMsgId(), writeChat, writeMsg);
+            log.error("【C2CSendMsgHandler-存储失败】消息或会话存储失败 - clientMsgId: {}, msgId: {}, writeMsg: {}",
+                dto.getClientMsgId(), dto.getMsgId(), writeMsg);
         }
         
         log.info("【C2CSendMsgHandler完成】在线消息处理完成 - clientMsgId: {}, msgId: {}", 

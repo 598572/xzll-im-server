@@ -1,0 +1,119 @@
+package com.xzll.business.controller;
+
+import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.google.common.collect.Lists;
+import com.xzll.business.mapper.ImUserMapper;
+import com.xzll.common.pojo.entity.ImUserDO;
+import com.xzll.common.pojo.request.BatchUserInfoAO;
+import com.xzll.common.pojo.response.BatchUserInfoVO;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 批量用户信息查询控制器
+ * 
+ * @Author: hzz
+ * @Date: 2025/11/20
+ * @Description: 支持客户端批量查询未缓存的用户信息，优化会话列表性能
+ */
+@Slf4j
+@RestController
+@RequestMapping("/api/user")
+public class BatchUserInfoController {
+
+    @Resource
+    private ImUserMapper imUserMapper;
+
+    /**
+     * 批量查询用户基础信息
+     * 
+     * @param ao 查询参数
+     * @return 用户信息列表
+     */
+    @PostMapping("/batchInfo")
+    public BatchUserInfoVO batchGetUserInfo(@RequestBody BatchUserInfoAO ao) {
+        log.info("批量查询用户信息_入参: {}", JSONUtil.toJsonStr(ao));
+
+        try {
+            // 参数校验
+            if (ao == null || CollectionUtils.isEmpty(ao.getUserIds())) {
+                log.error("批量查询用户信息失败，用户ID列表为空");
+                return new BatchUserInfoVO();
+            }
+
+            if (ao.getUserIds().size() > 50) {
+                log.error("批量查询用户信息失败，用户ID数量超过限制: {}", ao.getUserIds().size());
+                return new BatchUserInfoVO();
+            }
+
+            // 去重并过滤空值
+            List<String> validUserIds = ao.getUserIds().stream()
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (validUserIds.isEmpty()) {
+                log.info("过滤后的用户ID列表为空");
+                return new BatchUserInfoVO();
+            }
+
+            // 批量查询用户信息
+            List<ImUserDO> users = imUserMapper.selectList(
+                    Wrappers.lambdaQuery(ImUserDO.class)
+                            .in(ImUserDO::getUserId, validUserIds)
+            );
+
+            // 组装返回结果
+            BatchUserInfoVO result = new BatchUserInfoVO();
+            
+            if (!CollectionUtils.isEmpty(users)) {
+                // 转换为基础信息VO
+                List<BatchUserInfoVO.UserBasicInfo> userInfos = users.stream()
+                        .map(user -> {
+                            BatchUserInfoVO.UserBasicInfo info = new BatchUserInfoVO.UserBasicInfo();
+                            info.setUserId(user.getUserId());
+                            info.setUserName(user.getUserName());
+                            info.setUserFullName(user.getUserFullName());
+                            info.setHeadImage(user.getHeadImage());
+                            info.setSex(user.getSex());
+                            return info;
+                        })
+                        .collect(Collectors.toList());
+                
+                result.setUsers(userInfos);
+
+                // 找出未查询到的用户ID
+                Map<String, ImUserDO> userMap = users.stream()
+                        .collect(Collectors.toMap(ImUserDO::getUserId, user -> user));
+                
+                List<String> notFoundIds = validUserIds.stream()
+                        .filter(id -> !userMap.containsKey(id))
+                        .collect(Collectors.toList());
+                
+                result.setNotFoundUserIds(notFoundIds);
+            } else {
+                result.setUsers(Lists.newArrayList());
+                result.setNotFoundUserIds(validUserIds);
+            }
+
+            log.info("批量查询用户信息成功，查询{}个，找到{}个，未找到{}个", 
+                    validUserIds.size(), 
+                    result.getUsers() != null ? result.getUsers().size() : 0,
+                    result.getNotFoundUserIds() != null ? result.getNotFoundUserIds().size() : 0);
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("批量查询用户信息异常", e);
+            return new BatchUserInfoVO();
+        }
+    }
+}
