@@ -45,6 +45,14 @@ public interface ImC2CMsgRecordHBaseService {
     Map<String, ImC2CMsgRecord> batchGetLastMessagesByChatIds(List<String> chatIds);
 
     /**
+     * 批量查询消息记录（根据rowKey列表）
+     * rowKey格式：chatId_msgId
+     * @param rowKeys rowKey列表
+     * @return 消息记录映射 Map<rowKey, ImC2CMsgRecord>
+     */
+    Map<String, ImC2CMsgRecord> batchGetMessages(List<String> rowKeys);
+
+    /**
      * 查询聊天历史记录 (基于HBase范围扫描)
      * @param queryDTO 查询条件
      * @return 聊天历史记录响应

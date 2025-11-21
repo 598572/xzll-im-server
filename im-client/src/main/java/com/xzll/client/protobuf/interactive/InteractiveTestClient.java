@@ -73,10 +73,10 @@ public class InteractiveTestClient {
         try {
             // WebSocket URI (需要带上 userId 参数)
             URI uri = new URI("ws://" + IP + ":" + PORT + "/websocket?userId=" + currentUserId);
-            
+
             // 设置 HTTP Headers
             DefaultHttpHeaders headers = new DefaultHttpHeaders();
-            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJ3eXEwMSIsInNjb3BlIjpbImFsbCJdLCJkZXZpY2VfdHlwZSI6MSwiaWQiOjE5NjYzNjk2MDc5MTg5NDgzNTIsImV4cCI6MTc1NzY4Mzc1MSwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiNTExNGJiYmYtOThmNy00ZjI5LTgxYzktZmExZmFkOWM2ODI4IiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.oINtCWMHD17n8u-vT7z0MNEL9zPydciAZJl5xyQUHE67et6mKn1chkTtYUB2dsg_zxoNjrpqOAVd3IM1K18qC-qVgMKH04h30Ta5zwQ7mFC7-XoZCWmB7A7RqI0xEK6Le6UFntaMmdkMVXrnuSECOBu9F-NKp5qvge_bgqqP6ZoQByHktdqEzxgf0S5hwoVjKZD8Emr8hqm7wae05LGNOCha9y6GiI5Ze_3lFoRAPdGzFiQh-BHiPoF4NF9ECoa8bz-ZprY6--Wrsj7CwljMcl072yDC5hMNPNPQC58zH8F9Zle6LeTBaj4d1icicUdKJgVyRGfCHkb5r2Gd_W2dNg");
+            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzUzNzEwNCwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiYzA1MTJjODMtZWNiMS00YWJkLThjZmEtMzQ0ZWE4OGE4NWJhIiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.zdNzad5vhPYOb9sBqRwH2T9us00nbPSea2H3mYtnttsAYEwrVtRkE9syVh64btmtI9EEK3gHT8Js8AFY82_JveCSOtnvq7PpEUeE15ZC1-cJHrBuQQYrwABe-3CTlatWl6-8eIIhomAWHgh2E6dyLrHh0SyNhVKDn3xZ1XXDiFEuC9a5Ngv7AWQtFVm3jiQyiwXp9FBjTAe2kZXXIjVefQjnFl0T4FFWSNLzRNU-rPudGpLGnYa5g3RyyixZrvyBh6YvWeY7JcQdZm9qdhIHI_jzTS3GDAR32w9gsn3hG2d-p-ZZdi4uZ35b7TEZGYAS-ME8qvWy1qw_y78_OuNXYA");
             headers.set("uid", currentUserId);
             
             // 创建 WebSocket 握手器
@@ -126,12 +126,7 @@ public class InteractiveTestClient {
             printHelp();
             
             // ====================================================================
-            // 步骤 4: 初始化消息ID
-            // ====================================================================
-            initializeMsgIds(handler);
-            
-            // ====================================================================
-            // 步骤 5: 进入命令循环
+            // 步骤 4: 进入命令循环
             // ====================================================================
             commandLoop(scanner, handler);
             
@@ -384,17 +379,5 @@ public class InteractiveTestClient {
         }
     }
     
-    /**
-     * 初始化消息ID - 预先从服务端获取一批消息ID
-     */
-    private static void initializeMsgIds(InteractiveClientHandler handler) {
-        System.out.println("📥 正在初始化消息ID...");
-        
-        // 这里我们不直接调用handler的方法，而是让用户发送第一条消息时自动获取
-        // 因为消息ID的获取和管理逻辑已经在InteractiveClientHandler中实现了
-        
-        System.out.println("✅ 消息ID管理已就绪（将在发送消息时自动获取）");
-        System.out.println();
-    }
 }
 

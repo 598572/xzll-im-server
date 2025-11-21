@@ -1,6 +1,7 @@
 package com.xzll.common.grpc;
 
 import com.xzll.common.config.GrpcClientConfig;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.grpc.MessageServiceGrpc;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,19 +33,22 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(ProtoConverterUtil.longToSnowflakeString(push.getToUserId()));
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
                 boolean success = stub.responseServerAck2Client(push).getSuccess();
                 if (success) {
                     successRequests.incrementAndGet();
+                    return true;
                 } else {
                     failureRequests.incrementAndGet();
+                    log.warn("发送服务端ACK返回失败: toUserId={}", push.getToUserId());
+                    return false;
                 }
-                return success;
             } catch (Exception e) {
                 failureRequests.incrementAndGet();
-                log.error("发送服务端ACK失败: {}", e.getMessage(), e);
-                return false;
+                log.error("发送服务端ACK异常: {}", e.getMessage(), e);
+                // 抛出运行时异常，让CompletableFuture捕获
+                throw new RuntimeException("发送ServerAck失败: " + e.getMessage(), e);
             }
         });
     }
@@ -54,7 +58,7 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(ProtoConverterUtil.longToSnowflakeString(push.getToUserId()));
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
                 boolean success = stub.responseClientAck2Client(push).getSuccess();
                 if (success) {
@@ -76,7 +80,7 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(ProtoConverterUtil.longToSnowflakeString(push.getToUserId()));
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
                 boolean success = stub.sendWithdrawMsg2Client(push).getSuccess();
                 if (success) {
@@ -98,7 +102,7 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(ProtoConverterUtil.longToSnowflakeString(push.getToUserId()));
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
                 boolean success = stub.pushFriendRequest2Client(push).getSuccess();
                 if (success) {
@@ -120,7 +124,7 @@ public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
         return CompletableFuture.supplyAsync(() -> {
             totalRequests.incrementAndGet();
             try {
-                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(push.getToUserId());
+                SmartGrpcClientManager.GrpcStubWrapper stubWrapper = grpcClientManager.getStub(ProtoConverterUtil.longToSnowflakeString(push.getToUserId()));
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(stubWrapper.getChannelInfo().getChannel());
                 boolean success = stub.pushFriendResponse2Client(push).getSuccess();
                 if (success) {

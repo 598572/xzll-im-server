@@ -14,6 +14,10 @@ import lombok.Setter;
 public class C2CSendMsgAO extends CommonMsgAO {
 
     /**
+     * 客户端消息ID（UUID，客户端生成，用于去重和客户端关联）
+     */
+    private String clientMsgId;
+    /**
      * 发送人id
      */
     private String fromUserId;

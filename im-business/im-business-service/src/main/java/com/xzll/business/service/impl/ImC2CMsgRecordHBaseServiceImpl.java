@@ -85,6 +85,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
     private static final String COLUMN_MSG_CREATE_TIME = "msg_create_time";
     private static final String COLUMN_RETRY_COUNT = "retry_count";
     private static final String COLUMN_MSG_STATUS = "msg_status";
+    private static final String COLUMN_WITHDRAW_FLAG = "withdraw_flag"; // 撤回标志：0-未撤回，1-已撤回
     private static final String COLUMN_CHAT_ID = "chat_id";
     private static final String COLUMN_CREATE_TIME = "create_time";
     private static final String COLUMN_UPDATE_TIME = "update_time";
@@ -138,6 +139,7 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_CREATE_TIME), Bytes.toBytes(String.valueOf(dto.getMsgCreateTime())));
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_RETRY_COUNT), Bytes.toBytes("0"));
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_STATUS), Bytes.toBytes(String.valueOf(MsgStatusEnum.MsgStatus.SERVER_RECEIVED.getCode())));
+                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_WITHDRAW_FLAG), Bytes.toBytes(String.valueOf(MsgStatusEnum.MsgWithdrawStatus.NO.getCode()))); // 默认未撤回
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CHAT_ID), Bytes.toBytes(dto.getChatId()));
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_CREATE_TIME), Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_UPDATE_TIME), Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
@@ -242,15 +244,18 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                 // 构建RowKey
                 String rowKey = C2CMessageRowKeyUtil.generateRowKey(dto.getChatId(), dto.getMsgId());
                 
-                // 构建Put对象更新消息状态
+                // 构建Put对象更新撤回标志
+                //使用单独的withdraw_flag字段
+                //撤回状态和消息状态是独立的维度，可以同时存在（如：已读+已撤回）
                 Put put = new Put(Bytes.toBytes(rowKey));
-                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_MSG_STATUS), Bytes.toBytes(String.valueOf(MsgStatusEnum.MsgStatus.FAIL.getCode())));
+                Integer withdrawFlag = dto.getWithdrawFlag() != null ? dto.getWithdrawFlag() : MsgStatusEnum.MsgWithdrawStatus.YES.getCode();
+                put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_WITHDRAW_FLAG), Bytes.toBytes(String.valueOf(withdrawFlag)));
                 put.addColumn(Bytes.toBytes(COLUMN_FAMILY), Bytes.toBytes(COLUMN_UPDATE_TIME), Bytes.toBytes(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
                 
                 // 执行更新
                 table.put(put);
                 
-                log.info("C2C消息撤回状态更新成功: chatId={}, msgId={}", dto.getChatId(), dto.getMsgId());
+                log.info("C2C消息撤回状态更新成功: chatId={}, msgId={}, withdrawFlag={}", dto.getChatId(), dto.getMsgId(), withdrawFlag);
                 
                 // 发送数据同步消息
                 sendDataSyncMessage(OPERATION_TYPE_UPDATE_WITHDRAW, dto.getChatId(), dto.getMsgId(), dto);
@@ -602,6 +607,9 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                     case COLUMN_MSG_STATUS:
                         msgRecord.setMsgStatus(safeParseInteger(stringValue, 1)); // 默认消息状态为已发送
                         break;
+                    case COLUMN_WITHDRAW_FLAG:
+                        msgRecord.setWithdrawFlag(safeParseInteger(stringValue, 0)); // 默认未撤回
+                        break;
                     case COLUMN_CHAT_ID:
                         msgRecord.setChatId(stringValue);
                         break;
@@ -901,6 +909,9 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
                     case COLUMN_MSG_STATUS:
                         messageVO.setMsgStatus(safeParseInteger(stringValue, 1));
                         break;
+                    case COLUMN_WITHDRAW_FLAG:
+                        messageVO.setWithdrawFlag(safeParseInteger(stringValue, 0)); // 默认未撤回
+                        break;
                     case COLUMN_CHAT_ID:
                         messageVO.setChatId(stringValue);
                         break;
@@ -918,6 +929,62 @@ public class ImC2CMsgRecordHBaseServiceImpl implements ImC2CMsgRecordHBaseServic
             log.error("转换消息VO失败", e);
             return null;
         }
+    }
+
+    /**
+     * 批量查询消息记录（根据rowKey列表）
+     * 使用HBase批量Get操作，性能优于scan
+     * 
+     * @param rowKeys rowKey列表，格式：chatId_msgId
+     * @return 消息记录映射 Map<rowKey, ImC2CMsgRecord>
+     */
+    @Override
+    public Map<String, ImC2CMsgRecord> batchGetMessages(List<String> rowKeys) {
+        log.info("批量查询消息记录: rowKeys数量={}", rowKeys != null ? rowKeys.size() : 0);
+        Map<String, ImC2CMsgRecord> result = new HashMap<>();
+        
+        if (rowKeys == null || rowKeys.isEmpty()) {
+            return result;
+        }
+        
+        try (Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME))) {
+            // 构建批量Get请求
+            List<Get> gets = new ArrayList<>();
+            for (String rowKey : rowKeys) {
+                if (StringUtils.isNotBlank(rowKey)) {
+                    Get get = new Get(Bytes.toBytes(rowKey));
+                    // 只获取info列族
+                    get.addFamily(Bytes.toBytes(COLUMN_FAMILY));
+                    gets.add(get);
+                }
+            }
+            
+            if (gets.isEmpty()) {
+                return result;
+            }
+            
+            // 执行批量Get
+            Result[] results = table.get(gets);
+            
+            // 转换结果
+            for (int i = 0; i < results.length; i++) {
+                Result hbaseResult = results[i];
+                if (hbaseResult != null && !hbaseResult.isEmpty()) {
+                    String rowKey = rowKeys.get(i);
+                    ImC2CMsgRecord msgRecord = convertResultToImC2CMsgRecord(hbaseResult);
+                    if (msgRecord != null) {
+                        result.put(rowKey, msgRecord);
+                    }
+                }
+            }
+            
+            log.info("批量查询消息完成，请求{}条，返回{}条", rowKeys.size(), result.size());
+            
+        } catch (Exception e) {
+            log.error("批量查询消息失败, rowKeys数量={}", rowKeys.size(), e);
+        }
+        
+        return result;
     }
 
 }

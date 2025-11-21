@@ -1,7 +1,11 @@
 package com.xzll.client.protobuf.interactive;
 
+import cn.hutool.core.lang.Assert;
 import com.alibaba.fastjson.JSONObject;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.xzll.common.constant.ImConstant;
+import com.xzll.common.constant.MsgFormatEnum;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.grpc.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -19,12 +23,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 /**
@@ -34,12 +37,12 @@ import org.springframework.util.CollectionUtils;
  */
 public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object> {
 
-//    public static final String IP = "127.0.0.1";
-//    public static final String PORT = "8083";
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "8083";
 
 
-        public static final String IP = "120.46.85.43";
-    public static final String PORT = "80";
+//    public static final String IP = "120.46.85.43";
+//    public static final String PORT = "80";
 
     private final WebSocketClientHandshaker handshaker;
     private final String userId;
@@ -51,11 +54,8 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     // 存储待处理的好友请求 <requestId, FriendRequestPush>
     private final Map<String, FriendRequestPush> pendingFriendRequests = new ConcurrentHashMap<>();
     
-    // 存储从服务端获取的消息ID
-    private static final List<String> msgIds = new ArrayList<>();
-    
-    // 标识是否正在获取消息ID
-    private static volatile boolean getMsgFlag = false;
+    // 存储已发送消息的客户端ID，用于匹配ACK（clientMsgId -> 发送时间）
+    private final Map<String, Long> sentMessages = new ConcurrentHashMap<>();
     
     private static final DateTimeFormatter TIME_FORMATTER = 
         DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -146,7 +146,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     break;
                 
                 case C2C_ACK:
-                    handleAckMessage(protoResponse);
+                    handleClientAck(protoResponse);
                     break;
                 
                 case C2C_WITHDRAW:
@@ -161,10 +161,6 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     handleFriendResponse(protoResponse);
                     break;
                 
-                case PUSH_BATCH_MSG_IDS:
-                    handleBatchMsgIds(protoResponse);
-                    break;
-                
                 default:
                     System.out.println("[" + getTime() + "] ❓ 收到未知类型消息: " + msgType);
             }
@@ -175,19 +171,26 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理单聊消息
+     * 处理单聊消息（优化版：适配 fixed64/bytes）
      */
     private void handleC2CMessage(ImProtoResponse protoResponse) {
         try {
             C2CMsgPush pushMsg = C2CMsgPush.parseFrom(protoResponse.getPayload());
             
+            // 类型转换：fixed64 -> String, bytes -> String
+            String clientMsgId = ProtoConverterUtil.bytesToUuidString(pushMsg.getClientMsgId());
+            String msgId = ProtoConverterUtil.longToSnowflakeString(pushMsg.getMsgId());
+            String from = ProtoConverterUtil.longToSnowflakeString(pushMsg.getFrom());
+            String to = ProtoConverterUtil.longToSnowflakeString(pushMsg.getTo());
+            
             System.out.println();
             System.out.println("╔════════════════════════════════════════════════════╗");
-            System.out.println("║              📨 收到新消息                          ║");
+            System.out.println("║              📨 收到新消息（优化版）                 ║");
             System.out.println("╠════════════════════════════════════════════════════╣");
             System.out.println("║  时间: " + getTime());
-            System.out.println("║  发送方: " + pushMsg.getFrom());
-            System.out.println("║  消息ID: " + pushMsg.getMsgId());
+            System.out.println("║  发送方: " + from);
+            System.out.println("║  客户端ID: " + clientMsgId);
+            System.out.println("║  服务端ID: " + msgId);
             System.out.println("║  内容: " + pushMsg.getContent());
             System.out.println("╚════════════════════════════════════════════════════╝");
             
@@ -210,19 +213,79 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理ACK消息
+     * 处理服务端ACK（双轨制优化版：适配 fixed64/bytes，移除ackTextDesc）
+     * 注意：此方法现在已被handleClientAck方法统一处理，保留此方法以供参考
      */
-    private void handleAckMessage(ImProtoResponse protoResponse) {
+    private void handleServerAck(ImProtoResponse protoResponse) {
         try {
-            C2CAckReq ack = C2CAckReq.parseFrom(protoResponse.getPayload());
+            ServerAckPush serverAck = ServerAckPush.parseFrom(protoResponse.getPayload());
+            
+            // 类型转换：fixed64 -> String, bytes -> String
+            String clientMsgId = ProtoConverterUtil.bytesToUuidString(serverAck.getClientMsgId());
+            String msgId = ProtoConverterUtil.longToSnowflakeString(serverAck.getMsgId());
+            
+            // 从已发送消息中查找对应的消息
+            Long sendTime = sentMessages.get(clientMsgId);
+            String timeInfo = sendTime != null ? 
+                String.format(" (耗时: %dms)", System.currentTimeMillis() - sendTime) : "";
+            
+            System.out.println();
+            System.out.println("╔════════════════════════════════════════════════════╗");
+            System.out.println("║          💡 ★★★ 收到ACK（双轨制优化版）★★★        ║");
+            System.out.println("╠════════════════════════════════════════════════════╣");
+            System.out.println("║  客户端ID: " + clientMsgId);
+            System.out.println("║  服务端ID: " + msgId);
+            System.out.println("║  状态: SERVER_RECEIVED" + timeInfo);
+            System.out.println("╚════════════════════════════════════════════════════╝");
+            
+        } catch (InvalidProtocolBufferException e) {
+            System.err.println("[" + getTime() + "] ❌ 解析服务端ACK失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 处理ACK消息（统一处理ServerAck和ClientAck）（优化版：适配 fixed64/bytes）
+     * 注意：ServerAck(status=1)和ClientAck(status=3/4)都通过C2C_ACK发送
+     */
+    private void handleClientAck(ImProtoResponse protoResponse) {
+        try {
+            C2CAckReq ackReq = C2CAckReq.parseFrom(protoResponse.getPayload());
+            
+            // 类型转换：fixed64 -> String, bytes -> String
+            String clientMsgId = ProtoConverterUtil.bytesToUuidString(ackReq.getClientMsgId());
+            String msgId = ProtoConverterUtil.longToSnowflakeString(ackReq.getMsgId());
             
             String statusText;
             String emoji;
-            switch (ack.getStatus()) {
-                case 1:
-                    statusText = "服务器已接收";
-                    emoji = "📡";
-                    break;
+            
+            // 判断是ServerAck还是ClientAck
+            if (ackReq.getStatus() == 1) {
+                // ✅ ServerAck：服务端已接收
+                statusText = "服务端已接收";
+                emoji = "💡";
+                
+                // 从已发送消息中查找对应的消息，计算耗时
+                Long sendTime = sentMessages.get(clientMsgId);
+                String timeInfo = sendTime != null ? 
+                    String.format(" (耗时: %dms)", System.currentTimeMillis() - sendTime) : "";
+                
+                System.out.println();
+                System.out.println("╔════════════════════════════════════════════════════╗");
+                System.out.println("║          💡 ★★★ 收到ServerAck（双轨制优化版）★★★   ║");
+                System.out.println("╠════════════════════════════════════════════════════╣");
+                System.out.println("║  客户端ID: " + clientMsgId);
+                System.out.println("║  服务端ID: " + msgId);
+                System.out.println("║  状态: SERVER_RECEIVED" + timeInfo);
+                System.out.println("║  时间: " + getTime());
+                System.out.println("╚════════════════════════════════════════════════════╝");
+                
+                // 清理已发送消息记录（可选，避免内存泄漏）
+                sentMessages.remove(clientMsgId);
+                return;
+            }
+            
+            // ClientAck：对方未读/已读
+            switch (ackReq.getStatus()) {
                 case 3:
                     statusText = "对方未读";
                     emoji = "📬";
@@ -232,12 +295,12 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
                     emoji = "✅";
                     break;
                 default:
-                    statusText = "未知状态(" + ack.getStatus() + ")";
+                    statusText = "未知状态(" + ackReq.getStatus() + ")";
                     emoji = "❓";
             }
             
-            System.out.println("[" + getTime() + "] " + emoji + " ACK: " + statusText + 
-                             " (msgId: " + ack.getMsgId() + ")");
+            System.out.println("[" + getTime() + "] " + emoji + " 客户端ACK: " + statusText + 
+                             " (clientId: " + clientMsgId + ", msgId: " + msgId + ")");
             
         } catch (InvalidProtocolBufferException e) {
             System.err.println("[" + getTime() + "] ❌ 解析ACK失败: " + e.getMessage());
@@ -245,16 +308,20 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理撤回消息
+     * 处理撤回消息（优化版：适配 fixed64）
      */
     private void handleWithdrawMessage(ImProtoResponse protoResponse) {
         try {
             C2CWithdrawReq withdraw = C2CWithdrawReq.parseFrom(protoResponse.getPayload());
             
+            // 类型转换：fixed64 -> String
+            String msgId = ProtoConverterUtil.longToSnowflakeString(withdraw.getMsgId());
+            String from = ProtoConverterUtil.longToSnowflakeString(withdraw.getFrom());
+            
             System.out.println();
-            System.out.println("[" + getTime() + "] 🔄 收到撤回通知");
-            System.out.println("  消息ID: " + withdraw.getMsgId());
-            System.out.println("  发起人: " + withdraw.getFrom());
+            System.out.println("[" + getTime() + "] 🔄 收到撤回通知（优化版）");
+            System.out.println("  消息ID: " + msgId);
+            System.out.println("  发起人: " + from);
             
         } catch (InvalidProtocolBufferException e) {
             System.err.println("[" + getTime() + "] ❌ 解析撤回消息失败: " + e.getMessage());
@@ -262,26 +329,31 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理好友请求
+     * 处理好友请求（优化版：适配 fixed64）
      */
     private void handleFriendRequest(ImProtoResponse protoResponse) {
         try {
             FriendRequestPush request = FriendRequestPush.parseFrom(protoResponse.getPayload());
             
-            // 保存待处理的好友请求
-            pendingFriendRequests.put(request.getRequestId(), request);
+            // 类型转换：fixed64 -> String
+            String toUserId = ProtoConverterUtil.longToSnowflakeString(request.getToUserId());
+            String requestId = ProtoConverterUtil.bytesToUuidString(request.getRequestId());
+            String fromUserId = ProtoConverterUtil.longToSnowflakeString(request.getFromUserId());
+            
+            // 保存待处理的好友请求（使用转换后的requestId）
+            pendingFriendRequests.put(requestId, request);
             
             System.out.println();
             System.out.println("╔════════════════════════════════════════════════════╗");
-            System.out.println("║              👥 收到好友请求                        ║");
+            System.out.println("║              👥 收到好友请求（优化版）              ║");
             System.out.println("╠════════════════════════════════════════════════════╣");
-            System.out.println("║  申请人: " + request.getFromUserName() + " (" + request.getFromUserId() + ")");
+            System.out.println("║  申请人: " + request.getFromUserName() + " (" + fromUserId + ")");
             System.out.println("║  申请消息: " + request.getRequestMessage());
-            System.out.println("║  请求ID: " + request.getRequestId());
+            System.out.println("║  请求ID: " + requestId);
             System.out.println("╠════════════════════════════════════════════════════╣");
             System.out.println("║  💡 处理方式:                                      ║");
-            System.out.println("║     同意: friend accept " + request.getRequestId());
-            System.out.println("║     拒绝: friend reject " + request.getRequestId());
+            System.out.println("║     同意: friend accept " + requestId);
+            System.out.println("║     拒绝: friend reject " + requestId);
             System.out.println("║     查看: friend list                              ║");
             System.out.println("╚════════════════════════════════════════════════════╝");
             
@@ -291,20 +363,26 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理好友响应
+     * 处理好友响应（优化版：适配 fixed64）
      */
     private void handleFriendResponse(ImProtoResponse protoResponse) {
         try {
             FriendResponsePush response = FriendResponsePush.parseFrom(protoResponse.getPayload());
+            
+            // 类型转换：fixed64 -> String
+            String toUserId = ProtoConverterUtil.longToSnowflakeString(response.getToUserId());
+            String requestId = ProtoConverterUtil.bytesToUuidString(response.getRequestId());
+            String fromUserId = ProtoConverterUtil.longToSnowflakeString(response.getFromUserId());
             
             String resultText = response.getStatus() == 1 ? "✅ 已同意" : "❌ 已拒绝";
             String emoji = response.getStatus() == 1 ? "🎉" : "😔";
             
             System.out.println();
             System.out.println("╔════════════════════════════════════════════════════╗");
-            System.out.println("║            👥 好友申请响应                          ║");
+            System.out.println("║            👥 好友申请响应（优化版）                ║");
             System.out.println("╠════════════════════════════════════════════════════╣");
             System.out.println("║  响应人: " + response.getFromUserName());
+            System.out.println("║  请求ID: " + requestId);
             System.out.println("║  结果: " + resultText);
             System.out.println("║  " + emoji + " " + response.getPushContent());
             System.out.println("╚════════════════════════════════════════════════════╝");
@@ -315,44 +393,27 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 发送文本消息
+     * 发送文本消息（双轨制优化版：适配 fixed64/bytes，chatId不传）
      */
     public void sendTextMessage(String toUserId, String content) {
         try {
-            // 检查是否有可用的msgId
-            if (getMsgFlag) {
-                System.out.println("[" + getTime() + "] ⏳ 正在获取消息ID，请稍候...");
-                return;
-            }
+            // 生成客户端消息ID（UUID）
+            String clientMsgId = UUID.randomUUID().toString();
+            long sendTime = System.currentTimeMillis();
             
-            if (CollectionUtils.isEmpty(msgIds)) {
-                System.out.println("[" + getTime() + "] 📥 消息ID为空，正在获取...");
-                getMsgIds();
-                getMsgFlag = true;
-                return;
-            }
+            // 记录已发送消息，用于后续ACK匹配
+            sentMessages.put(clientMsgId, sendTime);
             
-            // 从集合中取出一个msgId
-            String msgId;
-            synchronized (msgIds) {
-                if (msgIds.isEmpty()) {
-                    System.out.println("[" + getTime() + "] ❌ 消息ID已用完，请重新获取");
-                    return;
-                }
-                msgId = msgIds.remove(0);
-            }
-            
-            String chatId = generateChatId(userId, toUserId);
-            
-            // 构建 C2CSendReq
+            // 构建 C2CSendReq（双轨制优化版：clientMsgId=bytes, msgId=0, from/to=fixed64, chatId不传）
             C2CSendReq sendReq = C2CSendReq.newBuilder()
-                    .setMsgId(msgId)
-                    .setFrom(userId)
-                    .setTo(toUserId)
-                    .setFormat(1) // 1=文本
+                    .setClientMsgId(ProtoConverterUtil.uuidStringToBytes(clientMsgId))  // UUID String -> bytes
+                    .setMsgId(0L)  // 留空（0L），服务端会自动生成
+                    .setFrom(ProtoConverterUtil.snowflakeStringToLong(userId))  // String -> fixed64
+                    .setTo(ProtoConverterUtil.snowflakeStringToLong(toUserId))  // String -> fixed64
+                    .setFormat(MsgFormatEnum.TEXT_MSG.getCode()) // 文本消息
                     .setContent(content)
-                    .setTime(System.currentTimeMillis())
-                    .setChatId(chatId)
+                    .setTime(sendTime)  // fixed64
+                    // chatId 已从proto删除，服务端会根据from+to动态生成
                     .build();
             
             // 包装为 ImProtoRequest
@@ -368,22 +429,25 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             
             sentCount.incrementAndGet();
             
+            System.out.println("[" + getTime() + "] 📤 消息已发送（优化版） (clientId: " + clientMsgId + ")");
+            
         } catch (Exception e) {
             System.err.println("[" + getTime() + "] ❌ 发送消息失败: " + e.getMessage());
         }
     }
     
     /**
-     * 发送ACK
+     * 发送ACK（双轨制优化版：适配 fixed64/bytes，chatId不传）
      */
     private void sendAck(C2CMsgPush pushMsg, int status) {
         try {
             C2CAckReq ackReq = C2CAckReq.newBuilder()
-                    .setMsgId(pushMsg.getMsgId())
-                    .setFrom(pushMsg.getTo())
-                    .setTo(pushMsg.getFrom())
+                    .setClientMsgId(pushMsg.getClientMsgId()) // bytes（直接使用，无需转换）
+                    .setMsgId(pushMsg.getMsgId())            // fixed64（直接使用，无需转换）
+                    .setFrom(pushMsg.getTo())                // fixed64（直接使用，发送方和接收方对调）
+                    .setTo(pushMsg.getFrom())                // fixed64（直接使用，发送方和接收方对调）
                     .setStatus(status)
-                    .setChatId(pushMsg.getChatId())
+                    // chatId 已从proto删除，服务端会动态生成
                     .build();
             
             ImProtoRequest protoRequest = ImProtoRequest.newBuilder()
@@ -410,7 +474,28 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
             return userId2 + "_" + userId1;
         }
     }
-    
+
+    public static String buildChatId(Integer bizType, String chatType, Long fromUserId, Long toUserId) {
+        Assert.isTrue(StringUtils.isNotBlank(chatType) && Objects.nonNull(fromUserId) && Objects.nonNull(toUserId));
+        bizType = bizType == null ? ImConstant.DEFAULT_BIZ_TYPE : bizType;
+        return String.format("%d-%s-%s-%s", bizType, ImConstant.ChatType.CHAT_TYPE_MAP.get(chatType), fromUserId, toUserId);
+    }
+
+    public static String buildC2CChatId(Integer bizType, Long fromUserId, Long toUserId) {
+        //单聊时 第一个userId是小的 第二个userId是较大的
+        Long smallUserId = null;
+        Long bigUserId = null;
+        if (fromUserId < toUserId) {
+            smallUserId = fromUserId;
+            bigUserId = toUserId;
+        } else {
+            smallUserId = toUserId;
+            bigUserId = fromUserId;
+        }
+        return buildChatId(bizType, ImConstant.ChatType.C2C, smallUserId, bigUserId);
+    }
+
+
     /**
      * 获取当前时间
      */
@@ -427,7 +512,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 处理好友请求（同意或拒绝）
+     * 处理好友请求（同意或拒绝）（优化版：适配 fixed64）
      */
     public void handleFriendRequestAction(String requestId, int handleResult) {
         FriendRequestPush request = pendingFriendRequests.get(requestId);
@@ -439,12 +524,13 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
         }
         
         try {
-            System.out.println("[" + getTime() + "] ⏳ 正在处理好友请求...");
+            System.out.println("[" + getTime() + "] ⏳ 正在处理好友请求（优化版）...");
             
             // 构建处理请求参数（参考client2实现）
+            // 注意：HTTP接口期望的是String类型的ID
             JSONObject handleRequest = new JSONObject();
-            handleRequest.put("requestId", request.getRequestId());
-            handleRequest.put("userId", request.getToUserId());
+            handleRequest.put("requestId", requestId); // 已经是转换后的String
+            handleRequest.put("userId", ProtoConverterUtil.longToSnowflakeString(request.getToUserId())); // fixed64 -> String
             handleRequest.put("handleResult", handleResult); // 1=同意, 2=拒绝
             
             // 调用HTTP接口处理好友申请
@@ -470,7 +556,7 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
     }
     
     /**
-     * 列出所有待处理的好友请求
+     * 列出所有待处理的好友请求（优化版：适配 fixed64）
      */
     public void listPendingFriendRequests() {
         if (pendingFriendRequests.isEmpty()) {
@@ -483,19 +569,22 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
         
         System.out.println();
         System.out.println("╔════════════════════════════════════════════════════╗");
-        System.out.println("║            待处理的好友请求列表                     ║");
+        System.out.println("║            待处理的好友请求列表（优化版）           ║");
         System.out.println("╠════════════════════════════════════════════════════╣");
         
         int index = 1;
         for (Map.Entry<String, FriendRequestPush> entry : pendingFriendRequests.entrySet()) {
             FriendRequestPush request = entry.getValue();
+            String requestId = entry.getKey(); // 使用Map的key（已转换的String）
+            String fromUserId = ProtoConverterUtil.longToSnowflakeString(request.getFromUserId());
+            
             System.out.println("║");
             System.out.println("║  [" + index + "] 申请人: " + request.getFromUserName() + 
-                             " (" + request.getFromUserId() + ")");
+                             " (" + fromUserId + ")");
             System.out.println("║      消息: " + request.getRequestMessage());
-            System.out.println("║      请求ID: " + request.getRequestId());
-            System.out.println("║      同意: friend accept " + request.getRequestId());
-            System.out.println("║      拒绝: friend reject " + request.getRequestId());
+            System.out.println("║      请求ID: " + requestId);
+            System.out.println("║      同意: friend accept " + requestId);
+            System.out.println("║      拒绝: friend reject " + requestId);
             index++;
         }
         
@@ -557,59 +646,5 @@ public class InteractiveClientHandler extends SimpleChannelInboundHandler<Object
         super.channelInactive(ctx);
     }
     
-    /**
-     * 获取消息ID列表
-     */
-    private void getMsgIds() {
-        try {
-            // 构建获取消息ID请求
-            GetBatchMsgIdsReq getBatchMsgIdsReq = GetBatchMsgIdsReq.newBuilder()
-                    .setUserId(userId)
-                    .build();
-
-            // 包装为 ImProtoRequest
-            ImProtoRequest protoRequest = ImProtoRequest.newBuilder()
-                    .setType(MsgType.GET_BATCH_MSG_IDS)
-                    .setPayload(com.google.protobuf.ByteString.copyFrom(getBatchMsgIdsReq.toByteArray()))
-                    .build();
-
-            // 发送 Protobuf 二进制消息
-            byte[] bytes = protoRequest.toByteArray();
-            ByteBuf buf = Unpooled.wrappedBuffer(bytes);
-            BinaryWebSocketFrame binaryFrame = new BinaryWebSocketFrame(buf);
-            handshakeFuture.channel().writeAndFlush(binaryFrame);
-            System.out.println("[" + getTime() + "] 📤 发送获取消息ID请求");
-        } catch (Exception e) {
-            System.err.println("[" + getTime() + "] ❌ 获取消息ID失败: " + e.getMessage());
-            getMsgFlag = false; // 重置标志位
-        }
-    }
-    
-    /**
-     * 处理批量消息ID
-     */
-    private void handleBatchMsgIds(ImProtoResponse protoResponse) {
-        try {
-            BatchMsgIdsPush resp = BatchMsgIdsPush.parseFrom(protoResponse.getPayload());
-            List<String> msgIdList = resp.getMsgIdsList();
-            
-            System.out.println("[" + getTime() + "] 📨 获取到一批消息ID，数量: " + msgIdList.size());
-            
-            if (!CollectionUtils.isEmpty(msgIdList)) {
-                synchronized (msgIds) {
-                    msgIds.addAll(msgIdList);
-                }
-                getMsgFlag = false; // 重置标志位
-                System.out.println("[" + getTime() + "] ✅ 消息ID已添加到本地缓存，当前缓存数量: " + msgIds.size());
-            } else {
-                getMsgFlag = false; // 重置标志位
-                System.out.println("[" + getTime() + "] ⚠️ 获取到的消息ID列表为空");
-            }
-            
-        } catch (InvalidProtocolBufferException e) {
-            System.err.println("[" + getTime() + "] ❌ 解析 BatchMsgIdsPush 失败: " + e.getMessage());
-            getMsgFlag = false; // 重置标志位
-        }
-    }
 }
 

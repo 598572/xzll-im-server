@@ -60,7 +60,7 @@ public class LocalChannelManager {
         
         // 启动连接统计任务，每10秒输出一次统计信息
         cleanupExecutor.scheduleAtFixedRate(LocalChannelManager::logConnectionStats, 
-            10, 10, TimeUnit.SECONDS);
+            60, 60, TimeUnit.SECONDS);
     }
 
     /**
@@ -86,10 +86,27 @@ public class LocalChannelManager {
         
         // 如果该用户已有连接，移除旧连接（单设备登录模式）
         Channel oldChannel = userIdChannelMap.get(userId);
-        if (oldChannel != null && oldChannel.isActive()) {
-            log.info("用户{}重新连接，关闭旧连接：{}", userId, oldChannel.id().asLongText());
-            removeUserChannel(userId);
-            oldChannel.close();
+        if (oldChannel != null && !oldChannel.id().equals(channel.id())) {
+            String oldChannelId = oldChannel.id().asLongText();
+            log.warn("用户{}重新连接，准备关闭旧连接：oldChannelId={}, newChannelId={}", 
+                userId, oldChannelId, channelId);
+            
+            // 【重要】先从映射中移除，再关闭Channel
+            // 这样channelInactive触发时，不会清除新连接的状态
+            userIdChannelMap.remove(userId, oldChannel); // 原子性操作
+            channelIdUserIdMap.remove(oldChannelId);
+            
+            // 从多连接映射中移除旧channelId
+            userChannels.remove(oldChannelId);
+            
+            // 关闭旧连接（异步，不影响新连接）
+            if (oldChannel.isActive()) {
+                oldChannel.close().addListener(future -> {
+                    if (future.isSuccess()) {
+                        log.info("旧连接已关闭：userId={}, oldChannelId={}", userId, oldChannelId);
+                    }
+                });
+            }
         }
         
         // 添加新连接

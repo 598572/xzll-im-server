@@ -27,7 +27,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collection;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -138,22 +138,50 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 log.info("客户端断开连接：{}, 用户ID: {}", channelId, uid);
             }
             
-            // 异步清理用户状态，避免阻塞IO线程
-            if (uid != null) {
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        LocalChannelManager.removeUserChannel(uid);
-                        userStatusManagerService.userDisconnectAfter(uid);
-                    } catch (Exception e) {
-                        log.error("用户断开连接后处理异常, uid: {}", uid, e);
-                    }
-                }, threadPoolTaskExecutor);
+            // 清理心跳失败计数，防止误杀重连用户
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .cleanup(channelId);
+                log.debug("已清理channelId={}的心跳数据", channelId);
             }
             
-            connectionCount.decrement();
+            // 【改为同步】清理用户状态
+            // 原因：异步清理存在时序问题，可能误删用户重连后的新状态
+            // Redis操作通常1-5ms，同步清理不会造成明显的性能问题
+            if (uid != null) {
+                try {
+                    // 【重要】验证是否为当前用户的Channel，避免误删新连接
+                    Channel currentChannel = LocalChannelManager.getChannelByUserId(uid);
+                    if (currentChannel != null) {
+                        String currentChannelId = currentChannel.id().asLongText();
+                        if (!currentChannelId.equals(channelId)) {
+                            // 用户已重连，旧连接清理时跳过
+                            log.info("用户{}已重连，跳过旧连接的状态清理，旧channelId: {}, 新channelId: {}", 
+                                uid, channelId, currentChannelId);
+                            return; // 直接返回，不清理任何状态
+                        }
+                    }
+                    
+                    // 只有在以下情况才清理：
+                    // 1. currentChannel == null（用户已离线）
+                    // 2. currentChannelId == channelId（是当前连接）
+                    
+                    // 清理LocalChannelManager映射
+                    LocalChannelManager.removeUserChannel(uid);
+                    
+                    // 清理Redis状态
+                    userStatusManagerService.userDisconnectAfter(uid);
+                    
+                    log.info("用户{}状态清理完成，channelId: {}", uid, channelId);
+                } catch (Exception e) {
+                    log.error("用户断开连接后清理状态异常, uid: {}, channelId: {}", uid, channelId, e);
+                }
+            }
         } catch (Exception e) {
             log.error("处理连接断开异常", e);
         } finally {
+            // 【重要】在finally中减少计数，确保旧连接断开时也会统计
+            connectionCount.decrement();
             super.channelInactive(ctx);
         }
     }
@@ -239,13 +267,29 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 if (future.isSuccess()) {
                     log.info("WebSocket握手成功, uid: {}", uidStr);
                     
-                    // 异步处理用户上线和离线消息推送，避免阻塞握手流程
+                    // 【重要】同步设置用户状态，确保后续心跳和消息处理时状态已就绪
+                    // 顺序：先设置LocalChannelManager，再设置Redis状态
+                    try {
+                        // 1. 设置本地Channel映射
+                        LocalChannelManager.addUserChannel(uidStr, ctx.channel());
+                        log.debug("用户{}本地Channel映射设置完成", uidStr);
+                        
+                        // 2. 设置Redis在线状态和路由信息
+                        userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
+                        log.debug("用户{}Redis在线状态设置完成", uidStr);
+                    } catch (Exception e) {
+                        log.error("设置用户{}在线状态失败", uidStr, e);
+                        // 状态设置失败，清理已设置的映射，关闭连接让用户重连
+                        LocalChannelManager.removeUserChannel(uidStr);
+                        ctx.close();
+                        return;
+                    }
+                    
+                    // 【异步】推送离线数据，避免阻塞握手流程
                     CompletableFuture.runAsync(() -> {
                         try {
-                            userStatusManagerService.userConnectSuccessAfter(ImConstant.UserStatus.ON_LINE.getValue(), uidStr);
-                            
-                            // 推送离线消息
-                            pushOfflineMessages(ctx, uid);
+                            // ❌ 【已移除】推送离线消息 - 客户端登录后会主动调用会话列表接口获取
+                            // pushOfflineMessages(ctx, uid);
                             
                             // 推送离线好友请求
                             pushOfflineFriendRequests(ctx, uid);
@@ -253,7 +297,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                             // 推送离线好友响应
                             pushOfflineFriendResponses(ctx, uid);
                         } catch (Exception e) {
-                            log.error("用户上线后处理异常, uid: {}", uidStr, e);
+                            log.error("推送离线数据异常, uid: {}", uidStr, e);
                         }
                     }, threadPoolTaskExecutor);
                 } else {
@@ -286,8 +330,18 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         
         //判断是否为ping消息
         if (frame instanceof PingWebSocketFrame) {
-            log.debug("[WebSocketServerHandler]_消息类型: ping");
-            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            long currentTime = System.currentTimeMillis();
+            Long lastReadTime = NettyAttrUtil.getReaderTime(ctx.channel());
+            long timeSinceLastRead = lastReadTime != null ? (currentTime - lastReadTime) : 0;
+            
+            log.debug("[WebSocketServerHandler]_消息类型: ping, 距离上次读取={}ms", timeSinceLastRead);
+            
+            NettyAttrUtil.updateReaderTime(ctx.channel(), currentTime);
+            // 记录心跳响应（客户端主动发送ping）
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .recordHeartbeatResponse(ctx, "ping");
+            }
             // 修复内存泄漏：使用try-with-resources或者手动管理引用计数
             try {
                 ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
@@ -295,6 +349,18 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
                 // 如果发送失败，需要释放retain的内容
                 ReferenceCountUtil.release(frame.content());
                 log.error("发送Pong消息失败", e);
+            }
+            return;
+        }
+        
+        // 处理客户端回复的Pong消息（服务器发送Ping后，客户端回复Pong）
+        if (frame instanceof PongWebSocketFrame) {
+            log.debug("[WebSocketServerHandler]_消息类型: pong");
+            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            // 记录心跳响应（客户端回复pong）
+            if (heartBeatHandler instanceof com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) {
+                ((com.xzll.connect.netty.heart.NettyServerHeartBeatHandlerImpl) heartBeatHandler)
+                    .recordHeartbeatResponse(ctx, "pong");
             }
             return;
         }
@@ -309,6 +375,10 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
         // Protobuf 二进制消息处理（唯一支持的格式）
         if (frame instanceof BinaryWebSocketFrame) {
             log.debug("[WebSocketServerHandler]_消息类型: protobuf 二进制");
+            
+            // 更新读取时间（任何消息都应该更新，包括业务消息）
+            NettyAttrUtil.updateReaderTime(ctx.channel(), System.currentTimeMillis());
+            
             ByteBuf content = ((BinaryWebSocketFrame) frame).content();
             
             // 消息长度检查
@@ -352,37 +422,134 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     /**
-     * 异步推送离线消息
+     * 【已废弃】异步推送离线消息（微信模式：每个会话只推送最新1条）
+     * 
+     * 废弃原因：
+     * - 客户端登录后会主动调用会话列表接口获取所有会话信息
+     * - 会话列表接口已包含每个会话的最新消息、时间、未读数
+     * - 不再需要 WebSocket 主动推送离线消息
+     * 
+     * 推送策略：
+     * 1. 每个会话只推送最新1条消息（作为会话列表的概要）
+     * 2. 携带该会话的未读消息数量
+     * 3. 用户点击会话后，调用HTTP接口拉取完整历史消息
+     * 
+     * 优点：
+     * - 登录速度快（只推送少量消息）
+     * - 用户体验好（类似微信、钉钉）
+     * - 按需加载（进入会话才拉取完整历史）
      */
-    private void pushOfflineMessages(ChannelHandlerContext ctx, Object uid) {
-        try {
-            Collection<String> lastOffLineMsgs = redissonUtils.getZSetRevRange(
-                ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid, 
-                0, 
-                imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount()
-            );
-            
-            if (!CollectionUtils.isEmpty(lastOffLineMsgs)) {
-                log.info("推送离线消息, uid: {}, count: {}", uid, lastOffLineMsgs.size());
-                
-                for (String msg : lastOffLineMsgs) {
-                    if (ctx.channel().isActive()) {
-                        ctx.channel().writeAndFlush(new TextWebSocketFrame(msg))
-                            .addListener(future -> {
-                                if (!future.isSuccess()) {
-                                    log.error("发送离线消息失败, uid: {}", uid, future.cause());
-                                }
-                            });
-                    } else {
-                        log.warn("连接已断开，停止推送离线消息, uid: {}", uid);
-                        break;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("推送离线消息异常, uid: {}", uid, e);
-        }
-    }
+//    @Deprecated
+//    private void pushOfflineMessages(ChannelHandlerContext ctx, Object uid) {
+//        try {
+//            // 1. 读取所有离线消息（最多1000条，避免内存溢出）
+//            int maxFetchCount = Math.max(imMsgConfig.getC2cMsgConfig().getPushOfflineMsgCount(), 1000);
+//            Collection<String> compressedMsgs = redissonUtils.getZSetRevRange(
+//                ImConstant.RedisKeyConstant.OFF_LINE_MSG_KEY + uid,
+//                0,
+//                maxFetchCount - 1
+//            );
+//
+//            if (CollectionUtils.isEmpty(compressedMsgs)) {
+//                log.debug("没有离线消息需要推送, uid: {}", uid);
+//                return;
+//            }
+//
+//            log.info("开始处理离线消息, uid: {}, 总数: {}", uid, compressedMsgs.size());
+//
+//            // 2. 按会话分组（chatId -> 消息列表）
+//            Map<String, List<OfflineMessageWrapper>> chatMessagesMap = new LinkedHashMap<>();
+//            int totalCount = 0;
+//
+//            for (String compressedMsg : compressedMsgs) {
+//                try {
+//                    // 解压消息
+//                    String decompressedMsg = CompressionUtil.decompressFromBase64(compressedMsg);
+//
+//                    // 解析JSON获取chatId
+//                    cn.hutool.json.JSONObject msgJson = JSONUtil.parseObj(decompressedMsg);
+//                    String chatId = msgJson.getStr("chatId");
+//
+//                    if (chatId == null) {
+//                        log.warn("离线消息缺少chatId，跳过, uid: {}", uid);
+//                        continue;
+//                    }
+//
+//                    // 按chatId分组
+//                    chatMessagesMap.computeIfAbsent(chatId, k -> new ArrayList<>())
+//                        .add(new OfflineMessageWrapper(decompressedMsg, msgJson));
+//
+//                    totalCount++;
+//                } catch (Exception e) {
+//                    log.error("解析离线消息失败, uid: {}", uid, e);
+//                }
+//            }
+//
+//            log.info("离线消息分组完成, uid: {}, 会话数: {}, 总消息数: {}",
+//                uid, chatMessagesMap.size(), totalCount);
+//
+//            // 3. 每个会话只推送最新1条消息 + 未读数量
+//            int successCount = 0;
+//            int failCount = 0;
+//
+//            for (Map.Entry<String, List<OfflineMessageWrapper>> entry : chatMessagesMap.entrySet()) {
+//                if (!ctx.channel().isActive()) {
+//                    log.warn("连接已断开，停止推送离线消息, uid: {}, 已推送: {}/{}",
+//                        uid, successCount, chatMessagesMap.size());
+//                    break;
+//                }
+//
+//                String chatId = entry.getKey();
+//                List<OfflineMessageWrapper> messages = entry.getValue();
+//                int unreadCount = messages.size();
+//
+//                // 取最新的1条消息（列表第一条就是最新的，因为ZSet是倒序）
+//                OfflineMessageWrapper latestMsg = messages.get(0);
+//
+//                try {
+//                    // 构建推送消息（添加未读数量）
+//                    cn.hutool.json.JSONObject pushMsg = latestMsg.jsonObject;
+//                    pushMsg.set("unreadCount", unreadCount); // 标记该会话的未读数量
+//                    pushMsg.set("isLatestOnly", true);       // 标记这是会话概要，需要调用历史接口拉取完整消息
+//
+//                    String pushMsgStr = pushMsg.toString();
+//
+//                    // 推送消息
+//                    ctx.channel().writeAndFlush(new TextWebSocketFrame(pushMsgStr))
+//                        .addListener(future -> {
+//                            if (!future.isSuccess()) {
+//                                log.error("推送离线消息失败, uid: {}, chatId: {}", uid, chatId, future.cause());
+//                            }
+//                        });
+//
+//                    successCount++;
+//
+//                    log.debug("推送会话概要, uid: {}, chatId: {}, 未读数: {}", uid, chatId, unreadCount);
+//
+//                } catch (Exception e) {
+//                    failCount++;
+//                    log.error("推送离线消息失败, uid: {}, chatId: {}", uid, chatId, e);
+//                }
+//            }
+//
+//            log.info("离线消息推送完成（微信模式）, uid: {}, 会话数: {}, 成功: {}, 失败: {}, 总未读: {}",
+//                uid, chatMessagesMap.size(), successCount, failCount, totalCount);
+//
+//        } catch (Exception e) {
+//            log.error("推送离线消息异常, uid: {}", uid, e);
+//        }
+//    }
+    
+//    /**
+//     * 离线消息包装类（内部使用）
+//     */
+//    private static class OfflineMessageWrapper {
+//        cn.hutool.json.JSONObject jsonObject;
+//
+//        OfflineMessageWrapper(String json, cn.hutool.json.JSONObject jsonObject) {
+//            this.jsonObject = jsonObject;
+//        }
+//    }
     
     /**
      * 推送离线好友请求

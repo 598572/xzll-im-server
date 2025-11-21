@@ -3,6 +3,7 @@ package com.xzll.business.test;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.xzll.business.entity.es.ImC2CMsgRecordES;
+import com.xzll.common.constant.MsgFormatEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -65,7 +66,7 @@ public class RestHighLevelClientTest {
         message.setFromUserId("user001");
         message.setToUserId("user002");
         message.setMsgId("test_msg_001");
-        message.setMsgFormat(1);
+        message.setMsgFormat(MsgFormatEnum.TEXT_MSG.getCode());
         message.setMsgContent("这是一条测试消息内容，用于测试ES功能");
         message.setMsgCreateTime(System.currentTimeMillis());
         message.setRetryCount(0);

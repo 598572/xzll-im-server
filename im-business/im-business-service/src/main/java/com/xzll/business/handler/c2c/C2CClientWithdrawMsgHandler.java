@@ -5,9 +5,9 @@ import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 
 
 import com.xzll.common.pojo.request.C2CWithdrawMsgAO;
+import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.grpc.GrpcMessageService;
 import lombok.extern.slf4j.Slf4j;
-import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,13 +44,13 @@ public class C2CClientWithdrawMsgHandler {
         } else {
             log.warn("HBase服务未启用，跳过更新撤回状态，注意此举仅适用于开发环境");
         }
-        //2. 撤回消息发送至接收方
+        //2. 撤回消息发送至接收方（优化后：string->fixed64，删除chatId）
         if (updateResult) {
             com.xzll.grpc.WithdrawPush withdrawPush = com.xzll.grpc.WithdrawPush.newBuilder()
-                    .setMsgId(ao.getMsgId())
-                    .setChatId(ao.getChatId())
-                    .setFromUserId(ao.getFromUserId())
-                    .setToUserId(ao.getToUserId())
+                    .setMsgId(ProtoConverterUtil.snowflakeStringToLong(ao.getMsgId())) // string -> fixed64
+                    // chatId已从proto删除
+                    .setFromUserId(ProtoConverterUtil.snowflakeStringToLong(ao.getFromUserId())) // string -> fixed64
+                    .setToUserId(ProtoConverterUtil.snowflakeStringToLong(ao.getToUserId())) // string -> fixed64
                     .build();
             // 使用gRPC发送撤回 - 异步方式
             CompletableFuture<Boolean> future = grpcMessageService.sendWithdrawMsg(withdrawPush);

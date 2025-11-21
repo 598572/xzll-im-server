@@ -1,6 +1,7 @@
 package com.xzll.business.service.impl;
 
 import org.springframework.util.CollectionUtils;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -9,16 +10,17 @@ import com.xzll.business.entity.mysql.ImChat;
 import com.xzll.business.entity.mysql.ImC2CMsgRecord;
 import com.xzll.business.entity.mysql.ImPersonalChatOpt;
 import com.xzll.business.mapper.ImChatMapper;
+import com.xzll.business.mapper.ImUserMapper;
+import com.xzll.business.service.ChatListService;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.ImPersonalChatOptService;
-import com.xzll.business.service.UnreadCountService;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.LastChatListAO;
 import com.xzll.common.pojo.response.LastChatListVO;
+import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,13 +48,15 @@ public class ImChatServiceImpl implements ImChatService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
-
     @Resource
-    private ConversionService conversionService;
+    private ChatListService chatListService;
 
-    @Resource
-    private UnreadCountService unreadCountService;
-
+    /**
+     * 此方法为好友申请通过时调用。
+     *
+     * @param dto
+     * @return
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
     public boolean saveOrUpdateC2CChat(C2CSendMsgAO dto) {
@@ -88,13 +92,13 @@ public class ImChatServiceImpl implements ImChatService {
 
 
     /**
-     * 查询最近会话列表
+     * 查询最近会话列表（优化版：优先从Redis读取元数据）
      * 
-     * 正确的查询流程：
-     * 1. 从 im_chat 表查询用户参与的所有会话（作为发送者或接收者）
-     * 2. 查询用户对这些会话的个人操作（置顶、隐藏、删除等）
-     * 3. 从 HBase 批量查询每个会话的最后消息
-     * 4. 从 Redis 批量获取未读消息数
+     * 新的查询流程：
+     * 1. 从 Redis 读取会话列表元数据（msgId + 未读数 + 时间戳）
+     * 2. 如果Redis为空，从MySQL查询用户的所有会话
+     * 3. 从 HBase 批量查询消息内容（根据chatId+msgId）
+     * 4. 查询用户对这些会话的个人操作（置顶、隐藏、删除等）
      * 5. 在内存中组装数据并按最后消息时间排序
      * 6. 处理置顶逻辑
      * 7. 在内存中分页返回结果
@@ -104,48 +108,68 @@ public class ImChatServiceImpl implements ImChatService {
      */
     @Override
     public List<LastChatListVO> findLastChatList(LastChatListAO ao) {
-        log.info("查询最近会话列表_入参:{}", JSONUtil.toJsonStr(ao));
+        log.info("查询最近会话列表_入参：{}", JSONUtil.toJsonStr(ao));
         
-        // 1. 先查询用户参与的所有会话
-        List<ImChat> userChats = getUserChats(ao.getUserId());
+        // 1. 【关键】从Redis读取会话列表元数据（msgId + 未读数 + 时间戳）
+        Map<String, String> chatMetadataMap = chatListService.getAllChatListMetadata(ao.getUserId());
         
-        if (CollectionUtils.isEmpty(userChats)) {
-            log.info("用户{}没有任何会话", ao.getUserId());
-            return Lists.newArrayList();
+        // 2. 如果Redis为空，从MySQL查询用户的所有会话（兜底逻辑）
+        List<String> chatIds;
+        if (chatMetadataMap.isEmpty()) {
+            log.info("用户{}Redis会话列表为空，从MySQL查询", ao.getUserId());
+            List<ImChat> userChats = getUserChats(ao.getUserId());
+            
+            if (CollectionUtils.isEmpty(userChats)) {
+                log.info("用户{}没有任何会话", ao.getUserId());
+                return Lists.newArrayList();
+            }
+            
+            chatIds = userChats.stream()
+                    .map(ImChat::getChatId)
+                    .collect(Collectors.toList());
+        } else {
+            chatIds = Lists.newArrayList(chatMetadataMap.keySet());
         }
         
-        // 2. 获取所有会话ID
-        List<String> chatIds = userChats.stream()
-                .map(ImChat::getChatId)
-                .collect(Collectors.toList());
-        
-        log.info("用户{}共有{}个会话，开始查询最后消息和个人操作", ao.getUserId(), chatIds.size());
+        log.info("用户{}共有{}个会话，开始查询消息内容和个人操作", ao.getUserId(), chatIds.size());
         
         // 3. 查询用户对这些会话的个人操作（置顶、隐藏、删除等）
         ImPersonalChatOpt queryOpt = new ImPersonalChatOpt();
         queryOpt.setUserId(ao.getUserId());
         List<ImPersonalChatOpt> allPersonalChats = imPersonalChatOptService.findPersonalChatByUserId(queryOpt, null, null);
         
-        // 4. 从HBase批量查询每个会话的最后一条消息
+        // 4. 【关键】从HBase批量查询消息内容（根据chatId+msgId）
         final Map<String, ImC2CMsgRecord> lastMsgMap;
-        if (imC2CMsgRecordHBaseService != null) {
+        if (imC2CMsgRecordHBaseService != null && !chatMetadataMap.isEmpty()) {
+            // 构建rowKeys：chatId_msgId
+            List<String> rowKeys = chatMetadataMap.entrySet().stream()
+                    .map(entry -> {
+                        String chatId = entry.getKey();
+                        JSONObject metadata = JSONUtil.parseObj(entry.getValue());
+                        String msgId = metadata.getStr("m");  // m = msgId
+                        return chatId + "_" + msgId;
+                    })
+                    .collect(Collectors.toList());
+            
+            log.info("从HBase批量查询消息内容，数量：{}", rowKeys.size());
+            lastMsgMap = imC2CMsgRecordHBaseService.batchGetMessages(rowKeys);
+        } else if (imC2CMsgRecordHBaseService != null && chatMetadataMap.isEmpty()) {
+            // Redis为空，使用旧逻辑：查询每个会话的最后一条消息
+            log.info("Redis为空，使用旧逻辑查询最后一条消息");
             lastMsgMap = imC2CMsgRecordHBaseService.batchGetLastMessagesByChatIds(chatIds);
+            //TODO mysql查完后，需要更新到redis
         } else {
-            log.warn("HBase服务未启用，无法查询最后一条消息");
+            log.warn("HBase服务未启用，无法查询消息内容");
             lastMsgMap = new HashMap<>();
         }
         
-        // 5. 从Redis批量获取未读消息数
-        Map<String, Integer> unreadCountMap = unreadCountService.getAllUnreadCounts(ao.getUserId());
-        
-        // 6. 创建个人操作映射，用于过滤隐藏/删除的会话
+        // 5. 创建个人操作映射，用于过滤隐藏/删除的会话
         Map<String, ImPersonalChatOpt> personalChatMap = allPersonalChats.stream()
                 .collect(Collectors.toMap(ImPersonalChatOpt::getChatId, opt -> opt));
         
-        // 7. 组装返回结果，过滤隐藏和删除的会话
-        List<LastChatListVO> allChatListVOs = userChats.stream()
-                .filter(chat -> {
-                    String chatId = chat.getChatId();
+        // 6. 组装返回结果，过滤隐藏和删除的会话
+        List<LastChatListVO> allChatListVOs = chatIds.stream()
+                .filter(chatId -> {
                     ImPersonalChatOpt personalOpt = personalChatMap.get(chatId);
                     
                     // 如果用户对该会话有操作记录，检查是否隐藏或删除
@@ -163,17 +187,42 @@ public class ImChatServiceImpl implements ImChatService {
                     }
                     return true;
                 })
-                .map(chat -> {
-                    String chatId = chat.getChatId();
-                    ImC2CMsgRecord lastMsg = lastMsgMap.get(chatId);
+                .map(chatId -> {
+                    // 【关键】从Redis元数据获取未读数和时间戳
+                    JSONObject metadata = chatMetadataMap.containsKey(chatId) ? 
+                            JSONUtil.parseObj(chatMetadataMap.get(chatId)) : null;
+                    
+                    // 根据chatId+msgId构建rowKey查询HBase消息
+                    String rowKey = metadata != null ? (chatId + "_" + metadata.getStr("m")) : null;
+                    ImC2CMsgRecord lastMsg = rowKey != null ? lastMsgMap.get(rowKey) : null;
                     
                     LastChatListVO vo = new LastChatListVO();
                     vo.setChatId(chatId);
                     vo.setUserId(ao.getUserId());
                     
-                    // 设置未读消息数（从Redis获取）
-                    Integer unreadCount = unreadCountMap.get(chatId);
-                    vo.setUnReadCount(unreadCount != null ? unreadCount : 0);
+                    // 【轻量】只解析获取otherUserId，便于客户端缓存映射
+                    try {
+                        List<String> participantIds = ChatIdUtils.getParticipantUserIds(chatId);
+                        if (!participantIds.isEmpty()) {
+                            String otherUserId = participantIds.stream()
+                                    .filter(id -> !ao.getUserId().equals(id))
+                                    .findFirst()
+                                    .orElse(null);
+                            
+                            if (otherUserId != null) {
+                                vo.setOtherUserId(otherUserId);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("解析会话{}的otherUserId失败: {}", chatId, e.getMessage());
+                    }
+                    
+                    // 【关键】从Redis元数据获取未读数
+                    int unreadCount = metadata != null ? metadata.getInt("u", 0) : 0;  // u = unread
+                    vo.setUnReadCount(unreadCount);
+                    
+                    // 【关键】从Redis元数据获取时间戳
+                    long lastMsgTime = metadata != null ? metadata.getLong("t", 0L) : 0L;  // t = time
                     
                     // 设置最后消息信息
                     if (lastMsg != null) {
@@ -183,15 +232,24 @@ public class ImChatServiceImpl implements ImChatService {
                         vo.setLastMsgTime(lastMsg.getMsgCreateTime());
                         vo.setMsgId(lastMsg.getMsgId());
                         vo.setMsgCreateTime(lastMsg.getMsgCreateTime());
+                    } else if (metadata != null) {
+                        // HBase中没找到，但Redis有元数据，使用元数据中的时间和msgId
+                        log.warn("会话{}未找到消息记录，使用Redis元数据", chatId);
+                        vo.setLastMessageContent("[点击查看]");
+                        vo.setLastMsgFormat(0);
+                        vo.setLastMsgId(metadata.getStr("m", ""));
+                        vo.setLastMsgTime(lastMsgTime);
+                        vo.setMsgId(metadata.getStr("m", ""));
+                        vo.setMsgCreateTime(lastMsgTime);
                     } else {
-                        // 如果HBase中没有找到最后一条消息，设置默认值
-                        log.warn("会话{}未找到最后一条消息记录", chatId);
+                        // 既没有HBase数据也没有Redis元数据
+                        log.warn("会话{}既无消息记录也无元数据", chatId);
                         vo.setLastMessageContent("");
                         vo.setLastMsgFormat(0);
                         vo.setLastMsgId("");
-                        vo.setLastMsgTime(chat.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+                        vo.setLastMsgTime(System.currentTimeMillis());
                         vo.setMsgId("");
-                        vo.setMsgCreateTime(chat.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+                        vo.setMsgCreateTime(System.currentTimeMillis());
                     }
                     
                     vo.setUrl("/api/chat/lastChatList");

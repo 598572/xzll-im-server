@@ -79,8 +79,8 @@ public interface ImConstant {
      * rocketMq topic
      */
     public static class TopicConstant {
-        public static final String XZLL_C2CMSG_TOPIC = "xzll-c2cmsg-topic";
-        public static final String XZLL_DATA_SYNC_TOPIC = "im_c2cmsg-sync-es-topic";
+        public static final String XZLL_C2CMSG_TOPIC = "XZLL-C2CMSG-TOPIC";
+        public static final String XZLL_DATA_SYNC_TOPIC = "IM_C2CMSG-SYNC-ES-TOPIC";
     }
 
     public static class RedisKeyConstant {
@@ -128,6 +128,16 @@ public interface ImConstant {
          */
         public static final String OFF_LINE_FRIEND_RESPONSE_KEY = "offLine:friendResponse:";
 
+        /**
+         * C2C消息重试队列key（ZSet）
+         */
+        public static final String C2C_MSG_RETRY_QUEUE = "C2C_MSG_RETRY_QUEUE";
+        
+        /**
+         * C2C消息重试索引key（Hash，用于快速删除）
+         */
+        public static final String C2C_MSG_RETRY_INDEX = "C2C_MSG_RETRY_INDEX";
+
 
     }
 
@@ -146,6 +156,10 @@ public interface ImConstant {
         public static final int FRIEND_REQUEST_PUSH = 60;
         //好友申请处理结果推送
         public static final int FRIEND_REQUEST_HANDLE_PUSH = 70;
+        //ServerAck重试消息
+        public static final int SERVER_ACK_RETRY = 80;
+        //C2C消息重试消息
+        public static final int C2C_MSG_RETRY = 90;
     }
 
 

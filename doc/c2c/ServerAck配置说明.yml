@@ -1,0 +1,200 @@
+# ================================================================
+# ServerAck重试机制配置 - 配置中心版本
+# ================================================================
+# 说明：此配置用于Nacos/Apollo等配置中心
+# 服务：im-business-service, im-connect-service
+# 版本：v2.0 (纯MQ重试方案)
+# 更新时间：2025-11-11
+# ================================================================
+
+im-server:
+  ack:
+    retry:
+      # ========== 基础配置 ==========
+      # 是否启用ServerAck重试机制
+      # - true: 启用重试（推荐生产环境）
+      # - false: 禁用重试（不推荐，发送失败后将不会重试）
+      enabled: true
+      
+      # 最大重试次数
+      # - 推荐值: 3-5次
+      # - 说明: 首次发送失败后，最多重试3次（共4次发送机会）
+      max-retries: 3
+      
+      # 重试延迟时间（秒），逗号分隔
+      # - 格式: delay1,delay2,delay3,...
+      # - 数量: 必须与max-retries的值数量一致
+      # - 说明: 第1次重试延迟5秒，第2次延迟30秒，第3次延迟300秒（5分钟）
+      # - RocketMQ实际延迟级别: 1s,5s,10s,30s,1m,2m,3m,4m,5m,6m,7m,8m,9m,10m,20m,30m,1h,2h
+      #   系统会自动匹配最接近的延迟级别
+      delays: 5,30,300
+      
+      # ========== 告警配置 ==========
+      alert:
+        # 是否启用告警
+        # - true: 当重试全部失败时发送告警
+        # - false: 不发送告警
+        enabled: true
+        
+        webhook:
+          # Webhook告警URL
+          # - 支持HTTP/HTTPS
+          # - 当ServerAck重试全部失败时，会POST请求到此URL
+          # - 请求格式: 
+          #   {
+          #     "title": "ServerAck重试失败告警",
+          #     "content": "clientMsgId: xxx, msgId: xxx, retryCount: 3, toUserId: xxx",
+          #     "severity": "high",
+          #     "timestamp": "2025-11-11 14:30:25"
+          #   }
+          # - 示例URL: https://your-webhook.com/alert
+          # - 钉钉群机器人: https://oapi.dingtalk.com/robot/send?access_token=xxx
+          # - 企业微信: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+          # - 飞书: https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+          url: ""
+
+
+
+
+# ================================================================
+# 配置说明
+# ================================================================
+
+# 1. 生产环境推荐配置：
+#    enabled: true
+#    max-retries: 3
+#    delays: 5,30,300
+#    alert.enabled: true
+#    alert.webhook.url: https://your-webhook.com/alert
+
+
+# 2. 测试环境推荐配置：
+#    enabled: true
+#    max-retries: 3
+#    delays: 5,30,300
+#    alert.enabled: false  # 测试时关闭告警
+
+
+# 3. 压测环境推荐配置：
+#    enabled: true
+#    max-retries: 5
+#    delays: 5,10,30,60,300
+#    alert.enabled: true
+
+
+# ================================================================
+# 延迟策略建议
+# ================================================================
+
+# 快速重试策略（适合短暂网络抖动）：
+# delays: 5,10,30
+
+# 标准重试策略（推荐，平衡速度和压力）：
+# delays: 5,30,300
+
+# 保守重试策略（适合高负载场景）：
+# delays: 30,300,1800
+
+# 激进重试策略（适合低延迟要求）：
+# delays: 5,10,20
+
+# ================================================================
+# 监控接口
+# ================================================================
+
+# 查看统计信息：
+# GET http://localhost:8080/api/server-ack-simple/statistics
+# 响应示例：
+# {
+#   "totalSent": 1000,
+#   "successCount": 950,
+#   "failureCount": 50,
+#   "retryCount": 50,
+#   "successRate": 95.0,
+#   "lastFailureTime": "2025-11-11 14:30:25",
+#   "consecutiveFailures": 0
+# }
+
+# 查看健康状态：
+# GET http://localhost:8080/api/server-ack-simple/health
+# 响应示例：
+# {
+#   "status": "UP",
+#   "retryEnabled": true,
+#   "successRate": 95.0,
+#   "alertEnabled": true
+# }
+
+# ================================================================
+# 告警Webhook示例
+# ================================================================
+
+# 钉钉群机器人配置：
+# 1. 在钉钉群中添加"自定义机器人"
+# 2. 获取Webhook地址：https://oapi.dingtalk.com/robot/send?access_token=xxx
+# 3. 配置到 alert.webhook.url
+# 4. 系统会自动发送告警消息到钉钉群
+
+# 企业微信群机器人配置：
+# 1. 在企业微信群中添加"群机器人"
+# 2. 获取Webhook地址：https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+# 3. 配置到 alert.webhook.url
+
+# 飞书群机器人配置：
+# 1. 在飞书群中添加"机器人"
+# 2. 获取Webhook地址：https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+# 3. 配置到 alert.webhook.url
+
+# 自定义Webhook服务：
+# 1. 实现HTTP POST接口
+# 2. 接收JSON格式告警数据
+# 3. 处理告警（发送邮件、短信、电话等）
+
+# ================================================================
+# 性能指标建议
+# ================================================================
+
+# 成功率：建议 > 95%
+# - 如果成功率低于95%，需要检查网络质量或服务稳定性
+
+# 重试率：建议 < 10%
+# - 如果重试率超过10%，说明首次发送失败率偏高
+
+# 连续失败：建议 < 5次
+# - 如果连续失败超过5次，需要立即人工介入
+
+# 平均耗时：建议 < 100ms
+# - 正常情况下，ServerAck应在100ms内送达客户端
+
+# ================================================================
+# 常见问题
+# ================================================================
+
+# Q1: 如何修改配置后立即生效？
+# A1: 配置中心支持动态刷新，修改后约10秒生效（无需重启服务）
+
+# Q2: 如何关闭重试机制？
+# A2: 将 enabled 设为 false
+
+# Q3: 为什么收不到告警？
+# A3: 检查 alert.enabled=true 且 alert.webhook.url 已配置
+
+
+# Q5: RocketMQ延迟不准确怎么办？
+# A5: RocketMQ使用固定延迟级别，实际延迟会自动匹配最接近的级别
+
+# ================================================================
+# 日志关键字
+# ================================================================
+
+# 成功日志：
+# [ServerAck简化重试服务] ServerAck发送成功 - clientMsgId: xxx
+
+# 重试日志：
+# [ServerAck简化重试服务] ServerAck发送失败，启动MQ重试 - clientMsgId: xxx
+# [ServerAck简化重试服务] 第1次重试发送 - clientMsgId: xxx
+# [ServerAck简化重试服务] 第1次重试成功 - clientMsgId: xxx
+
+# 失败日志：
+# [ServerAck简化重试服务] 第3次重试失败，已达最大重试次数 - clientMsgId: xxx
+# [ServerAck简化重试服务] 发送告警 - clientMsgId: xxx, retryCount: 3
