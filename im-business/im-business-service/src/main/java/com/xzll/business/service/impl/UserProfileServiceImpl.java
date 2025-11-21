@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * 用户个人信息服务实现
@@ -25,6 +26,10 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Resource
     private ImUserMapper imUserMapper;
+    
+    // 文件访问配置
+    @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/}")
+    private String fileBaseUrl;
 
     @Override
     public UserProfileVO getUserProfileByUserId(String userId) {
@@ -48,6 +53,15 @@ public class UserProfileServiceImpl implements UserProfileService {
             // 3. 转换为VO对象
             UserProfileVO userProfileVO = new UserProfileVO();
             BeanUtils.copyProperties(userDO, userProfileVO);
+            
+            // 4. 转换头像路径为完整访问URL
+            if (StringUtils.hasText(userDO.getHeadImage())) {
+                String shortCode = generateShortCode(userDO.getHeadImage());
+                String fullAvatarUrl = fileBaseUrl + "s/" + shortCode;
+                userProfileVO.setHeadImage(fullAvatarUrl);
+                log.info("头像URL转换 - 原路径: {}, 短码: {}, 完整URL: {}", 
+                    userDO.getHeadImage(), shortCode, fullAvatarUrl);
+            }
             
             log.info("获取用户个人信息成功，userId：{}", userId);
             return userProfileVO;
@@ -107,6 +121,10 @@ public class UserProfileServiceImpl implements UserProfileService {
                 updateWrapper.set(ImUserDO::getSex, updateAO.getSex());
                 hasUpdate = true;
             }
+            if (StringUtils.hasText(updateAO.getHeadImage())) {
+                updateWrapper.set(ImUserDO::getHeadImage, updateAO.getHeadImage());
+                hasUpdate = true;
+            }
             
             if (!hasUpdate) {
                 log.warn("没有需要更新的字段，userId：{}", userId);
@@ -159,5 +177,12 @@ public class UserProfileServiceImpl implements UserProfileService {
             log.error("更新用户头像异常，userId：{}", userId, e);
             return false;
         }
+    }
+    
+    /**
+     * 生成短码（Base64编码文件路径）
+     */
+    private String generateShortCode(String filePath) {
+        return java.util.Base64.getEncoder().encodeToString(filePath.getBytes());
     }
 }

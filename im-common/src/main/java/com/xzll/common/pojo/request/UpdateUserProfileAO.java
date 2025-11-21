@@ -37,4 +37,9 @@ public class UpdateUserProfileAO {
      * 性别：0女，1男，-1未知
      */
     private Integer sex;
+    
+    /**
+     * 头像URL
+     */
+    private String headImage;
 }
