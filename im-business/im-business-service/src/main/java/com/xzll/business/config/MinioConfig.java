@@ -46,7 +46,7 @@ public class MinioConfig {
                 // 设置桶为公共读取权限
                 String policy = """
                     {
-                        "Version": "2025-11-21",
+                        "Version": "2012-10-17",
                         "Statement": [
                             {
                                 "Effect": "Allow",
