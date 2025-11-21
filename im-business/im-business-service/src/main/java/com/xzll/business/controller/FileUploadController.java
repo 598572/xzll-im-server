@@ -37,7 +37,7 @@ public class FileUploadController {
     private UserProfileController userProfileController;
 
     // 文件上传配置
-    @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/image/}")
+    @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/}")
     private String fileBaseUrl;
 
     @Value("${minio.file.upload.avatar.max-size:5242880}")  // 5MB = 5 * 1024 * 1024
@@ -77,8 +77,7 @@ public class FileUploadController {
             String originalFilename = file.getOriginalFilename();
             String fileExtension = getFileExtension(originalFilename);
             String cleanUserId = userId.replaceAll("[^a-zA-Z0-9]", "_"); // 替换特殊字符为下划线
-//            String fileName = generateFilePath(cleanUserId, 2, fileExtension);
-            String fileName = "";
+            String fileName = generateFilePath(cleanUserId, FileBusinessType.AVATAR, fileExtension);
 
             // 5. 上传到MinIO
             minioClient.putObject(
@@ -96,8 +95,9 @@ public class FileUploadController {
             // 7. 更新用户头像路径到数据库（安全版本，通过上下文验证用户）
             boolean updateSuccess = userProfileController.updateUserAvatar(storagePath);
 
-            // 8. 生成永久访问URL（通过代理接口）
-            String avatarUrl = fileBaseUrl + java.util.Base64.getEncoder().encodeToString(fileName.getBytes());
+            // 8. 生成永久访问URL（短链接）
+            String shortCode = generateShortCode(fileName);
+            String avatarUrl = fileBaseUrl + "s/" + shortCode;
             if (!updateSuccess) {
                 log.warn("头像上传成功但更新数据库失败，avatarUrl：{}", avatarUrl);
                 // 注意：这里不回滚MinIO中的文件，因为后续可以重试更新数据库
@@ -113,7 +113,25 @@ public class FileUploadController {
     }
 
     /**
-     * 永久图片访问代理接口（通过Base64编码的路径访问图片）
+     * 短链接文件访问接口
+     */
+    @GetMapping("/s/{shortCode}")
+    @CrossOrigin
+    public ResponseEntity<byte[]> getFileByShortCode(@PathVariable String shortCode) {
+        try {
+            // 从短码解码文件路径
+            String filePath = new String(java.util.Base64.getDecoder().decode(shortCode));
+            log.info("短链接访问文件，短码：{}，文件路径：{}", shortCode, filePath);
+            
+            return getFileContent(filePath);
+        } catch (Exception e) {
+            log.error("短链接访问失败，shortCode：{}", shortCode, e);
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
+    /**
+     * 永久图片访问代理接口（兼容旧接口）
      */
     @GetMapping("/image/{encodedPath}")
     @CrossOrigin
@@ -186,10 +204,9 @@ public class FileUploadController {
     @PostMapping("/uploadChatFile")
     public AvatarUploadResult uploadChatFile(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId,
-            @RequestParam("businessType") String businessType) {
+            @RequestParam("userId") String userId) {
 
-        log.info("用户{}上传聊天文件，类型：{}，文件大小：{}", userId, businessType, file.getSize());
+        log.info("用户{}上传聊天文件，文件大小：{}", userId, file.getSize());
 
         try {
             // 1. 参数校验
@@ -197,24 +214,16 @@ public class FileUploadController {
                 return AvatarUploadResult.error("文件不能为空");
             }
 
-            // 2. 验证业务类型
-            FileBusinessType type;
-            try {
-                type = FileBusinessType.valueOf(businessType.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                return AvatarUploadResult.error("不支持的业务类型：" + businessType);
-            }
-
             // 3. 文件大小校验
             if (file.getSize() > chatFileMaxSize) {
                 return AvatarUploadResult.error("文件大小不能超过" + (chatFileMaxSize / 1024 / 1024) + "MB");
             }
 
-            // 4. 生成文件名
+            // 2. 生成文件名（统一存储到chat目录）
             String originalFilename = file.getOriginalFilename();
             String fileExtension = getFileExtension(originalFilename);
             String cleanUserId = userId.replaceAll("[^a-zA-Z0-9]", "_");
-            String fileName = generateFilePath(cleanUserId, FileBusinessType.AVATAR, fileExtension);
+            String fileName = generateChatFilePath(cleanUserId, fileExtension);
 
             // 5. 上传到MinIO
             minioClient.putObject(
@@ -226,8 +235,9 @@ public class FileUploadController {
                     .build()
             );
 
-            // 6. 生成永久访问URL
-            String fileUrl = fileBaseUrl + java.util.Base64.getEncoder().encodeToString(fileName.getBytes());
+            // 6. 生成永久访问URL（短链接）
+            String shortCode = generateShortCode(fileName);
+            String fileUrl = fileBaseUrl + "s/" + shortCode;
 
             log.info("用户{}聊天文件上传成功：{}", userId, fileUrl);
             return AvatarUploadResult.success(fileUrl);
@@ -243,6 +253,13 @@ public class FileUploadController {
      */
     private String generateFilePath(String cleanUserId, FileBusinessType fileBusinessType, String fileExtension) {
         return cleanUserId + "/" + fileBusinessType.getPath() + "/" + UUID.randomUUID() + fileExtension;
+    }
+
+    /**
+     * 生成聊天文件存储路径（统一存储到chat目录）
+     */
+    private String generateChatFilePath(String cleanUserId, String fileExtension) {
+        return cleanUserId + "/chat/" + UUID.randomUUID() + fileExtension;
     }
 
     /**
@@ -284,6 +301,47 @@ public class FileUploadController {
         if (filename == null) return ".jpg";
         int lastDotIndex = filename.lastIndexOf('.');
         return lastDotIndex > 0 ? filename.substring(lastDotIndex) : ".jpg";
+    }
+    
+    /**
+     * 生成短码（实际就是Base64编码，但URL中看起来像短码）
+     */
+    private String generateShortCode(String filePath) {
+        return java.util.Base64.getEncoder().encodeToString(filePath.getBytes());
+    }
+    
+    /**
+     * 获取文件内容的通用方法
+     */
+    private ResponseEntity<byte[]> getFileContent(String filePath) {
+        try {
+            // 从MinIO获取文件流
+            InputStream inputStream = minioClient.getObject(
+                GetObjectArgs.builder()
+                    .bucket(minioConfig.getBucketName())
+                    .object(filePath)
+                    .build()
+            );
+            
+            // 读取文件内容
+            byte[] fileBytes = StreamUtils.copyToByteArray(inputStream);
+            inputStream.close();
+            
+            // 设置响应头
+            HttpHeaders headers = new HttpHeaders();
+            String contentType = getContentTypeByExtension(filePath);
+            headers.set("Content-Type", contentType);
+            headers.set("Cache-Control", "public, max-age=86400"); // 缓存1天
+            headers.set("ETag", "\"" + filePath.hashCode() + "\"");
+            headers.set("Access-Control-Allow-Origin", "*");
+            
+            log.info("文件访问成功，文件路径：{}，大小：{} bytes", filePath, fileBytes.length);
+            return ResponseEntity.ok().headers(headers).body(fileBytes);
+            
+        } catch (Exception e) {
+            log.error("文件访问失败，filePath：{}", filePath, e);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
