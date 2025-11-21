@@ -1,9 +1,9 @@
 package com.xzll.business.controller;
 
+import com.xzll.business.service.UserProfileService;
 import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.request.UpdateUserProfileAO;
 import com.xzll.common.pojo.response.UserProfileVO;
-import com.xzll.business.service.UserProfileService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,6 +46,7 @@ public class UserProfileController extends BaseController {
     
     /**
      * 更新当前用户个人信息（安全版本，只能修改自己的信息）
+     * 支持更新：用户名、全名、手机号、邮箱、性别、头像URL
      */
     @PutMapping("/update")
     public UserProfileVO updateUserProfile(@RequestBody UpdateUserProfileAO updateAO) {
@@ -58,7 +59,7 @@ public class UserProfileController extends BaseController {
                 throw new RuntimeException("用户未登录或token无效");
             }
             
-            // 2. 通过service更新用户信息（根据userId字段更新）
+            // 2. 通过service更新用户信息（根据userId字段更新，包括头像）
             return userProfileService.updateUserProfile(currentUserId, updateAO);
             
         } catch (Exception e) {
@@ -66,28 +67,5 @@ public class UserProfileController extends BaseController {
             throw new RuntimeException("更新用户信息失败：" + e.getMessage());
         }
     }
-    
-    /**
-     * 更新当前用户头像URL（安全版本，只能修改自己的头像）
-     */
-    @PutMapping("/avatar")
-    public boolean updateUserAvatar(@RequestParam String avatarUrl) {
-        try {
-            // 1. 从上下文获取当前登录用户ID（安全校验）
-            String currentUserId = getCurrentUserIdWithValidation();
-            if (currentUserId == null) {
-                log.error("更新用户头像失败，用户未登录或token无效");
-                return false;
-            }
-            
-            log.info("更新用户头像，userId：{}，avatarUrl：{}", currentUserId, avatarUrl);
-            
-            // 2. 通过service更新用户头像（根据userId字段更新）
-            return userProfileService.updateUserAvatar(currentUserId, avatarUrl);
-            
-        } catch (Exception e) {
-            log.error("更新用户头像异常", e);
-            return false;
-        }
-    }
+
 }

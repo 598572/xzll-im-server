@@ -1,6 +1,10 @@
 package com.xzll.business.controller;
 
+import com.xzll.business.service.UserProfileService;
 import com.xzll.common.constant.enums.FileBusinessType;
+import com.xzll.common.controller.BaseController;
+import com.xzll.common.pojo.request.UpdateUserProfileAO;
+import com.xzll.common.pojo.response.UserProfileVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -10,7 +14,6 @@ import com.xzll.business.config.MinioConfig;
 
 import javax.annotation.Resource;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +28,7 @@ import io.minio.GetObjectArgs;
 @RestController
 @RequestMapping("/api/file")
 @Slf4j
-public class FileUploadController {
+public class FileUploadController extends BaseController {
 
     @Resource
     private MinioClient minioClient;
@@ -33,8 +36,8 @@ public class FileUploadController {
     @Resource
     private MinioConfig minioConfig;
 
-    @Autowired
-    private UserProfileController userProfileController;
+    @Resource
+    private UserProfileService userProfileService;
 
     // 文件上传配置
     @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/}")
@@ -47,17 +50,22 @@ public class FileUploadController {
     private long chatFileMaxSize;
 
     /**
-     * 上传头像
+     * 上传头像（安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadAvatar")
     public AvatarUploadResult uploadAvatar(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId) {
-
-        log.info("用户{}上传头像，文件大小：{}", userId, file.getSize());
+            @RequestParam("file") MultipartFile file) {
 
         try {
-            // 1. 参数校验
+            // 1. 从上下文获取当前登录用户ID（安全校验）
+            String userId = getCurrentUserIdWithValidation();
+            if (userId == null) {
+                return AvatarUploadResult.error("用户未登录或token无效");
+            }
+            
+            log.info("用户{}上传头像，文件大小：{}", userId, file.getSize());
+
+            // 2. 参数校验
             if (file.isEmpty()) {
                 return AvatarUploadResult.error("文件不能为空");
             }
@@ -92,12 +100,16 @@ public class FileUploadController {
             // 6. 存储文件路径到数据库（不是完整URL，避免预签名URL过期问题）
             String storagePath = fileName;
 
-            // 7. 更新用户头像路径到数据库（安全版本，通过上下文验证用户）
-            boolean updateSuccess = userProfileController.updateUserAvatar(storagePath);
+            // 7. 更新用户头像路径到数据库（使用统一更新接口）
+            UpdateUserProfileAO updateAO = new UpdateUserProfileAO();
+            updateAO.setHeadImage(storagePath);
+            UserProfileVO result = userProfileService.updateUserProfile(userId, updateAO);
+            boolean updateSuccess = (result != null);
 
             // 8. 生成永久访问URL（短链接）
             String shortCode = generateShortCode(fileName);
             String avatarUrl = fileBaseUrl + "s/" + shortCode;
+            log.info("URL生成调试 - fileBaseUrl: {}, shortCode: {}, 完整URL: {}", fileBaseUrl, shortCode, avatarUrl);
             if (!updateSuccess) {
                 log.warn("头像上传成功但更新数据库失败，avatarUrl：{}", avatarUrl);
                 // 注意：这里不回滚MinIO中的文件，因为后续可以重试更新数据库
@@ -199,17 +211,22 @@ public class FileUploadController {
     }
 
     /**
-     * 上传聊天文件（单聊/群聊通用）
+     * 上传聊天文件（单聊/群聊通用，安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadChatFile")
     public AvatarUploadResult uploadChatFile(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId) {
-
-        log.info("用户{}上传聊天文件，文件大小：{}", userId, file.getSize());
+            @RequestParam("file") MultipartFile file) {
 
         try {
-            // 1. 参数校验
+            // 1. 从上下文获取当前登录用户ID（安全校验）
+            String userId = getCurrentUserIdWithValidation();
+            if (userId == null) {
+                return AvatarUploadResult.error("用户未登录或token无效");
+            }
+            
+            log.info("用户{}上传聊天文件，文件大小：{}", userId, file.getSize());
+
+            // 2. 参数校验
             if (file.isEmpty()) {
                 return AvatarUploadResult.error("文件不能为空");
             }
@@ -238,6 +255,7 @@ public class FileUploadController {
             // 6. 生成永久访问URL（短链接）
             String shortCode = generateShortCode(fileName);
             String fileUrl = fileBaseUrl + "s/" + shortCode;
+            log.info("聊天文件URL生成调试 - fileBaseUrl: {}, shortCode: {}, 完整URL: {}", fileBaseUrl, shortCode, fileUrl);
 
             log.info("用户{}聊天文件上传成功：{}", userId, fileUrl);
             return AvatarUploadResult.success(fileUrl);
