@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * @Author: hzz
@@ -50,6 +51,10 @@ public class ImFriendServiceImpl implements ImFriendService {
 
     @Resource
     private FriendRequestPushService friendRequestPushService;
+
+    // 文件服务基础URL配置
+    @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/}")
+    private String fileBaseUrl;
 
     @Override
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
@@ -342,7 +347,18 @@ public class ImFriendServiceImpl implements ImFriendService {
                         if (friendUser != null) {
                             vo.setFriendName(friendUser.getUserName());
                             vo.setFriendFullName(friendUser.getUserFullName());
-                            vo.setFriendAvatar(friendUser.getHeadImage());
+                            
+                            // 转换头像路径为完整访问URL（短链接）
+                            if (StringUtils.hasText(friendUser.getHeadImage())) {
+                                String shortCode = generateShortCode(friendUser.getHeadImage());
+                                String fullAvatarUrl = fileBaseUrl + "s/" + shortCode;
+                                vo.setFriendAvatar(fullAvatarUrl);
+                                log.debug("好友头像URL转换 - 用户ID: {}, 原路径: {}, 短码: {}, 完整URL: {}", 
+                                    friendUser.getUserId(), friendUser.getHeadImage(), shortCode, fullAvatarUrl);
+                            } else {
+                                vo.setFriendAvatar(null);
+                            }
+                            
                             vo.setFriendSex(friendUser.getSex());
                         }
 
@@ -554,5 +570,12 @@ public class ImFriendServiceImpl implements ImFriendService {
             default:
                 return "未知";
         }
+    }
+
+    /**
+     * 生成短码（Base64编码文件路径）
+     */
+    private String generateShortCode(String filePath) {
+        return java.util.Base64.getEncoder().encodeToString(filePath.getBytes());
     }
 }
