@@ -54,7 +54,7 @@ public class FileUploadController extends BaseController {
      * 上传头像（安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadAvatar")
-    public WebBaseResponse<String> uploadAvatar(
+    public WebBaseResponse<FileUploadResult> uploadAvatar(
             @RequestParam("file") MultipartFile file) {
 
         try {
@@ -122,7 +122,7 @@ public class FileUploadController extends BaseController {
             }
 
             log.info("用户{}头像上传成功：{}", userId, avatarUrl);
-            return WebBaseResponse.returnResultSuccess(avatarUrl);
+            return WebBaseResponse.returnResultSuccess("头像上传成功", new FileUploadResult(avatarUrl));
 
         } catch (Exception e) {
             log.error("头像上传失败", e);
@@ -220,7 +220,7 @@ public class FileUploadController extends BaseController {
      * 上传聊天文件（单聊/群聊通用，安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadChatFile")
-    public WebBaseResponse<String> uploadChatFile(
+    public WebBaseResponse<FileUploadResult> uploadChatFile(
             @RequestParam("file") MultipartFile file) {
 
         try {
@@ -264,7 +264,7 @@ public class FileUploadController extends BaseController {
             log.info("聊天文件URL生成调试 - fileBaseUrl: {}, shortCode: {}, 完整URL: {}", fileBaseUrl, shortCode, fileUrl);
 
             log.info("用户{}聊天文件上传成功：{}", userId, fileUrl);
-            return WebBaseResponse.returnResultSuccess(fileUrl);
+            return WebBaseResponse.returnResultSuccess("文件上传成功", new FileUploadResult(fileUrl));
 
         } catch (Exception e) {
             log.error("聊天文件上传失败", e);
@@ -369,8 +369,30 @@ public class FileUploadController extends BaseController {
     }
 
     /**
-     * 头像上传结果
+     * 文件上传结果
      */
+    public static class FileUploadResult {
+        private String url;
+
+        public FileUploadResult() {}
+
+        public FileUploadResult(String url) {
+            this.url = url;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+    }
+
+    /**
+     * 头像上传结果（已废弃，保留兼容性）
+     */
+    @Deprecated
     public static class AvatarUploadResult {
         private boolean success;
         private String message;
