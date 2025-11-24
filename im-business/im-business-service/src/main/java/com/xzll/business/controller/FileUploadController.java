@@ -5,6 +5,7 @@ import com.xzll.common.constant.enums.FileBusinessType;
 import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.request.UpdateUserProfileAO;
 import com.xzll.common.pojo.response.UserProfileVO;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,32 +54,37 @@ public class FileUploadController extends BaseController {
      * 上传头像（安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadAvatar")
-    public AvatarUploadResult uploadAvatar(
+    public WebBaseResponse<String> uploadAvatar(
             @RequestParam("file") MultipartFile file) {
 
         try {
             // 1. 从上下文获取当前登录用户ID（安全校验）
             String userId = getCurrentUserIdWithValidation();
             if (userId == null) {
-                return AvatarUploadResult.error("用户未登录或token无效");
+                return WebBaseResponse.returnResultError("用户未登录或token无效");
             }
             
             log.info("用户{}上传头像，文件大小：{}", userId, file.getSize());
 
             // 2. 参数校验
             if (file.isEmpty()) {
-                return AvatarUploadResult.error("文件不能为空");
+                return WebBaseResponse.returnResultError("文件不能为空");
             }
 
             // 2. 文件类型校验
             String contentType = file.getContentType();
+            log.info("文件上传调试 - 原始文件名: {}, ContentType: {}, 文件大小: {}", 
+                file.getOriginalFilename(), contentType, file.getSize());
+            
             if (!isImageFile(contentType)) {
-                return AvatarUploadResult.error("只支持图片格式文件");
+                log.error("图片格式验证失败 - ContentType: {}, OriginalFilename: {}", 
+                    contentType, file.getOriginalFilename());
+                return WebBaseResponse.returnResultError("只支持图片格式文件");
             }
 
             // 3. 文件大小校验
             if (file.getSize() > avatarMaxSize) {
-                return AvatarUploadResult.error("文件大小不能超过" + (avatarMaxSize / 1024 / 1024) + "MB");
+                return WebBaseResponse.returnResultError("文件大小不能超过" + (avatarMaxSize / 1024 / 1024) + "MB");
             }
 
             // 4. 生成文件名（按用户ID和业务类型划分）
@@ -116,11 +122,11 @@ public class FileUploadController extends BaseController {
             }
 
             log.info("用户{}头像上传成功：{}", userId, avatarUrl);
-            return AvatarUploadResult.success(avatarUrl);
+            return WebBaseResponse.returnResultSuccess(avatarUrl);
 
         } catch (Exception e) {
             log.error("头像上传失败", e);
-            return AvatarUploadResult.error("上传失败：" + e.getMessage());
+            return WebBaseResponse.returnResultError("上传失败：" + e.getMessage());
         }
     }
 
@@ -214,26 +220,26 @@ public class FileUploadController extends BaseController {
      * 上传聊天文件（单聊/群聊通用，安全版本，自动从Token获取当前用户ID）
      */
     @PostMapping("/uploadChatFile")
-    public AvatarUploadResult uploadChatFile(
+    public WebBaseResponse<String> uploadChatFile(
             @RequestParam("file") MultipartFile file) {
 
         try {
             // 1. 从上下文获取当前登录用户ID（安全校验）
             String userId = getCurrentUserIdWithValidation();
             if (userId == null) {
-                return AvatarUploadResult.error("用户未登录或token无效");
+                return WebBaseResponse.returnResultError("用户未登录或token无效");
             }
             
             log.info("用户{}上传聊天文件，文件大小：{}", userId, file.getSize());
 
             // 2. 参数校验
             if (file.isEmpty()) {
-                return AvatarUploadResult.error("文件不能为空");
+                return WebBaseResponse.returnResultError("文件不能为空");
             }
 
             // 3. 文件大小校验
             if (file.getSize() > chatFileMaxSize) {
-                return AvatarUploadResult.error("文件大小不能超过" + (chatFileMaxSize / 1024 / 1024) + "MB");
+                return WebBaseResponse.returnResultError("文件大小不能超过" + (chatFileMaxSize / 1024 / 1024) + "MB");
             }
 
             // 2. 生成文件名（统一存储到chat目录）
@@ -258,11 +264,11 @@ public class FileUploadController extends BaseController {
             log.info("聊天文件URL生成调试 - fileBaseUrl: {}, shortCode: {}, 完整URL: {}", fileBaseUrl, shortCode, fileUrl);
 
             log.info("用户{}聊天文件上传成功：{}", userId, fileUrl);
-            return AvatarUploadResult.success(fileUrl);
+            return WebBaseResponse.returnResultSuccess(fileUrl);
 
         } catch (Exception e) {
             log.error("聊天文件上传失败", e);
-            return AvatarUploadResult.error("上传失败：" + e.getMessage());
+            return WebBaseResponse.returnResultError("上传失败：" + e.getMessage());
         }
     }
 

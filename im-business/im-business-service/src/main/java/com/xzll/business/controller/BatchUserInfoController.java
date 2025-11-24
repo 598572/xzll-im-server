@@ -7,6 +7,7 @@ import com.xzll.business.mapper.ImUserMapper;
 import com.xzll.common.pojo.entity.ImUserDO;
 import com.xzll.common.pojo.request.BatchUserInfoAO;
 import com.xzll.common.pojo.response.BatchUserInfoVO;
+import com.xzll.common.pojo.base.WebBaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -39,19 +40,19 @@ public class BatchUserInfoController {
      * @return 用户信息列表
      */
     @PostMapping("/batchInfo")
-    public BatchUserInfoVO batchGetUserInfo(@RequestBody BatchUserInfoAO ao) {
+    public WebBaseResponse<BatchUserInfoVO> batchGetUserInfo(@RequestBody BatchUserInfoAO ao) {
         log.info("批量查询用户信息_入参: {}", JSONUtil.toJsonStr(ao));
 
         try {
             // 参数校验
             if (ao == null || CollectionUtils.isEmpty(ao.getUserIds())) {
                 log.error("批量查询用户信息失败，用户ID列表为空");
-                return new BatchUserInfoVO();
+                return WebBaseResponse.returnResultError("用户ID列表不能为空");
             }
 
             if (ao.getUserIds().size() > 50) {
                 log.error("批量查询用户信息失败，用户ID数量超过限制: {}", ao.getUserIds().size());
-                return new BatchUserInfoVO();
+                return WebBaseResponse.returnResultError("用户ID数量不能超过50个");
             }
 
             // 去重并过滤空值
@@ -62,7 +63,7 @@ public class BatchUserInfoController {
 
             if (validUserIds.isEmpty()) {
                 log.info("过滤后的用户ID列表为空");
-                return new BatchUserInfoVO();
+                return WebBaseResponse.returnResultSuccess(new BatchUserInfoVO());
             }
 
             // 批量查询用户信息
@@ -109,11 +110,11 @@ public class BatchUserInfoController {
                     result.getUsers() != null ? result.getUsers().size() : 0,
                     result.getNotFoundUserIds() != null ? result.getNotFoundUserIds().size() : 0);
 
-            return result;
+            return WebBaseResponse.returnResultSuccess(result);
 
         } catch (Exception e) {
             log.error("批量查询用户信息异常", e);
-            return new BatchUserInfoVO();
+            return WebBaseResponse.returnResultError("批量查询用户信息失败：" + e.getMessage());
         }
     }
 }
