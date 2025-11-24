@@ -17,6 +17,7 @@ import javax.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * 批量用户信息查询控制器
@@ -32,6 +33,10 @@ public class BatchUserInfoController {
 
     @Resource
     private ImUserMapper imUserMapper;
+
+    // 文件服务基础URL配置
+    @Value("${minio.file.upload.base-url:http://localhost:8080/im-business/api/file/}")
+    private String fileBaseUrl;
 
     /**
      * 批量查询用户基础信息
@@ -83,7 +88,18 @@ public class BatchUserInfoController {
                             info.setUserId(user.getUserId());
                             info.setUserName(user.getUserName());
                             info.setUserFullName(user.getUserFullName());
-                            info.setHeadImage(user.getHeadImage());
+                            
+                            // 转换头像路径为完整访问URL（短链接）
+                            if (StringUtils.hasText(user.getHeadImage())) {
+                                String shortCode = generateShortCode(user.getHeadImage());
+                                String fullAvatarUrl = fileBaseUrl + "s/" + shortCode;
+                                info.setHeadImage(fullAvatarUrl);
+                                log.debug("批量查询头像URL转换 - 用户ID: {}, 原路径: {}, 短码: {}, 完整URL: {}", 
+                                    user.getUserId(), user.getHeadImage(), shortCode, fullAvatarUrl);
+                            } else {
+                                info.setHeadImage(null);
+                            }
+                            
                             info.setSex(user.getSex());
                             return info;
                         })
@@ -116,5 +132,12 @@ public class BatchUserInfoController {
             log.error("批量查询用户信息异常", e);
             return WebBaseResponse.returnResultError("批量查询用户信息失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 生成短码（Base64编码文件路径）
+     */
+    private String generateShortCode(String filePath) {
+        return java.util.Base64.getEncoder().encodeToString(filePath.getBytes());
     }
 }
