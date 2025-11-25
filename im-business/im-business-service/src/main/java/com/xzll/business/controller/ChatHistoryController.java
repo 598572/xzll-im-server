@@ -3,13 +3,13 @@ package com.xzll.business.controller;
 import com.xzll.business.dto.request.ChatHistoryQueryDTO;
 import com.xzll.business.dto.response.ChatHistoryResponseDTO;
 import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.util.ChatIdUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.List;
 
@@ -23,7 +23,7 @@ import java.util.List;
 @RequestMapping("/api/chat/c2c")
 @CrossOrigin
 @Slf4j
-public class ChatHistoryController {
+public class ChatHistoryController extends BaseController {
 
     @Autowired(required = false)
     private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
@@ -37,6 +37,15 @@ public class ChatHistoryController {
      */
     @PostMapping("/history")
     public WebBaseResponse<ChatHistoryResponseDTO> queryChatHistory(@Valid @RequestBody ChatHistoryQueryDTO queryDTO) {
+        // 从网关获取当前登录用户ID（安全）
+        String currentUserId = getCurrentUserIdWithValidation();
+        if (currentUserId == null) {
+            return WebBaseResponse.returnResultError("用户未登录或token无效");
+        }
+        
+        // 设置当前用户ID到查询DTO中，覆盖客户端传递的userId（安全考虑）
+        queryDTO.setUserId(currentUserId);
+        
         log.info("接收聊天历史查询请求: chatId={}, userId={}, lastMsgId={}, pageSize={}, startTime={}, endTime={}", 
                 queryDTO.getChatId(), queryDTO.getUserId(), queryDTO.getLastMsgId(), 
                 queryDTO.getPageSize(), queryDTO.getStartTime(), queryDTO.getEndTime());
@@ -47,8 +56,8 @@ public class ChatHistoryController {
                 return WebBaseResponse.returnResultError("chatId不能为空");
             }
             
-            // 应用层权限前置验证：检查用户是否有权访问该会话  TODO : 安全来说应该gateway带过来userId
-            if (!isUserAuthorizedForChat(queryDTO.getUserId(), queryDTO.getChatId())) {
+            // 应用层权限前置验证：检查用户是否有权访问该会话（使用网关传递的用户ID）
+            if (!isUserAuthorizedForChat(currentUserId, queryDTO.getChatId())) {
                 return WebBaseResponse.returnResultError("无权访问此会话记录");
             }
             
@@ -68,14 +77,14 @@ public class ChatHistoryController {
             ChatHistoryResponseDTO response = imC2CMsgRecordHBaseService.queryChatHistory(queryDTO);
             
             log.info("聊天历史查询完成: chatId={}, userId={}, 查询到{}条记录, hasMore={}", 
-                    queryDTO.getChatId(), queryDTO.getUserId(), 
+                    queryDTO.getChatId(), currentUserId, 
                     response.getCurrentPageSize(), response.getHasMore());
             
             return WebBaseResponse.returnResultSuccess(response);
             
         } catch (Exception e) {
             log.error("聊天历史查询失败: chatId={}, userId={}", 
-                    queryDTO.getChatId(), queryDTO.getUserId(), e);
+                    queryDTO.getChatId(), currentUserId, e);
             return WebBaseResponse.returnResultError("查询聊天历史失败: " + e.getMessage());
         }
     }
@@ -113,19 +122,4 @@ public class ChatHistoryController {
         }
     }
 
-    /**
-     * 从网关过来的请求头中获取当前登录用户ID
-     *
-     * @param request HTTP请求对象
-     * @return 当前登录用户ID
-     */
-    private String getCurrentUserIdFromGateway(HttpServletRequest request) {
-        //  TODO : 从GATEWAY的Header中获取
-        String userId = request.getHeader("X-User-Id");
-        if (userId != null && !userId.trim().isEmpty()) {
-            return userId.trim();
-        }
-        log.warn("无法从请求中获取用户ID，请检查网关配置");
-        return null;
-    }
 }
