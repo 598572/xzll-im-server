@@ -44,8 +44,12 @@ public class WebSocketChannelInitializer extends ChannelInitializer<SocketChanne
         pipeline.addLast(new HttpObjectAggregator(65536));
         //用于大数据的分区传输
         pipeline.addLast(new ChunkedWriteHandler());
-        // 支持WebSocket数据压缩
-        pipeline.addLast(new WebSocketServerCompressionHandler());
+        // WebSocket数据压缩（可通过Nacos配置开关）
+        // 高QPS场景建议关闭（im.netty.enableCompression=false），压缩消耗CPU
+        if (imConnectServerConfig.isEnableCompression()) {
+            pipeline.addLast(new WebSocketServerCompressionHandler());
+            log.debug("WebSocket压缩已启用");
+        }
         //设置心跳 - 从配置读取IdleStateHandler检测周期
         // 注意：idleStateCheckInterval < heartBeatTime，提供容错余量
         int idleCheckInterval = imConnectServerConfig.getIdleStateCheckInterval();

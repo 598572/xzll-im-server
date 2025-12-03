@@ -36,6 +36,7 @@ public class InteractiveTestClient {
 //    public static final String PORT = "10001";
 
 
+//    public static final String IP = "www.okim.site";
     public static final String IP = "120.46.85.43";
     public static final String PORT = "80";
 
@@ -76,7 +77,7 @@ public class InteractiveTestClient {
 
             // 设置 HTTP Headers
             DefaultHttpHeaders headers = new DefaultHttpHeaders();
-            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2MzUzNzEwNCwiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiYzA1MTJjODMtZWNiMS00YWJkLThjZmEtMzQ0ZWE4OGE4NWJhIiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.zdNzad5vhPYOb9sBqRwH2T9us00nbPSea2H3mYtnttsAYEwrVtRkE9syVh64btmtI9EEK3gHT8Js8AFY82_JveCSOtnvq7PpEUeE15ZC1-cJHrBuQQYrwABe-3CTlatWl6-8eIIhomAWHgh2E6dyLrHh0SyNhVKDn3xZ1XXDiFEuC9a5Ngv7AWQtFVm3jiQyiwXp9FBjTAe2kZXXIjVefQjnFl0T4FFWSNLzRNU-rPudGpLGnYa5g3RyyixZrvyBh6YvWeY7JcQdZm9qdhIHI_jzTS3GDAR32w9gsn3hG2d-p-ZZdi4uZ35b7TEZGYAS-ME8qvWy1qw_y78_OuNXYA");
+            headers.set("token", "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiJoeHkxMTIyMzMiLCJzY29wZSI6WyJhbGwiXSwiZGV2aWNlX3R5cGUiOjEsImlkIjoxMjQ5NDg1NjcwNDAsImV4cCI6MTc2NDY2MzExNywiYXV0aG9yaXRpZXMiOlsiQURNSU4iXSwianRpIjoiN2UxNjQwNTYtMWI1Yy00MDEyLWJjOGEtMmM4OWI2YWI4NGQ1IiwiY2xpZW50X2lkIjoiY2xpZW50LWFwcCJ9.ARqj38fm0oxk1K47uHLBCoQzuqk6JzNMHTCoffZfHyr1PelbrnE-uXnJ3A1TrXA9K7uQ0XCkfefwhnhoqDu4xV4crxNPycSbIxnY7pud_agATAqQXR-UIlZr9V1KNUZs7sZYumZu8l-rcr-sDjob65WNxavc1vsC20CNPTYHqFjiiexonidgyhbH0BPPq8fV9AdocIojeTMq0g0kWtNjFG-ACg2CvAEt3ArqtKWPgEqWYRqJWOWRJ_qhyJ5YPuHfm4-T4weEA-W6H5siDCZHZKOgeBqPlLREkaC9s09eX40Hlnzehji1yohfaW_FObm7dBzcU5ODvUTKfdbMR2Tojg");
             headers.set("uid", currentUserId);
             
             // 创建 WebSocket 握手器
