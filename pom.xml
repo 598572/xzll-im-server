@@ -24,6 +24,7 @@
         <module>im-business</module>
         <module>im-console</module>
         <module>im-data-sync</module>
+        <module>im-stress-gatling</module>
     </modules>
 
 

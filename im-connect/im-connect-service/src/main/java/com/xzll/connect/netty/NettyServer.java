@@ -100,23 +100,43 @@ public class NettyServer implements ApplicationRunner {
 
     /**
      * 初始化EventLoopGroup，根据系统特性选择最优实现
+     * 
+     * 配置来源（优先级从高到低）：
+     * 1. Nacos配置：im.netty.bossThreads / im.netty.workerThreads
+     * 2. 自动计算：Boss=max(1,CPU/4), Worker=CPU*2
+     * 
+     * 百万连接优化：
+     * - Boss线程：1-2个，只负责接受连接
+     * - Worker线程：CPU核心数 * 2，处理IO读写
+     * - 使用Epoll（Linux）获得最佳性能
      */
     private void initEventLoopGroups() {
-        // 计算线程数量
-        int bossThreads = 1; // Boss线程通常1个就够，用于接受连接
-        int workerThreads = Math.max(4, Runtime.getRuntime().availableProcessors() * 2); // Worker线程数量
+        int cpuCores = Runtime.getRuntime().availableProcessors();
         
-        log.info("[NettyServer]_EventLoopGroup配置: Boss线程={}, Worker线程={}", bossThreads, workerThreads);
+        // 从配置读取线程数，0表示自动计算
+        int bossThreads = imConnectServerConfig.getBossThreads();
+        int workerThreads = imConnectServerConfig.getWorkerThreads();
         
-        // 在Linux环境下优先使用Epoll，性能更好
+        // 自动计算（配置为0时）
+        if (bossThreads <= 0) {
+            bossThreads = Math.max(1, cpuCores / 4);
+        }
+        if (workerThreads <= 0) {
+            workerThreads = cpuCores * 2;
+        }
+        
+        log.info("[NettyServer]_EventLoopGroup配置: CPU核心={}, Boss线程={}, Worker线程={} (来自Nacos配置)", 
+            cpuCores, bossThreads, workerThreads);
+        
+        // 在Linux环境下优先使用Epoll，性能更好（百万连接必须使用Epoll）
         if (Epoll.isAvailable()) {
-            log.info("[NettyServer]_使用Epoll EventLoopGroup (Linux优化)");
+            log.info("[NettyServer]_使用Epoll EventLoopGroup (Linux优化，支持百万连接)");
             bossGroup = new EpollEventLoopGroup(bossThreads, 
                 new DefaultThreadFactory("netty-boss", Thread.MAX_PRIORITY));
             workerGroup = new EpollEventLoopGroup(workerThreads, 
                 new DefaultThreadFactory("netty-worker", Thread.NORM_PRIORITY));
         } else {
-            log.info("[NettyServer]_使用NIO EventLoopGroup");
+            log.warn("[NettyServer]_使用NIO EventLoopGroup（非Linux环境，性能受限）");
             bossGroup = new NioEventLoopGroup(bossThreads, 
                 new DefaultThreadFactory("netty-boss", Thread.MAX_PRIORITY));
             workerGroup = new NioEventLoopGroup(workerThreads, 
@@ -125,7 +145,19 @@ public class NettyServer implements ApplicationRunner {
     }
 
     /**
-     * 配置ServerBootstrap
+     * 配置ServerBootstrap（百万连接 + 高QPS 双优化）
+     * 
+     * 所有参数均可通过 Nacos 配置动态调整：
+     * - im.netty.soBackLog: 连接队列大小
+     * - im.netty.socketBufferSize: Socket缓冲区大小
+     * - im.netty.writeBufferLowWaterMark: 写缓冲区低水位
+     * - im.netty.writeBufferHighWaterMark: 写缓冲区高水位
+     * 
+     * 设计思路：在大量连接和高吞吐之间找到平衡
+     * 
+     * 内存估算：每连接约 bufferSize*2（收发缓冲区）
+     * - 32KB配置：100万连接约 64GB
+     * - 16KB配置：100万连接约 32GB
      */
     private void configureServerBootstrap(ServerBootstrap bootstrap) {
         bootstrap.group(bossGroup, workerGroup);
@@ -137,25 +169,50 @@ public class NettyServer implements ApplicationRunner {
             bootstrap.channel(NioServerSocketChannel.class);
         }
         
-        // 配置ServerSocket选项
-        bootstrap.option(ChannelOption.SO_BACKLOG, imConnectServerConfig.getSoBackLog())
-                .option(ChannelOption.SO_REUSEADDR, true)  // 允许重用地址
-                .option(ChannelOption.SO_RCVBUF, 32 * 1024) // 设置接收缓冲区大小32KB
-                .option(ChannelOption.SO_SNDBUF, 32 * 1024); // 设置发送缓冲区大小32KB
+        // ==================== 从 Nacos 配置读取参数 ====================
+        int soBacklog = imConnectServerConfig.getSoBackLog();
+        int bufferSize = imConnectServerConfig.getSocketBufferSize();
+        int writeBufferLow = imConnectServerConfig.getWriteBufferLowWaterMark();
+        int writeBufferHigh = imConnectServerConfig.getWriteBufferHighWaterMark();
         
-        // 配置ChildChannel选项 (针对每个客户端连接)
-        bootstrap.childOption(ChannelOption.SO_KEEPALIVE, true)  // TCP Keepalive
-                .childOption(ChannelOption.TCP_NODELAY, true)    // 禁用Nagle算法，适合实时通信
-                .childOption(ChannelOption.SO_RCVBUF, 64 * 1024) // 客户端连接接收缓冲区64KB
-                .childOption(ChannelOption.SO_SNDBUF, 64 * 1024) // 客户端连接发送缓冲区64KB
-                .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, 
-                    new io.netty.channel.WriteBufferWaterMark(8 * 1024, 32 * 1024)) // 写缓冲区水位线
-                .childOption(ChannelOption.SO_LINGER, 0);        // 关闭时立即释放端口
+        // 配置校验和警告
+        if (soBacklog < 65535) {
+            log.warn("[NettyServer]_SO_BACKLOG={} 偏小，建议设置为65535以支持高并发", soBacklog);
+        }
+        if (bufferSize < 8 * 1024) {
+            log.warn("[NettyServer]_socketBufferSize={}KB 偏小，可能影响QPS", bufferSize / 1024);
+        }
+        
+        // ==================== Server Socket 选项 ====================
+        bootstrap.option(ChannelOption.SO_BACKLOG, soBacklog)
+                .option(ChannelOption.SO_REUSEADDR, true);
+        
+        // ==================== Child Channel 选项 ====================
+        bootstrap
+            // TCP 连接参数
+            .childOption(ChannelOption.SO_KEEPALIVE, true)    // TCP Keepalive，检测死连接
+            .childOption(ChannelOption.TCP_NODELAY, true)     // 【关键】禁用Nagle算法，降低延迟！
+            .childOption(ChannelOption.SO_LINGER, 0)          // 关闭时立即释放端口
+            
+            // 缓冲区配置（从Nacos读取）
+            .childOption(ChannelOption.SO_RCVBUF, bufferSize)  // 接收缓冲区
+            .childOption(ChannelOption.SO_SNDBUF, bufferSize)  // 发送缓冲区
+            
+            // 写缓冲区水位线（从Nacos读取）
+            .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, 
+                new io.netty.channel.WriteBufferWaterMark(writeBufferLow, writeBufferHigh))
+            
+            // 【关键】池化内存分配器 - 大幅提升高QPS性能
+            .childOption(ChannelOption.ALLOCATOR, io.netty.buffer.PooledByteBufAllocator.DEFAULT)
+            
+            // 自动读取（高QPS场景保持开启）
+            .childOption(ChannelOption.AUTO_READ, true);
         
         // 设置Pipeline处理器
         bootstrap.childHandler(new WebSocketChannelInitializer());
         
-        log.info("[NettyServer]_ServerBootstrap配置完成");
+        log.info("[NettyServer]_ServerBootstrap配置完成 (来自Nacos): SO_BACKLOG={}, 缓冲区={}KB, 写水位线={}/{}KB", 
+            soBacklog, bufferSize / 1024, writeBufferLow / 1024, writeBufferHigh / 1024);
     }
 
     /**

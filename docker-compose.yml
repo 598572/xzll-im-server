@@ -96,9 +96,47 @@ services:
       - default_network
     volumes:
       - "/tmp/data/logs:/logs"
+    # ==================== 百万连接关键配置 ====================
+    # 文件句柄限制（必须！默认1024根本不够）
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+      nproc:
+        soft: 65535
+        hard: 65535
+    # 内核参数优化（需要宿主机支持）- 高连接 + 高QPS
+    sysctls:
+      # 连接队列
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_max_syn_backlog=65535
+      - net.core.netdev_max_backlog=65535
+      # 端口和连接复用
+      - net.ipv4.ip_local_port_range=1024 65535
+      - net.ipv4.tcp_tw_reuse=1
+      - net.ipv4.tcp_fin_timeout=10
+      # 【高QPS关键】网络缓冲区 - 增大以提高吞吐
+      - net.core.rmem_max=16777216
+      - net.core.wmem_max=16777216
+      - net.core.rmem_default=262144
+      - net.core.wmem_default=262144
+      # 【高QPS关键】TCP缓冲区自动调优
+      - net.ipv4.tcp_rmem=4096 87380 16777216
+      - net.ipv4.tcp_wmem=4096 65536 16777216
+      # 【低延迟关键】禁用慢启动重启
+      - net.ipv4.tcp_slow_start_after_idle=0
+    # 内存限制（根据服务器配置调整）
+    # 推荐配置：堆内存+直接内存+系统开销 = 8g + 4g + 2g = 14g
+    # 如果服务器内存充足，可以增大到 16g
+    mem_limit: 12g
+    memswap_limit: 12g
+    # =========================================================
     environment:
-      # JDK 17 兼容性配置 - Netty/gRPC 反射访问
-      - JAVA_OPTS=--add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/java.time=ALL-UNNAMED
+      # JVM 高性能参数（百万连接 + 高QPS 优化）
+      # 内存：堆4G + 直接内存2G（Netty零拷贝）
+      # GC：ZGC低延迟（<1ms停顿）
+      # 吞吐优化：JIT编译优化 + 大页内存 + 偏向锁禁用
+      - JAVA_OPTS=-Xms4g -Xmx4g -XX:MaxDirectMemorySize=2g -XX:+UseZGC -XX:+ZGenerational -Xss512k -XX:+AlwaysPreTouch -XX:-UseBiasedLocking -XX:+UseStringDeduplication -XX:ConcGCThreads=4 -XX:ParallelGCThreads=8 -XX:+PerfDisableSharedMem -Djdk.nio.maxCachedBufferSize=262144 -Dio.netty.leakDetection.level=disabled -Dio.netty.allocator.type=pooled -Dio.netty.allocator.numHeapArenas=16 -Dio.netty.allocator.numDirectArenas=16 -Dio.netty.recycler.maxCapacityPerThread=4096 -Dio.netty.eventLoopThreads=0
 
   im-console:
     build:
