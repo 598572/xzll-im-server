@@ -150,33 +150,47 @@ class ImWebSocketSimulation extends Simulation {
         )
     )
     
-    // 2. 循环发送心跳和消息（持续测试时长）
+    // 2. 保持连接活跃 - 修复心跳和消息发送逻辑
+    // ✅ 核心思路：使用消息间隔作为基准，每隔 N 条消息发送一次心跳
+    // 例如：消息间隔 5s，心跳间隔 30s → 每发送 6 条消息发一次心跳
     .during(testDuration) {
-      // 按配置的心跳间隔发送 Ping 心跳
-      pace(heartbeatIntervalMs.milliseconds)
-        .exec(
+      doIf(_ => enableMsgSend) {
+        // 🔹 方案 A：发消息 + 心跳
+        val msgsPerHeartbeat = Math.max(1, heartbeatIntervalMs / msgIntervalMs).toInt
+        
+        // 先发送心跳
+        exec(
           ws("Send Ping Heartbeat")
-            .sendBytes(Array[Byte]())  // Ping 帧由 Netty 自动处理
+            .sendBytes(Array[Byte]())
         )
         
-        // 按配置的消息间隔发送单聊消息（可通过 ENABLE_MSG_SEND 开关控制）
-        .doIf(_ => enableMsgSend) {
+        // 然后在心跳间隔内发送多条消息
+        .repeat(msgsPerHeartbeat, "msgCycle") {
           pause(msgIntervalMs.milliseconds)
-            .exec { session =>
-              val fromUser = session("userId").as[String]
-              // 随机选择一个接收方（使用压缩雪花算法生成）
-              val randomVirtualUserId = scala.util.Random.nextInt(usersPerMachine * 10).toLong
-              val toUser = generateCompactUserId(randomVirtualUserId)
-              
-              val message = buildC2CMessage(fromUser, toUser, s"Stress test from $fromUser")
-              session.set("message", message)
-            }
-            .exec(
-              ws("Send C2C Message")
-                .sendBytes("${message}")
-            )
+          .exec { session =>
+            val fromUser = session("userId").as[String]
+            val randomVirtualUserId = scala.util.Random.nextInt(usersPerMachine * 10).toLong
+            val toUser = generateCompactUserId(randomVirtualUserId)
+            val message = buildC2CMessage(fromUser, toUser, s"Test msg ${System.currentTimeMillis()}")
+            session.set("message", message)
+          }
+          .exec(
+            ws("Send C2C Message")
+              .sendBytes("${message}")
+          )
         }
+      }
+      
+      // 🔹 方案 B：只发心跳（不发消息）
+      .doIf(_ => !enableMsgSend) {
+        exec(
+          ws("Send Ping Heartbeat")
+            .sendBytes(Array[Byte]())
+        )
+        .pause(heartbeatIntervalMs.milliseconds)
+      }
     }
+    .exitHereIfFailed  // 连接失败立即退出
     
     // 3. 关闭连接
     .exec(
