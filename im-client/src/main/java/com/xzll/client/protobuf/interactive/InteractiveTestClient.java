@@ -32,13 +32,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class InteractiveTestClient {
 
-//    public static final String IP = "127.0.0.1";
-//    public static final String PORT = "10001";
+    public static final String IP = "127.0.0.1";
+    public static final String PORT = "10001";
 
 
 //    public static final String IP = "www.okim.site";
-    public static final String IP = "120.46.85.43";
-    public static final String PORT = "80";
+//    public static final String IP = "120.46.85.43";
+//    public static final String PORT = "8090";
 
 
     private static String currentUserId;
@@ -104,7 +104,7 @@ public class InteractiveTestClient {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(new HttpClientCodec());
                             pipeline.addLast(new HttpObjectAggregator(65536));
-                            pipeline.addLast("heart-notice", new IdleStateHandler(11, 0, 0, TimeUnit.SECONDS));
+                            pipeline.addLast("heart-notice", new IdleStateHandler(6, 0, 0, TimeUnit.SECONDS));
                             pipeline.addLast(handler);
                         }
                     });
