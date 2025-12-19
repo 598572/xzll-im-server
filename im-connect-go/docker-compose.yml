@@ -1,0 +1,356 @@
+# ============================================================================
+# IM-Connect-Go Docker Compose - 完整部署方案
+# ============================================================================
+# 
+# 使用方法：
+#   docker-compose up -d                    # 启动所有服务
+#   docker-compose logs -f im-connect-go    # 查看日志
+#   docker-compose down                     # 停止所有服务
+#
+# 性能配置：
+#   支持百万级连接 + 高QPS消息处理
+#   已针对 Go 语言和容器环境优化
+#
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # IM-Connect-Go 主服务
+  # ==========================================
+  im-connect-go:
+    build: .
+    image: im-connect-go:latest
+    container_name: im-connect-go
+    restart: unless-stopped
+    
+    # 端口映射
+    ports:
+      - "10001:10001"  # WebSocket 端口
+      - "9090:9090"    # gRPC 端口
+    
+    # 环境变量配置
+    environment:
+      # 服务器配置
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: 10001
+      SERVER_MAX_CONNECTIONS: 1000000
+      
+      # gRPC 配置
+      GRPC_PORT: 9090
+      GRPC_MAX_RECV_MSG_SIZE: 4194304    # 4MB
+      GRPC_MAX_SEND_MSG_SIZE: 4194304    # 4MB
+      
+      # Netty 优化配置（百万连接）
+      NETTY_BOSS_THREADS: 2              # Boss 线程数
+      NETTY_WORKER_THREADS: 16           # Worker 线程数
+      NETTY_SO_BACKLOG: 65535            # 连接队列大小
+      NETTY_SOCKET_BUFFER_SIZE: 16384    # 16KB 缓冲区
+      NETTY_WRITE_BUFFER_LOW: 8192       # 8KB 低水位
+      NETTY_WRITE_BUFFER_HIGH: 32768     # 32KB 高水位
+      NETTY_ENABLE_COMPRESSION: false    # 禁用压缩（减少CPU）
+      NETTY_PING_INTERVAL: 30s           # 心跳间隔
+      NETTY_PONG_TIMEOUT: 60s            # Pong 超时
+      NETTY_MAX_MESSAGE_SIZE: 10240      # 10KB 消息限制
+      
+      # Redis 配置
+      REDIS_ADDRESS: "redis:6379"
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_POOL_SIZE: 100
+      REDIS_MIN_IDLE_CONNS: 20
+      
+      # Nacos 配置
+      NACOS_SERVER_ADDR: "nacos:8848"
+      NACOS_NAMESPACE: "im"
+      NACOS_GROUP: "DEFAULT_GROUP"
+      NACOS_DATA_ID: "im-connect-go.yaml"
+      NACOS_USERNAME: "nacos"
+      NACOS_PASSWORD: "nacos"
+      
+      # 认证配置
+      AUTH_STRESS_TEST_ENABLED: true
+      AUTH_STRESS_TEST_TOKEN: "STRESS_TEST_BYPASS_TOKEN"
+      
+      # 日志配置
+      LOG_LEVEL: "info"
+      LOG_OUTPUT: "logs/im-connect-go.log"
+      
+      # Go 运行时配置
+      GOMAXPROCS: 16                     # 与 worker_threads 一致
+      GOGC: 100                          # GC 频率
+      GOMEMLIMIT: "8GiB"                 # 内存限制
+    
+    # 容器资源限制（百万连接优化）
+    deploy:
+      resources:
+        limits:
+          memory: 12G                    # 内存限制（百万连接约需8-10GB）
+          cpus: '16'                     # CPU 限制
+        reservations:
+          memory: 4G                     # 内存预留
+          cpus: '4'                      # CPU 预留
+    
+    # 系统资源限制
+    ulimits:
+      nofile:
+        soft: 1000000                    # 软限制：100万文件句柄
+        hard: 1000000                    # 硬限制：100万文件句柄
+      nproc:
+        soft: 65535                      # 软限制：进程数
+        hard: 65535                      # 硬限制：进程数
+    
+    # 系统内核参数（宿主机需要先设置）
+    # 注意：这些参数需要在宿主机上预先配置
+    # sysctls:
+    #   - net.core.somaxconn=65535
+    #   - net.ipv4.tcp_max_syn_backlog=65535
+    
+    # 挂载卷
+    volumes:
+      - ./logs:/app/logs               # 日志目录
+      - ./configs:/app/configs         # 配置目录
+      - /etc/localtime:/etc/localtime:ro # 时区同步
+    
+    # 依赖服务
+    depends_on:
+      - redis
+      - nacos
+    
+    # 网络配置
+    networks:
+      - im-network
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ==========================================
+  # Redis 服务
+  # ==========================================
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    restart: unless-stopped
+    
+    ports:
+      - "6379:6379"
+    
+    # Redis 配置优化
+    command: >
+      redis-server
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --tcp-keepalive 60
+      --timeout 0
+      --tcp-backlog 65535
+    
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/etc/redis/redis.conf:ro
+    
+    networks:
+      - im-network
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==========================================
+  # Nacos 配置中心
+  # ==========================================
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: nacos
+    restart: unless-stopped
+    
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_DB_NAME: nacos
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_USER: nacos
+      MYSQL_SERVICE_PASSWORD: nacos123
+      NACOS_AUTH_ENABLE: true
+      NACOS_AUTH_TOKEN: "SecretKey012345678901234567890123456789012345678901234567890123456789"
+      NACOS_AUTH_IDENTITY_KEY: "nacos"
+      NACOS_AUTH_IDENTITY_VALUE: "nacos"
+    
+    volumes:
+      - nacos_logs:/home/nacos/logs
+      - nacos_data:/home/nacos/data
+    
+    depends_on:
+      - mysql
+    
+    networks:
+      - im-network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8848/nacos/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ==========================================
+  # MySQL 数据库
+  # ==========================================
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    
+    ports:
+      - "3306:3306"
+    
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: nacos
+      MYSQL_USER: nacos
+      MYSQL_PASSWORD: nacos123
+    
+    # MySQL 性能优化
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=512M
+      --innodb-log-file-size=256M
+      --innodb-flush-log-at-trx-commit=2
+      --sync-binlog=0
+      --max-connections=1000
+    
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    
+    networks:
+      - im-network
+    
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 监控服务（可选）
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    
+    ports:
+      - "9091:9090"
+    
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    
+    networks:
+      - im-network
+    
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    
+    ports:
+      - "3000:3000"
+    
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+    
+    depends_on:
+      - prometheus
+    
+    networks:
+      - im-network
+    
+    profiles:
+      - monitoring
+
+# ==========================================
+# 网络配置
+# ==========================================
+networks:
+  im-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ==========================================
+# 数据卷
+# ==========================================
+volumes:
+  redis_data:
+    driver: local
+  mysql_data:
+    driver: local
+  nacos_logs:
+    driver: local
+  nacos_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ==========================================
+# 使用说明和优化建议
+# ==========================================
+# 
+# 1. 启动完整服务：
+#    docker-compose up -d
+# 
+# 2. 启动含监控的服务：
+#    docker-compose --profile monitoring up -d
+# 
+# 3. 查看日志：
+#    docker-compose logs -f im-connect-go
+# 
+# 4. 扩容 IM 服务：
+#    docker-compose up -d --scale im-connect-go=3
+# 
+# 5. 宿主机优化（必须）：
+#    sudo ./optimize-system.sh persist
+# 
+# 6. 性能监控地址：
+#    - IM 健康检查: http://localhost:10001/health
+#    - IM 指标: http://localhost:10001/metrics
+#    - Nacos 控制台: http://localhost:8848/nacos
+#    - Grafana 监控: http://localhost:3000 (admin/admin123)
+# 
+# 7. 压测命令：
+#    ./run-jar.sh localhost 10001 100000 300 1800 5000 30000

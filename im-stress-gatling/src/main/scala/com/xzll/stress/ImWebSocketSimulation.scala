@@ -167,19 +167,19 @@ class ImWebSocketSimulation extends Simulation {
         // 然后在心跳间隔内发送多条消息
         .repeat(msgsPerHeartbeat, "msgCycle") {
           pause(msgIntervalMs.milliseconds)
-          .exec { session =>
-            val fromUser = session("userId").as[String]
-            val randomVirtualUserId = scala.util.Random.nextInt(usersPerMachine * 10).toLong
-            val toUser = generateCompactUserId(randomVirtualUserId)
+            .exec { session =>
+              val fromUser = session("userId").as[String]
+              val randomVirtualUserId = scala.util.Random.nextInt(usersPerMachine * 10).toLong
+              val toUser = generateCompactUserId(randomVirtualUserId)
             val message = buildC2CMessage(fromUser, toUser, s"Test msg ${System.currentTimeMillis()}")
-            session.set("message", message)
-          }
-          .exec(
-            ws("Send C2C Message")
-              .sendBytes("${message}")
-          )
+              session.set("message", message)
+            }
+            .exec(
+              ws("Send C2C Message")
+                .sendBytes("${message}")
+            )
         }
-      }
+    }
       
       // 🔹 方案 B：只发心跳（不发消息）
       .doIf(_ => !enableMsgSend) {
