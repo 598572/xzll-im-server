@@ -141,8 +141,8 @@ func main() {
 		logger.Fatal("❌ Redis 客户端未初始化")
 	}
 
-	// 初始化 WebSocket 服务器（传入 mqProducer 和 redisClient）
-	wsServer, err := server.NewWebSocketServer(cfg, logger, mqProducer, redisClient)
+	// 初始化 WebSocket 服务器（使用 nbio 高性能框架）
+	wsServer, err := server.NewNbioWebSocketServer(cfg, logger, mqProducer, redisClient)
 	if err != nil {
 		logger.Fatal("❌ 创建 WebSocket 服务器失败", zap.Error(err))
 	}

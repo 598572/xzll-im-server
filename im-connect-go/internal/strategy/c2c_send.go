@@ -28,13 +28,13 @@ import (
 type C2CMsgSendStrategy struct {
 	config         *config.Config
 	logger         *zap.Logger
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 	mqProducer     *mq.Producer       // RocketMQ 生产者
 	redisClient    *redis.RedisClient // Redis 客户端（用于查询用户状态和路由信息）
 }
 
 // NewC2CMsgSendStrategy 创建 C2C 消息发送策略
-func NewC2CMsgSendStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.Manager, mqProducer *mq.Producer, redisClient *redis.RedisClient) *C2CMsgSendStrategy {
+func NewC2CMsgSendStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager, mqProducer *mq.Producer, redisClient *redis.RedisClient) *C2CMsgSendStrategy {
 	return &C2CMsgSendStrategy{
 		config:         cfg,
 		logger:         logger,
@@ -425,8 +425,15 @@ func (s *C2CMsgSendStrategy) pushMessageToUser(userID string, sendReq *pb.C2CSen
 	response := &pb.ImProtoResponse{
 		Type:    pb.MsgType_C2C_MSG_PUSH,
 		Payload: pushPayload,
-		Code:    pb.ProtoResponseCode_SUCCESS,
+		Code:    pb.ProtoResponseCode(0), // 0:成功（对标 Java 的 int32 code）
 	}
+
+	s.logger.Info("📤 构建 C2C 推送响应",
+		zap.String("to_user_id", userID),
+		zap.String("msg_type", "C2C_MSG_PUSH"),
+		zap.Int32("msg_type_value", int32(pb.MsgType_C2C_MSG_PUSH)),
+		zap.Int32("code", 0),
+	)
 
 	// 4. 序列化响应
 	responseData, err := proto.Marshal(response)

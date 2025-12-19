@@ -62,7 +62,7 @@ type C2CMsgRetryEvent struct {
 type C2CMsgRetryService struct {
 	config         *C2CMsgRetryConfig
 	redisClient    *redis.RedisClient
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 	logger         *zap.Logger
 
 	stopChan chan struct{}
@@ -73,7 +73,7 @@ type C2CMsgRetryService struct {
 func NewC2CMsgRetryService(
 	config *C2CMsgRetryConfig,
 	redisClient *redis.RedisClient,
-	channelManager *channel.Manager,
+	channelManager *channel.NbioManager,
 	logger *zap.Logger,
 ) *C2CMsgRetryService {
 	if config == nil {
@@ -268,7 +268,10 @@ func (s *C2CMsgRetryService) processRetryBatch(ctx context.Context, toUserID str
 	isOnline := len(conns) > 0
 	var conn channel.Connection
 	if isOnline {
-		conn = conns[0] // 使用第一个连接
+		// 从 nbio 的 websocket.Conn 获取包装器
+		if connWrapper, ok := s.channelManager.GetConnectionWrapper(conns[0]); ok {
+			conn = connWrapper
+		}
 	}
 
 	for _, event := range events {

@@ -20,7 +20,7 @@ import (
 // 2. 支持增量同步（基于lastMsgId）
 // 3. 支持分页获取
 type ClientGetBatchMsgIdsStrategy struct {
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 	logger         *zap.Logger
 
 	// 缓存最近的消息ID列表（减少数据库查询）
@@ -29,7 +29,7 @@ type ClientGetBatchMsgIdsStrategy struct {
 }
 
 // NewClientGetBatchMsgIdsStrategy 创建策略
-func NewClientGetBatchMsgIdsStrategy(channelManager *channel.Manager, logger *zap.Logger) *ClientGetBatchMsgIdsStrategy {
+func NewClientGetBatchMsgIdsStrategy(channelManager *channel.NbioManager, logger *zap.Logger) *ClientGetBatchMsgIdsStrategy {
 	return &ClientGetBatchMsgIdsStrategy{
 		channelManager: channelManager,
 		logger:         logger,

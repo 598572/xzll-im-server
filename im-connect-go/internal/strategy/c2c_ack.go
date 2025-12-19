@@ -21,7 +21,7 @@ import (
 type C2CMsgAckStrategy struct {
 	config         *config.Config
 	logger         *zap.Logger
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 
 	// 统计信息
 	totalAcks     int64
@@ -29,7 +29,7 @@ type C2CMsgAckStrategy struct {
 }
 
 // NewC2CMsgAckStrategy 创建消息确认策略
-func NewC2CMsgAckStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.Manager) *C2CMsgAckStrategy {
+func NewC2CMsgAckStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager) *C2CMsgAckStrategy {
 	return &C2CMsgAckStrategy{
 		config:         cfg,
 		logger:         logger,

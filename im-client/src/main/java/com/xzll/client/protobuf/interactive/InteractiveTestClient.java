@@ -105,7 +105,7 @@ public class InteractiveTestClient {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(new HttpClientCodec());
                             pipeline.addLast(new HttpObjectAggregator(65536));
-                            pipeline.addLast("heart-notice", new IdleStateHandler(600, 0, 0, TimeUnit.SECONDS));
+                            pipeline.addLast("heart-notice", new IdleStateHandler(10, 0, 0, TimeUnit.SECONDS));
                             pipeline.addLast(handler);
                         }
                     });

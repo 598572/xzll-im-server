@@ -26,7 +26,7 @@ import (
 type TransferC2CMsgService struct {
 	config         *config.Config
 	logger         *zap.Logger
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 
 	// gRPC客户端连接池
 	clientPool  sync.Map // serverAddr -> *grpc.ClientConn
@@ -42,7 +42,7 @@ type TransferC2CMsgService struct {
 }
 
 // NewTransferC2CMsgService 创建跨服务器消息转发服务
-func NewTransferC2CMsgService(cfg *config.Config, logger *zap.Logger, channelManager *channel.Manager, localAddr string) *TransferC2CMsgService {
+func NewTransferC2CMsgService(cfg *config.Config, logger *zap.Logger, channelManager *channel.NbioManager, localAddr string) *TransferC2CMsgService {
 	service := &TransferC2CMsgService{
 		config:          cfg,
 		logger:          logger,

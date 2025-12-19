@@ -22,7 +22,7 @@ import (
 type WithdrawMsgStrategy struct {
 	config         *config.Config
 	logger         *zap.Logger
-	channelManager *channel.Manager
+	channelManager *channel.NbioManager
 
 	// 撤回配置
 	withdrawTimeLimit time.Duration // 撤回时间限制，超过此时间不能撤回
@@ -34,7 +34,7 @@ type WithdrawMsgStrategy struct {
 }
 
 // NewWithdrawMsgStrategy 创建消息撤回策略
-func NewWithdrawMsgStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.Manager) *WithdrawMsgStrategy {
+func NewWithdrawMsgStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager) *WithdrawMsgStrategy {
 	return &WithdrawMsgStrategy{
 		config:            cfg,
 		logger:            logger,
