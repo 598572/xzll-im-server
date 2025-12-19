@@ -138,7 +138,7 @@ func (h *HeartbeatHandler) UnregisterUser(userID string) {
 func (h *HeartbeatHandler) heartbeatChecker() {
 	defer h.wg.Done()
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(h.heartbeatInterval) // 使用配置的心跳间隔
 	defer ticker.Stop()
 
 	for {

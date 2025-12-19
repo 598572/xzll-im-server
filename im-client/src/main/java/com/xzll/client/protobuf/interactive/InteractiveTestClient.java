@@ -58,8 +58,9 @@ public class InteractiveTestClient {
         currentUserId = scanner.nextLine().trim();
         
         if (currentUserId.isEmpty()) {
-            System.err.println("❌ 用户ID不能为空！");
-            return;
+//            System.err.println("❌ 用户ID不能为空！");
+//            return;
+            currentUserId = "123729024000";
         }
         
         System.out.println("✅ 当前用户: " + currentUserId);
@@ -104,7 +105,7 @@ public class InteractiveTestClient {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(new HttpClientCodec());
                             pipeline.addLast(new HttpObjectAggregator(65536));
-                            pipeline.addLast("heart-notice", new IdleStateHandler(6, 0, 0, TimeUnit.SECONDS));
+                            pipeline.addLast("heart-notice", new IdleStateHandler(600, 0, 0, TimeUnit.SECONDS));
                             pipeline.addLast(handler);
                         }
                     });
