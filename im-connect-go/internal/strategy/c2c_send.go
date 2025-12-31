@@ -78,7 +78,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 	// ✅ UUID bytes 转换（对标 Java ProtoConverterUtil.bytesToUuidString）
 	clientMsgID := util.BytesToUUIDString(sendReq.ClientMsgId)
 
-	s.logger.Info("处理 C2C 消息",
+	s.logger.Info("📨 处理 C2C 消息",
 		zap.String("from_user_id", fromUserID),
 		zap.String("to_user_id", toUserID),
 		zap.String("client_msg_id", clientMsgID),
@@ -149,7 +149,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 		return nil
 	}
 
-	s.logger.Info("接收者状态信息",
+	s.logger.Info("👤 接收者状态信息",
 		zap.String("to_user_id", toUserID),
 		zap.String("user_status", receiveUserData.UserStatus),
 		zap.Bool("has_local_channel", receiveUserData.HasLocalChannel),
@@ -159,7 +159,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 	// 6. 根据接收人状态做对应的处理（对标 Java 三种情况判断）
 	if receiveUserData.HasLocalChannel && receiveUserData.UserStatus == "5" {
 		// 情况1：用户在线且在本台机器上，直接发送（对标 Java targetChannel != null && userStatus == ON_LINE(5)）
-		s.logger.Debug("【步骤3-本地发送】用户在线且在本台机器上，将直接发送",
+		s.logger.Info("🟢【本地发送】用户在线且在本台机器上，将直接发送",
 			zap.String("to_user_id", toUserID),
 			zap.String("client_msg_id", clientMsgID),
 			zap.String("msg_id", msgEvent.MsgID),
@@ -173,8 +173,9 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 			// 推送失败，发送离线消息
 			s.sendOfflineMsgToMQ(msgEvent, "推送失败")
 		} else {
-			s.logger.Debug("消息已推送给在线用户",
+			s.logger.Info("✅ 消息已推送给在线用户",
 				zap.String("to_user_id", toUserID),
+				zap.String("msg_id", msgEvent.MsgID),
 			)
 			// ✅ 添加到重试队列，等待客户端 ACK（对标 Java c2CMsgRetryService.addToRetryQueue）
 			if s.retryService != nil {
@@ -202,7 +203,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 
 	} else if !receiveUserData.HasLocalChannel && receiveUserData.UserStatus == "5" && receiveUserData.RouteAddress != "" {
 		// 情况2：用户在线但不在本机器上，跨服务器转发（对标 Java targetChannel == null && userStatus == ON_LINE(5) && ipPortStr != blank）
-		s.logger.Debug("【步骤3-跨服务器转发】用户在线但不在该机器上，跨服务器转发",
+		s.logger.Info("🟡【跨服务器转发】用户在线但不在该机器上，跨服务器转发",
 			zap.String("to_user_id", toUserID),
 			zap.String("target_server", receiveUserData.RouteAddress),
 			zap.String("client_msg_id", clientMsgID),
@@ -221,7 +222,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 
 	} else if receiveUserData.UserStatus == "" || receiveUserData.UserStatus == "0" {
 		// 情况3：用户不在线，保存为离线消息（对标 Java userStatus == null）
-		s.logger.Debug("【步骤3-离线处理】用户不在线，将消息保存至离线表中",
+		s.logger.Info("🔴【离线处理】用户不在线，将消息保存至离线表中",
 			zap.String("to_user_id", toUserID),
 			zap.String("client_msg_id", clientMsgID),
 			zap.String("msg_id", msgEvent.MsgID),
@@ -245,7 +246,11 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 		s.sendOfflineMsgToMQ(msgEvent, "用户状态不一致")
 	}
 
-	// 6. 发送确认给发送者（对标 Java ServerAck）
+	// 7. 发送确认给发送者（对标 Java ServerAck）
+	s.logger.Info("📩 发送 ServerAck 给发送方",
+		zap.String("from_user_id", fromUserID),
+		zap.Uint64("msg_id", serverMsgID),
+	)
 	if err := s.sendServerAck(conn, sendReq, true); err != nil {
 		s.logger.Error("发送服务器确认失败",
 			zap.String("from_user_id", fromUserID),
@@ -253,7 +258,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 		)
 	}
 
-	s.logger.Debug("C2C 消息处理完成",
+	s.logger.Info("✅ C2C 消息处理完成",
 		zap.String("from_user_id", fromUserID),
 		zap.String("to_user_id", toUserID),
 		zap.Uint64("msg_id", serverMsgID),
@@ -289,7 +294,7 @@ func (s *C2CMsgSendStrategy) ReceiveAndSendMsg(protoRequest *pb.ImProtoRequest) 
 		return err
 	}
 
-	s.logger.Info("跨服务器 C2C 消息推送成功",
+	s.logger.Debug("跨服务器 C2C 消息推送成功",
 		zap.String("to_user_id", toUserID),
 		zap.Uint64("msg_id", sendReq.MsgId),
 	)
@@ -423,7 +428,7 @@ func (s *C2CMsgSendStrategy) sendOfflineMsgToMQ(msgEvent *mq.C2CMsgEvent, reason
 			zap.Error(err),
 		)
 	} else {
-		s.logger.Info("✅ 离线消息已发送到 RocketMQ",
+		s.logger.Debug("✅ 离线消息已发送到 RocketMQ",
 			zap.String("msg_id", msgEvent.MsgID),
 			zap.String("to_user_id", msgEvent.ToUserID),
 			zap.String("reason", reason),
@@ -526,7 +531,7 @@ func (s *C2CMsgSendStrategy) sendServerAck(conn channel.Connection, sendReq *pb.
 		return fmt.Errorf("发送服务器确认失败: %w", err)
 	}
 
-	s.logger.Debug("服务器确认已发送",
+	s.logger.Info("✅ 服务器确认已发送 (ServerAck)",
 		zap.String("user_id", conn.GetUserID()),
 		zap.Uint64("msg_id", sendReq.MsgId),
 		zap.Bool("success", success),
@@ -554,7 +559,7 @@ func (s *C2CMsgSendStrategy) forwardToOtherServer(toUserID string, routeAddress 
 
 	targetAddr := fmt.Sprintf("%s:%d", targetIP, targetGrpcPort)
 
-	s.logger.Info("【跨服务器转发-准备】",
+	s.logger.Debug("【跨服务器转发-准备】",
 		zap.String("to_user_id", toUserID),
 		zap.String("route_address", routeAddress),
 		zap.String("target_addr", targetAddr),
@@ -599,7 +604,7 @@ func (s *C2CMsgSendStrategy) forwardToOtherServer(toUserID string, routeAddress 
 		return fmt.Errorf("跨服务器转发失败: code=%d, msg=%s", response.Code, response.Message)
 	}
 
-	s.logger.Info("【跨服务器转发-成功】",
+	s.logger.Debug("【跨服务器转发-成功】",
 		zap.String("to_user_id", toUserID),
 		zap.String("target_addr", targetAddr),
 		zap.Int32("code", response.Code),

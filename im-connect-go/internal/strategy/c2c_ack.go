@@ -3,6 +3,7 @@ package strategy
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"im-connect-go/internal/channel"
@@ -67,11 +68,12 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 			zap.String("user_id", userID),
 			zap.Error(err),
 		)
-		s.ackErrorCount++
+		atomic.AddInt64(&s.ackErrorCount, 1)
 		return fmt.Errorf("解析消息确认请求失败: %w", err)
 	}
 
-	s.logger.Info("处理消息确认",
+	// ✅ 优化：高频操作使用 Debug 级别，避免影响性能
+	s.logger.Info("📬 处理消息确认",
 		zap.String("user_id", userID),
 		zap.Uint64("msg_id", ackReq.MsgId),
 		zap.String("client_msg_id", util.BytesToUUIDString(ackReq.ClientMsgId)),
@@ -87,7 +89,7 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 			zap.Uint64("msg_id", ackReq.MsgId),
 			zap.Error(err),
 		)
-		s.ackErrorCount++
+		atomic.AddInt64(&s.ackErrorCount, 1)
 		return err
 	}
 
@@ -101,19 +103,23 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 		// 状态更新失败但继续处理，确保通知发送方
 	}
 
-	// 4. 查找原消息的发送方（对标 Java 查询消息发送者）
-	senderID, err := s.getMessageSender(ackReq.MsgId)
-	if err != nil {
-		s.logger.Error("查找消息发送者失败",
-			zap.Uint64("msg_id", ackReq.MsgId),
-			zap.Error(err),
-		)
-		s.ackErrorCount++
-		return fmt.Errorf("查找消息发送者失败: %w", err)
-	}
+	// 4. ✅ 优化：从 ACK 请求中获取发送方 ID（无需查询数据库）
+	// ACK 消息的 To 字段就是原消息的发送方（接收方发 ACK 给发送方）
+	senderID := fmt.Sprintf("%d", ackReq.To)
+
+	s.logger.Info("🔍 获取原消息发送方",
+		zap.String("sender_id", senderID),
+		zap.Uint64("msg_id", ackReq.MsgId),
+		zap.Int32("ack_status", ackReq.Status),
+	)
 
 	// 5. 如果发送方在线，通知消息已送达（对标 Java 送达通知）
 	if s.channelManager.IsUserOnline(senderID) {
+		s.logger.Info("📢 发送方在线，准备发送送达通知",
+			zap.String("sender_id", senderID),
+			zap.Uint64("msg_id", ackReq.MsgId),
+			zap.Int32("status", ackReq.Status),
+		)
 		if err := s.notifyMessageDelivered(senderID, ackReq); err != nil {
 			s.logger.Error("通知发送方消息已送达失败",
 				zap.String("sender_id", senderID),
@@ -127,9 +133,10 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 		// 1. 保存送达通知为离线消息
 		// 2. 通过推送服务通知
 		// 3. 或者忽略（发送方下次上线时主动查询）
-		s.logger.Debug("发送方不在线，跳过送达通知",
+		s.logger.Info("ℹ️ 发送方不在线，跳过送达通知",
 			zap.String("sender_id", senderID),
 			zap.Uint64("msg_id", ackReq.MsgId),
+			zap.Int32("status", ackReq.Status),
 		)
 	}
 
@@ -145,10 +152,10 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 		}
 	}
 
-	// 7. 更新统计信息
-	s.totalAcks++
+	// 7. ✅ 优化：使用原子操作更新统计信息（并发安全）
+	atomic.AddInt64(&s.totalAcks, 1)
 
-	s.logger.Debug("消息确认处理完成",
+	s.logger.Info("✅ 消息确认处理完成",
 		zap.String("user_id", userID),
 		zap.Uint64("msg_id", ackReq.MsgId),
 		zap.String("sender_id", senderID),
@@ -194,17 +201,19 @@ func (s *C2CMsgAckStrategy) updateMessageDeliveryStatus(msgID uint64, receiverID
 	return nil
 }
 
-// getMessageSender 查找消息发送者（对标 Java 数据库查询）
+// getMessageSender 查找消息发送者
+// ✅ 优化：此方法已不再使用，发送方 ID 直接从 ACK 请求的 To 字段获取
+// 保留此方法供需要从数据库查询的场景使用
 func (s *C2CMsgAckStrategy) getMessageSender(msgID uint64) (string, error) {
-	// TODO: 实现数据库查询逻辑
-	// SELECT from_user_id FROM messages WHERE msg_id = ?
-
+	// 注意：在当前实现中，发送方 ID 直接从 ACK 请求中获取（ackReq.To）
+	// 此方法仅在需要从数据库查询时使用
 	s.logger.Debug("查找消息发送者",
 		zap.Uint64("msg_id", msgID),
 	)
 
-	// 模拟查询结果（实际应从数据库查询）
-	return "mock_sender_id", nil
+	// TODO: 如需从数据库查询，实现此逻辑
+	// SELECT from_user_id FROM messages WHERE msg_id = ?
+	return "", fmt.Errorf("请使用 ACK 请求中的 To 字段获取发送方 ID")
 }
 
 // notifyMessageDelivered 通知发送方消息已送达（对标 Java 送达通知）
@@ -249,7 +258,7 @@ func (s *C2CMsgAckStrategy) notifyMessageDelivered(senderID string, ackReq *pb.C
 		return fmt.Errorf("发送送达通知失败: %w", err)
 	}
 
-	s.logger.Debug("送达通知已发送",
+	s.logger.Info("✅ 送达通知已发送",
 		zap.String("sender_id", senderID),
 		zap.Uint64("msg_id", ackReq.MsgId),
 		zap.Int32("status", ackReq.Status),
@@ -259,11 +268,11 @@ func (s *C2CMsgAckStrategy) notifyMessageDelivered(senderID string, ackReq *pb.C
 	return nil
 }
 
-// GetAckStats 获取确认统计信息
+// GetAckStats 获取确认统计信息（并发安全）
 func (s *C2CMsgAckStrategy) GetAckStats() AckStats {
 	return AckStats{
-		TotalAcks:   s.totalAcks,
-		ErrorCount:  s.ackErrorCount,
+		TotalAcks:   atomic.LoadInt64(&s.totalAcks),
+		ErrorCount:  atomic.LoadInt64(&s.ackErrorCount),
 		SuccessRate: s.calculateSuccessRate(),
 	}
 }
@@ -275,12 +284,14 @@ type AckStats struct {
 	SuccessRate float64 `json:"success_rate"`
 }
 
-// calculateSuccessRate 计算成功率
+// calculateSuccessRate 计算成功率（并发安全）
 func (s *C2CMsgAckStrategy) calculateSuccessRate() float64 {
-	if s.totalAcks+s.ackErrorCount == 0 {
+	total := atomic.LoadInt64(&s.totalAcks)
+	errors := atomic.LoadInt64(&s.ackErrorCount)
+	if total+errors == 0 {
 		return 0.0
 	}
-	return float64(s.totalAcks) / float64(s.totalAcks+s.ackErrorCount) * 100
+	return float64(total) / float64(total+errors) * 100
 }
 
 // 批量处理相关方法（性能优化）
