@@ -1,12 +1,15 @@
 package strategy
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"im-connect-go/internal/channel"
 	"im-connect-go/internal/config"
 	pb "im-connect-go/internal/proto"
+	"im-connect-go/internal/service"
+	"im-connect-go/internal/util"
 
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -18,10 +21,12 @@ import (
 // 2. 更新消息状态为已送达
 // 3. 通知发送方消息已送达
 // 4. 统计消息送达率
+// 5. 从重试队列删除消息（对标 Java c2CMsgRetryService.removeFromRetryQueue）
 type C2CMsgAckStrategy struct {
 	config         *config.Config
 	logger         *zap.Logger
 	channelManager *channel.NbioManager
+	retryService   *service.C2CMsgRetryService // 消息重试服务
 
 	// 统计信息
 	totalAcks     int64
@@ -29,17 +34,19 @@ type C2CMsgAckStrategy struct {
 }
 
 // NewC2CMsgAckStrategy 创建消息确认策略
-func NewC2CMsgAckStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager) *C2CMsgAckStrategy {
+func NewC2CMsgAckStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager, retryService *service.C2CMsgRetryService) *C2CMsgAckStrategy {
 	return &C2CMsgAckStrategy{
 		config:         cfg,
 		logger:         logger,
 		channelManager: cm,
+		retryService:   retryService,
 	}
 }
 
 // SupportMsgType 返回支持的消息类型
+// ✅ 修复：使用 C2C_ACK（对标 Java ClientReceivedMsgAckProtoStrategyImpl）
 func (s *C2CMsgAckStrategy) SupportMsgType() pb.MsgType {
-	return pb.MsgType_CLIENT_RECEIVED_MSG_ACK
+	return pb.MsgType_C2C_ACK
 }
 
 // Exchange 处理客户端消息确认（对标 Java exchange 方法）
@@ -52,8 +59,9 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 		zap.Int("payload_size", len(protoRequest.Payload)),
 	)
 
-	// 1. 解析消息确认请求（对标 Java ClientReceivedMsgAck.parseFrom）
-	ackReq := &pb.ClientReceivedMsgAck{}
+	// 1. 解析消息确认请求（对标 Java C2CAckReq.parseFrom）
+	// ✅ 修复：使用 C2CAckReq（与 Java 保持一致）
+	ackReq := &pb.C2CAckReq{}
 	if err := proto.Unmarshal(protoRequest.Payload, ackReq); err != nil {
 		s.logger.Error("解析消息确认请求失败",
 			zap.String("user_id", userID),
@@ -66,8 +74,10 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 	s.logger.Info("处理消息确认",
 		zap.String("user_id", userID),
 		zap.Uint64("msg_id", ackReq.MsgId),
-		zap.String("client_msg_id", string(ackReq.ClientMsgId)), // TODO: 需要实现 UUID bytes 转换
-		zap.Uint64("ack_time", ackReq.Time),
+		zap.String("client_msg_id", util.BytesToUUIDString(ackReq.ClientMsgId)),
+		zap.Uint64("from", ackReq.From),
+		zap.Uint64("to", ackReq.To),
+		zap.Int32("status", ackReq.Status),
 	)
 
 	// 2. 验证确认消息
@@ -123,7 +133,19 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 		)
 	}
 
-	// 6. 更新统计信息
+	// 6. ✅ 从重试队列删除消息（对标 Java c2CMsgRetryService.removeFromRetryQueue）
+	if s.retryService != nil {
+		msgIDStr := fmt.Sprintf("%d", ackReq.MsgId)
+		if err := s.retryService.RemoveFromRetryQueue(context.Background(), msgIDStr); err != nil {
+			s.logger.Warn("从重试队列删除消息失败",
+				zap.Uint64("msg_id", ackReq.MsgId),
+				zap.Error(err),
+			)
+			// 删除失败不影响确认处理结果
+		}
+	}
+
+	// 7. 更新统计信息
 	s.totalAcks++
 
 	s.logger.Debug("消息确认处理完成",
@@ -137,7 +159,8 @@ func (s *C2CMsgAckStrategy) Exchange(conn channel.Connection, protoRequest *pb.I
 }
 
 // validateAckMessage 验证确认消息
-func (s *C2CMsgAckStrategy) validateAckMessage(ackReq *pb.ClientReceivedMsgAck) error {
+// ✅ 修复：使用 C2CAckReq（与 Java 保持一致）
+func (s *C2CMsgAckStrategy) validateAckMessage(ackReq *pb.C2CAckReq) error {
 	// 1. 检查消息ID
 	if ackReq.MsgId <= 0 {
 		return fmt.Errorf("无效的消息ID: %d", ackReq.MsgId)
@@ -148,19 +171,10 @@ func (s *C2CMsgAckStrategy) validateAckMessage(ackReq *pb.ClientReceivedMsgAck) 
 		return fmt.Errorf("客户端消息ID不能为空")
 	}
 
-	// 3. 检查确认时间
-	if ackReq.Time <= 0 {
-		return fmt.Errorf("无效的确认时间: %d", ackReq.Time)
+	// 3. 检查状态值（对标 Java：1=SERVER_RECEIVED, 3=UN_READ, 4=READED）
+	if ackReq.Status < 1 || ackReq.Status > 4 {
+		return fmt.Errorf("无效的状态值: %d", ackReq.Status)
 	}
-
-	// 4. 检查确认时间是否合理（不能太早或太晚）
-	now := uint64(time.Now().UnixMilli())
-	if ackReq.Time > now+5000 { // 不能超过当前时间5秒
-		return fmt.Errorf("确认时间过晚: %d > %d", ackReq.Time, now)
-	}
-
-	// 5. 检查消息是否存在且属于该用户
-	// TODO: 实现消息存在性和权限验证
 
 	return nil
 }
@@ -194,24 +208,32 @@ func (s *C2CMsgAckStrategy) getMessageSender(msgID uint64) (string, error) {
 }
 
 // notifyMessageDelivered 通知发送方消息已送达（对标 Java 送达通知）
-func (s *C2CMsgAckStrategy) notifyMessageDelivered(senderID string, ackReq *pb.ClientReceivedMsgAck) error {
-	// 1. 构建送达通知消息
-	deliveryNotification := &pb.MessageDeliveryNotification{
-		MsgId:       ackReq.MsgId,
+// ✅ 修复：使用 C2C_ACK 类型（与 Java 客户端保持一致，Java 没有 MSG_DELIVERY_NOTIFICATION）
+// 通过 status 来区分不同类型的 ACK：
+// - status=1: SERVER_RECEIVED（服务端已收到）
+// - status=3: UN_READ（客户端未读确认）
+// - status=4: READED（客户端已读确认）
+// 送达通知使用 status=3（对方收到但未读）通知发送方
+func (s *C2CMsgAckStrategy) notifyMessageDelivered(senderID string, ackReq *pb.C2CAckReq) error {
+	// 1. 构建送达通知消息（使用 C2CAckReq 格式，status 取原始值）
+	// 对标 Java 客户端 InteractiveClientHandler.handleClientAck()
+	deliveryAck := &pb.C2CAckReq{
 		ClientMsgId: ackReq.ClientMsgId,
-		DeliveredAt: ackReq.Time,
-		ReceiverAck: true,
+		MsgId:       ackReq.MsgId,
+		From:        ackReq.From,
+		To:          ackReq.To,
+		Status:      ackReq.Status, // 保持原始状态（3=未读，4=已读）
 	}
 
 	// 2. 序列化通知消息
-	notifyPayload, err := proto.Marshal(deliveryNotification)
+	notifyPayload, err := proto.Marshal(deliveryAck)
 	if err != nil {
 		return fmt.Errorf("序列化送达通知失败: %w", err)
 	}
 
-	// 3. 构建 Protobuf 响应
+	// 3. 构建 Protobuf 响应（使用 C2C_ACK 类型，Java 客户端能识别）
 	response := &pb.ImProtoResponse{
-		Type:    pb.MsgType_MSG_DELIVERY_NOTIFICATION,
+		Type:    pb.MsgType_C2C_ACK, // ✅ 修复：使用 C2C_ACK（Java 客户端能识别）
 		Payload: notifyPayload,
 		Code:    pb.ProtoResponseCode_SUCCESS,
 	}
@@ -230,6 +252,7 @@ func (s *C2CMsgAckStrategy) notifyMessageDelivered(senderID string, ackReq *pb.C
 	s.logger.Debug("送达通知已发送",
 		zap.String("sender_id", senderID),
 		zap.Uint64("msg_id", ackReq.MsgId),
+		zap.Int32("status", ackReq.Status),
 		zap.Int("notification_size", len(responseData)),
 	)
 
@@ -263,7 +286,8 @@ func (s *C2CMsgAckStrategy) calculateSuccessRate() float64 {
 // 批量处理相关方法（性能优化）
 
 // BatchUpdateDeliveryStatus 批量更新送达状态（性能优化）
-func (s *C2CMsgAckStrategy) BatchUpdateDeliveryStatus(acks []*pb.ClientReceivedMsgAck, receiverID string) error {
+// ✅ 修复：使用 C2CAckReq
+func (s *C2CMsgAckStrategy) BatchUpdateDeliveryStatus(acks []*pb.C2CAckReq, receiverID string) error {
 	// TODO: 实现批量数据库更新
 	// 可以显著提高高并发场景下的性能
 
@@ -276,7 +300,8 @@ func (s *C2CMsgAckStrategy) BatchUpdateDeliveryStatus(acks []*pb.ClientReceivedM
 }
 
 // BatchNotifyDelivered 批量通知送达（性能优化）
-func (s *C2CMsgAckStrategy) BatchNotifyDelivered(senderID string, acks []*pb.ClientReceivedMsgAck) error {
+// ✅ 修复：使用 C2CAckReq
+func (s *C2CMsgAckStrategy) BatchNotifyDelivered(senderID string, acks []*pb.C2CAckReq) error {
 	// TODO: 实现批量通知逻辑
 	// 可以将多个送达通知合并为一个消息发送
 

@@ -33,6 +33,7 @@ type NbioWebSocketServer struct {
 	authHandler       *auth.Handler
 	messageHandler    *handler.MessageHandler
 	userStatusService *service.UserStatusService
+	retryService      *service.C2CMsgRetryService // 消息重试服务
 
 	// 连接映射：websocket.Conn -> userID
 	connUserMap sync.Map // map[*websocket.Conn]string
@@ -60,8 +61,12 @@ func NewNbioWebSocketServer(cfg *config.Config, logger *zap.Logger, mqProducer *
 	// 创建认证处理器
 	authHandler := auth.NewHandler(cfg, logger)
 
-	// 创建消息处理器（nbio 版本，传入 channelManager）
-	messageHandler := handler.NewMessageHandler(cfg, logger, channelManager, mqProducer, redisClient)
+	// 创建消息重试服务（对标 Java C2CMsgRetryServiceImpl）
+	retryConfig := service.DefaultC2CMsgRetryConfig()
+	retryService := service.NewC2CMsgRetryService(retryConfig, redisClient, channelManager, logger)
+
+	// 创建消息处理器（nbio 版本，传入 channelManager 和 retryService）
+	messageHandler := handler.NewMessageHandler(cfg, logger, channelManager, mqProducer, redisClient, retryService)
 
 	// 创建用户状态管理服务
 	serverAddr := getServerAddress(cfg)
@@ -77,6 +82,7 @@ func NewNbioWebSocketServer(cfg *config.Config, logger *zap.Logger, mqProducer *
 		authHandler:       authHandler,
 		messageHandler:    messageHandler,
 		userStatusService: userStatusService,
+		retryService:      retryService,
 		shutdown:          make(chan struct{}),
 	}
 
@@ -145,6 +151,40 @@ func (s *NbioWebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Req
 	nettyConfig := s.config.GetNettyRuntimeConfig()
 	heartbeatTimeout := time.Duration(nettyConfig.HeartbeatTimeout) * time.Second
 
+	// ✅ 设置 Ping 处理器（对标 Java IdleStateHandler 心跳处理）
+	// Java 客户端使用 WebSocket Ping 帧作为心跳，需要在收到 Ping 时更新活跃度
+	upgrader.SetPingHandler(func(c *websocket.Conn, message string) {
+		// 更新读取超时
+		c.SetReadDeadline(time.Now().Add(heartbeatTimeout))
+
+		// 获取用户ID并更新心跳
+		if userIDInterface, ok := s.connUserMap.Load(c); ok {
+			userID := userIDInterface.(string)
+			s.advancedHeartbeatHandler.OnRead(userID)
+			s.logger.Debug("💓 收到 Ping 心跳",
+				zap.String("user_id", userID),
+			)
+		}
+
+		// 发送 Pong 响应
+		c.WriteMessage(websocket.PongMessage, []byte(message))
+	})
+
+	// 设置 Pong 处理器（收到客户端的 Pong 响应时更新活跃度）
+	upgrader.SetPongHandler(func(c *websocket.Conn, message string) {
+		// 更新读取超时
+		c.SetReadDeadline(time.Now().Add(heartbeatTimeout))
+
+		// 获取用户ID并更新心跳
+		if userIDInterface, ok := s.connUserMap.Load(c); ok {
+			userID := userIDInterface.(string)
+			s.advancedHeartbeatHandler.OnRead(userID)
+			s.logger.Debug("💓 收到 Pong 响应",
+				zap.String("user_id", userID),
+			)
+		}
+	})
+
 	// 设置 OnOpen 回调
 	upgrader.OnOpen(func(c *websocket.Conn) {
 		// 设置读取超时（心跳检测）
@@ -157,7 +197,17 @@ func (s *NbioWebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Req
 		connectTime := time.Now()
 		s.connectTimeMap.Store(userID, connectTime)
 
-		// 注册连接包装器
+		// ✅ 修复：添加连接到 userConnections 映射（对标 Java LocalChannelManager.addUserChannel）
+		if err := s.channelManager.AddConnection(userID, c); err != nil {
+			s.logger.Error("添加连接到管理器失败",
+				zap.String("user_id", userID),
+				zap.Error(err),
+			)
+			c.Close()
+			return
+		}
+
+		// 注册连接包装器（用于消息发送）
 		s.channelManager.RegisterConnection(nil, c, userID)
 
 		// 设置用户在线状态到 Redis
@@ -303,6 +353,12 @@ func (s *NbioWebSocketServer) handleWebSocketClose(c *websocket.Conn, err error)
 
 // Start 启动 WebSocket 服务器
 func (s *NbioWebSocketServer) Start(ctx context.Context) error {
+	// 启动消息重试服务（对标 Java @Scheduled 定时任务）
+	if s.retryService != nil {
+		s.retryService.Start(ctx)
+		s.logger.Info("✅ 消息重试服务已启动")
+	}
+
 	// 启动 nbio HTTP 服务器
 	if err := s.server.Start(); err != nil {
 		return fmt.Errorf("启动 nbio 服务器失败: %w", err)
@@ -330,6 +386,12 @@ func (s *NbioWebSocketServer) Shutdown(ctx context.Context) error {
 
 		// 通知所有协程关闭
 		close(s.shutdown)
+
+		// 关闭消息重试服务
+		if s.retryService != nil {
+			s.logger.Info("关闭消息重试服务...")
+			s.retryService.Stop()
+		}
 
 		// 关闭异步消息处理器（等待队列处理完成）
 		s.logger.Info("关闭异步消息处理器...")

@@ -9,6 +9,8 @@ import (
 	"im-connect-go/internal/channel"
 	"im-connect-go/internal/config"
 	pb "im-connect-go/internal/proto"
+	"im-connect-go/internal/service"
+	"im-connect-go/internal/util"
 	"im-connect-go/pkg/mq"
 	"im-connect-go/pkg/redis"
 
@@ -25,22 +27,25 @@ import (
 // 4. 离线消息处理
 // 5. 跨服务器转发
 // 6. 消息确认机制
+// 7. 消息重试机制（确保消息可靠投递）
 type C2CMsgSendStrategy struct {
 	config         *config.Config
 	logger         *zap.Logger
 	channelManager *channel.NbioManager
-	mqProducer     *mq.Producer       // RocketMQ 生产者
-	redisClient    *redis.RedisClient // Redis 客户端（用于查询用户状态和路由信息）
+	mqProducer     *mq.Producer                // RocketMQ 生产者
+	redisClient    *redis.RedisClient          // Redis 客户端（用于查询用户状态和路由信息）
+	retryService   *service.C2CMsgRetryService // 消息重试服务（对标 Java c2CMsgRetryService）
 }
 
 // NewC2CMsgSendStrategy 创建 C2C 消息发送策略
-func NewC2CMsgSendStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager, mqProducer *mq.Producer, redisClient *redis.RedisClient) *C2CMsgSendStrategy {
+func NewC2CMsgSendStrategy(cfg *config.Config, logger *zap.Logger, cm *channel.NbioManager, mqProducer *mq.Producer, redisClient *redis.RedisClient, retryService *service.C2CMsgRetryService) *C2CMsgSendStrategy {
 	return &C2CMsgSendStrategy{
 		config:         cfg,
 		logger:         logger,
 		channelManager: cm,
 		mqProducer:     mqProducer,
 		redisClient:    redisClient,
+		retryService:   retryService,
 	}
 }
 
@@ -70,7 +75,8 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 	}
 
 	toUserID := fmt.Sprintf("%d", sendReq.To)
-	clientMsgID := string(sendReq.ClientMsgId) // TODO: 需要实现 UUID bytes 转换
+	// ✅ UUID bytes 转换（对标 Java ProtoConverterUtil.bytesToUuidString）
+	clientMsgID := util.BytesToUUIDString(sendReq.ClientMsgId)
 
 	s.logger.Info("处理 C2C 消息",
 		zap.String("from_user_id", fromUserID),
@@ -91,7 +97,7 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 	}
 
 	// 3. 生成服务器消息ID（对标 Java 雪花算法）
-	serverMsgID := s.generateMessageID()
+	serverMsgID := util.GenerateMessageID()
 	sendReq.MsgId = serverMsgID
 
 	// 4. 发送到 RocketMQ（对标 Java c2CMsgProvider.sendC2CMsg()）
@@ -100,7 +106,9 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 	// - 更新会话记录
 	// - 消息审核、敏感词过滤
 	// - 消息统计、分析
-	chatID := s.generateChatID(fromUserID, toUserID)
+	// ✅ 生成会话ID（对标 Java ChatIdUtils.buildC2CChatId）
+	// 格式：{bizType}-{chatType}-{smallerUserId}-{largerUserId}，例如：100-1-111-222
+	chatID := util.GenerateChatID(fromUserID, toUserID)
 	msgEvent := &mq.C2CMsgEvent{
 		ClientMsgID:   clientMsgID,
 		MsgID:         fmt.Sprintf("%d", serverMsgID),
@@ -168,7 +176,28 @@ func (s *C2CMsgSendStrategy) Exchange(conn channel.Connection, protoRequest *pb.
 			s.logger.Debug("消息已推送给在线用户",
 				zap.String("to_user_id", toUserID),
 			)
-			// TODO: 添加到重试队列，等待客户端 ACK（对标 Java c2CMsgRetryService.addToRetryQueue）
+			// ✅ 添加到重试队列，等待客户端 ACK（对标 Java c2CMsgRetryService.addToRetryQueue）
+			if s.retryService != nil {
+				retryEvent := &service.C2CMsgRetryEvent{
+					ClientMsgID:   clientMsgID,
+					MsgID:         msgEvent.MsgID,
+					FromUserID:    fromUserID,
+					ToUserID:      toUserID,
+					ChatID:        chatID,
+					RetryCount:    0,
+					MsgContent:    sendReq.Content,
+					MsgFormat:     sendReq.Format,
+					MsgCreateTime: msgEvent.MsgCreateTime,
+					MaxRetries:    3,
+					CreateTime:    time.Now().Format("2006-01-02 15:04:05"),
+				}
+				if err := s.retryService.AddToRetryQueue(context.Background(), retryEvent); err != nil {
+					s.logger.Error("添加到重试队列失败",
+						zap.String("msg_id", msgEvent.MsgID),
+						zap.Error(err),
+					)
+				}
+			}
 		}
 
 	} else if !receiveUserData.HasLocalChannel && receiveUserData.UserStatus == "5" && receiveUserData.RouteAddress != "" {
@@ -289,9 +318,14 @@ func (s *C2CMsgSendStrategy) getReceiveUserData(userID string) (*ReceiveUserData
 	// 2. 从 Redis 查询用户状态和路由信息
 	ctx := context.Background()
 
-	// 2.1 查询用户状态（对标 Java LOGIN_STATUS_PREFIX）
-	userStatusKey := "userLogin:status:" + userID
-	userStatus, err := s.redisClient.Get(ctx, userStatusKey)
+	// Redis Key 常量（对标 Java ImConstant.RedisKeyConstant）
+	// 注意：Java 用的是 Hash 结构，key 是 "userLogin:status:"，field 是 userID
+	statusKey := "userLogin:status:" // LOGIN_STATUS_PREFIX
+	routeKey := "userLogin:server:"  // ROUTE_PREFIX
+
+	// 2.1 查询用户状态（对标 Java redissonUtils.getHash(LOGIN_STATUS_PREFIX, toUserId)）
+	// ✅ 修复：使用 HGET 而不是 GET
+	userStatus, err := s.redisClient.HGet(ctx, statusKey, userID)
 	if err != nil {
 		if err.Error() != "redis: nil" {
 			s.logger.Warn("从 Redis 查询用户状态失败",
@@ -305,11 +339,11 @@ func (s *C2CMsgSendStrategy) getReceiveUserData(userID string) (*ReceiveUserData
 		data.UserStatus = userStatus
 	}
 
-	// 2.2 如果用户在线，查询路由信息（对标 Java ROUTE_PREFIX）
+	// 2.2 如果用户在线，查询路由信息（对标 Java redissonUtils.getHash(ROUTE_PREFIX, toUserId)）
 	// 注意：在线状态是 "5"（对标 Java UserStatus.ON_LINE = 5）
 	if data.UserStatus == "5" {
-		userRouteKey := "userLogin:server:" + userID
-		routeAddress, err := s.redisClient.Get(ctx, userRouteKey)
+		// ✅ 修复：使用 HGET 而不是 GET
+		routeAddress, err := s.redisClient.HGet(ctx, routeKey, userID)
 		if err != nil {
 			if err.Error() != "redis: nil" {
 				s.logger.Warn("从 Redis 查询路由信息失败",
@@ -355,21 +389,16 @@ func (s *C2CMsgSendStrategy) validateC2CMessage(sendReq *pb.C2CSendReq) error {
 	return nil
 }
 
-// generateMessageID 生成服务器消息ID（简化版雪花算法）
+// generateMessageID 生成服务器消息ID（使用雪花算法）
+// 已迁移到 util.GenerateMessageID()，保留此方法作为兼容
 func (s *C2CMsgSendStrategy) generateMessageID() uint64 {
-	// TODO: 实现完整的雪花算法
-	// 这里使用简化版本：时间戳 + 随机数
-	return uint64(time.Now().UnixNano() / 1000000) // 毫秒时间戳
+	return util.GenerateMessageID()
 }
 
 // generateChatID 生成会话ID（对标 Java ChatIdUtils.buildC2CChatId）
+// 已迁移到 util.GenerateChatID()，保留此方法作为兼容
 func (s *C2CMsgSendStrategy) generateChatID(fromUserID, toUserID string) string {
-	// 简化版：from_to 格式
-	// TODO: 可以改为与 Java 版本一致的算法
-	if fromUserID < toUserID {
-		return fmt.Sprintf("%s_%s", fromUserID, toUserID)
-	}
-	return fmt.Sprintf("%s_%s", toUserID, fromUserID)
+	return util.GenerateChatID(fromUserID, toUserID)
 }
 
 // sendOfflineMsgToMQ 发送离线消息到 RocketMQ（对标 Java c2CMsgProvider.offLineMsg()）
@@ -456,13 +485,21 @@ func (s *C2CMsgSendStrategy) pushMessageToUser(userID string, sendReq *pb.C2CSen
 }
 
 // sendServerAck 发送服务器确认（对标 Java ServerAck）
+// ✅ 修复：使用 C2C_ACK 类型 + status=1，与 Java 客户端期望一致
 func (s *C2CMsgSendStrategy) sendServerAck(conn channel.Connection, sendReq *pb.C2CSendReq, success bool) error {
-	// 构建服务器确认消息
-	ack := &pb.ServerAck{
+	// 构建服务器确认消息（使用 C2CAckReq，status=1 表示服务端已接收）
+	// 对标 Java 客户端 InteractiveClientHandler.handleClientAck()
+	statusValue := int32(1) // 1 = SERVER_RECEIVED
+	if !success {
+		statusValue = 0 // 0 = 失败
+	}
+
+	ack := &pb.C2CAckReq{
 		ClientMsgId: sendReq.ClientMsgId,
 		MsgId:       sendReq.MsgId,
-		Success:     success,
-		Timestamp:   uint64(time.Now().UnixMilli()),
+		From:        sendReq.To,   // 服务器ACK：from 是接收方
+		To:          sendReq.From, // to 是发送方
+		Status:      statusValue,
 	}
 
 	// 序列化确认消息
@@ -471,9 +508,9 @@ func (s *C2CMsgSendStrategy) sendServerAck(conn channel.Connection, sendReq *pb.
 		return fmt.Errorf("序列化服务器确认失败: %w", err)
 	}
 
-	// 构建响应
+	// 构建响应（使用 C2C_ACK 类型，不是 SERVER_ACK）
 	response := &pb.ImProtoResponse{
-		Type:    pb.MsgType_SERVER_ACK,
+		Type:    pb.MsgType_C2C_ACK, // ✅ 修复：使用 C2C_ACK（Java 客户端能识别）
 		Payload: ackPayload,
 		Code:    pb.ProtoResponseCode_SUCCESS,
 	}

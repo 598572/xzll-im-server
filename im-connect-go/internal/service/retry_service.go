@@ -9,6 +9,7 @@ import (
 
 	"im-connect-go/internal/channel"
 	pb "im-connect-go/internal/proto"
+	"im-connect-go/internal/util"
 	"im-connect-go/pkg/redis"
 
 	"go.uber.org/zap"
@@ -368,8 +369,9 @@ func (s *C2CMsgRetryService) processRetryBatch(ctx context.Context, toUserID str
 // sendRetryMessage 发送重试消息
 func (s *C2CMsgRetryService) sendRetryMessage(ctx context.Context, conn channel.Connection, event *C2CMsgRetryEvent) error {
 	// 构建推送消息
+	// ✅ 修复：使用 UUIDStringToBytes 转换成 16 字节（对标 Java ProtoConverterUtil.uuidStringToBytes）
 	pushMsg := &pb.C2CMsgPush{
-		ClientMsgId: []byte(event.ClientMsgID),
+		ClientMsgId: util.UUIDStringToBytes(event.ClientMsgID),
 		MsgId:       parseUint64(event.MsgID),
 		From:        parseUint64(event.FromUserID),
 		To:          parseUint64(event.ToUserID),

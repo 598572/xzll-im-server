@@ -6,8 +6,10 @@ import (
 	"net"
 	"time"
 
+	"im-connect-go/internal/channel"
 	"im-connect-go/internal/config"
-	"im-connect-go/internal/handler"
+	pb "im-connect-go/internal/proto"
+	"im-connect-go/internal/strategy"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -16,12 +18,14 @@ import (
 )
 
 // GrpcServer gRPC 服务器（对标 Java MessageServiceGrpcImpl）
-// 功能：跨服务器消息转发
+// 功能：跨服务器消息转发、好友请求推送等
 type GrpcServer struct {
 	config         *config.Config
 	logger         *zap.Logger
 	server         *grpc.Server
-	messageHandler *handler.MessageHandler
+	channelManager *channel.NbioManager
+	c2cStrategy    *strategy.C2CMsgSendStrategy
+	serviceImpl    *MessageServiceImpl
 	listener       net.Listener
 }
 
@@ -73,9 +77,16 @@ func NewGrpcServer(cfg *config.Config, logger *zap.Logger) (*GrpcServer, error) 
 	return grpcServer, nil
 }
 
-// SetMessageHandler 设置消息处理器
-func (s *GrpcServer) SetMessageHandler(messageHandler *handler.MessageHandler) {
-	s.messageHandler = messageHandler
+// SetDependencies 设置依赖（连接管理器和C2C策略）
+func (s *GrpcServer) SetDependencies(channelManager *channel.NbioManager, c2cStrategy *strategy.C2CMsgSendStrategy) {
+	s.channelManager = channelManager
+	s.c2cStrategy = c2cStrategy
+
+	// 创建并注册 gRPC 服务实现
+	s.serviceImpl = NewMessageServiceImpl(s.logger, channelManager, c2cStrategy)
+	pb.RegisterMessageServiceServer(s.server, s.serviceImpl)
+
+	s.logger.Info("✅ gRPC 服务实现已注册")
 }
 
 // Start 启动 gRPC 服务器
@@ -109,14 +120,3 @@ func (s *GrpcServer) Shutdown() {
 		s.logger.Info("✅ gRPC 服务器已关闭")
 	}
 }
-
-// TODO: 完整的 gRPC 服务实现需要：
-// 1. 安装 protoc-gen-go-grpc 插件
-// 2. 重新生成 gRPC 服务代码
-// 3. 实现以下接口方法：
-//    - ResponseServerAck2Client
-//    - ResponseClientAck2Client
-//    - SendWithdrawMsg2Client
-//    - PushFriendRequest2Client
-//    - PushFriendResponse2Client
-//    - TransferC2CMsg

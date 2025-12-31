@@ -7,6 +7,7 @@ import (
 	"im-connect-go/internal/channel"
 	"im-connect-go/internal/config"
 	pb "im-connect-go/internal/proto"
+	"im-connect-go/internal/service"
 	"im-connect-go/internal/strategy"
 	"im-connect-go/pkg/mq"
 	"im-connect-go/pkg/redis"
@@ -23,17 +24,19 @@ type MessageHandler struct {
 	channelManager *channel.NbioManager
 	mqProducer     *mq.Producer
 	redisClient    *redis.RedisClient
+	retryService   *service.C2CMsgRetryService // 消息重试服务
 	strategies     map[pb.MsgType]strategy.ProtoMsgHandlerStrategy
 }
 
 // NewMessageHandler 创建消息处理器
-func NewMessageHandler(cfg *config.Config, logger *zap.Logger, channelManager *channel.NbioManager, mqProducer *mq.Producer, redisClient *redis.RedisClient) *MessageHandler {
+func NewMessageHandler(cfg *config.Config, logger *zap.Logger, channelManager *channel.NbioManager, mqProducer *mq.Producer, redisClient *redis.RedisClient, retryService *service.C2CMsgRetryService) *MessageHandler {
 	handler := &MessageHandler{
 		config:         cfg,
 		logger:         logger,
 		channelManager: channelManager,
 		mqProducer:     mqProducer,
 		redisClient:    redisClient,
+		retryService:   retryService,
 		strategies:     make(map[pb.MsgType]strategy.ProtoMsgHandlerStrategy),
 	}
 	handler.registerStrategies()
@@ -44,11 +47,12 @@ func NewMessageHandler(cfg *config.Config, logger *zap.Logger, channelManager *c
 // registerStrategies 注册消息处理策略
 func (h *MessageHandler) registerStrategies() {
 	// 使用 nbio 的 channelManager
-	c2cSendStrategy := strategy.NewC2CMsgSendStrategy(h.config, h.logger, h.channelManager, h.mqProducer, h.redisClient)
+	c2cSendStrategy := strategy.NewC2CMsgSendStrategy(h.config, h.logger, h.channelManager, h.mqProducer, h.redisClient, h.retryService)
 	h.strategies[pb.MsgType_C2C_SEND] = c2cSendStrategy
 
-	c2cAckStrategy := strategy.NewC2CMsgAckStrategy(h.config, h.logger, h.channelManager)
-	h.strategies[pb.MsgType_CLIENT_RECEIVED_MSG_ACK] = c2cAckStrategy
+	c2cAckStrategy := strategy.NewC2CMsgAckStrategy(h.config, h.logger, h.channelManager, h.retryService)
+	// ✅ 修复：使用 C2C_ACK 作为 key（对标 Java MsgType.C2C_ACK）
+	h.strategies[pb.MsgType_C2C_ACK] = c2cAckStrategy
 
 	withdrawStrategy := strategy.NewWithdrawMsgStrategy(h.config, h.logger, h.channelManager)
 	h.strategies[pb.MsgType_WITHDRAW_MSG_SEND] = withdrawStrategy

@@ -13,6 +13,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// messageTaskPool 对象池（对标 Netty PooledByteBufAllocator）
+// 复用 MessageTask 对象，减少 GC 压力
+var messageTaskPool = sync.Pool{
+	New: func() interface{} {
+		return &MessageTask{}
+	},
+}
+
 // AsyncMessageHandler 异步消息处理器
 // 对标 Java 的 ThreadPoolTaskExecutor 处理方式
 type AsyncMessageHandler struct {
@@ -112,12 +120,13 @@ func NewAsyncMessageHandler(
 
 // Submit 提交消息处理任务
 func (h *AsyncMessageHandler) Submit(userID string, conn channel.Connection, message []byte) bool {
-	task := &MessageTask{
-		UserID:     userID,
-		Connection: conn,
-		Message:    message,
-		Timestamp:  time.Now(),
-	}
+	// ✅ 从对象池获取（对标 Netty ctx.alloc().buffer()）
+	task := messageTaskPool.Get().(*MessageTask)
+	task.UserID = userID
+	task.Connection = conn
+	task.Message = message
+	task.Timestamp = time.Now()
+	task.RetryCount = 0
 
 	select {
 	case h.queue <- task:
@@ -143,6 +152,9 @@ func (h *AsyncMessageHandler) Submit(userID string, conn channel.Connection, mes
 			zap.Int("max_queue_size", h.queueSize),
 		)
 		atomic.AddInt64(&h.droppedCount, 1)
+
+		// ✅ 归还到池（对标 Netty ReferenceCountUtil.release()）
+		messageTaskPool.Put(task)
 
 		// 记录监控指标
 		if h.metricsClient != nil {
@@ -190,6 +202,9 @@ func (w *MessageWorker) run(wg *sync.WaitGroup, handler *AsyncMessageHandler) {
 
 		// 累计处理时间
 		atomic.AddInt64(&handler.processingTime, time.Since(startTime).Nanoseconds())
+
+		// ✅ 归还到池（对标 Netty ReferenceCountUtil.release()）
+		messageTaskPool.Put(task)
 	}
 }
 

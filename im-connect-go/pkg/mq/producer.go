@@ -20,10 +20,12 @@ const (
 
 // ClusterEventType 事件类型常量（对应 Java 的 ImConstant.ClusterEventTypeConstant）
 const (
-	ClusterEventType_C2C_SEND_MSG            = "C2C_SEND_MSG"            // 单聊消息发送
-	ClusterEventType_C2C_OFF_LINE_MSG        = "C2C_OFF_LINE_MSG"        // 离线消息
-	ClusterEventType_C2C_CLIENT_RECEIVED_ACK = "C2C_CLIENT_RECEIVED_ACK" // 客户端ACK
-	ClusterEventType_C2C_WITHDRAW_MSG        = "C2C_WITHDRAW_MSG"        // 撤回消息
+	ClusterEventType_C2C_SEND_MSG            = "C2C_SEND_MSG"               // 单聊消息发送
+	ClusterEventType_C2C_OFF_LINE_MSG        = "C2C_OFF_LINE_MSG"           // 离线消息
+	ClusterEventType_C2C_CLIENT_RECEIVED_ACK = "C2C_CLIENT_RECEIVED_ACK"    // 客户端ACK
+	ClusterEventType_C2C_WITHDRAW_MSG        = "C2C_WITHDRAW_MSG"           // 撤回消息
+	ClusterEventType_FRIEND_REQUEST_PUSH     = "FRIEND_REQUEST_PUSH"        // 好友申请推送
+	ClusterEventType_FRIEND_REQUEST_HANDLE   = "FRIEND_REQUEST_HANDLE_PUSH" // 好友申请处理结果推送
 )
 
 // Producer RocketMQ 生产者
@@ -123,6 +125,20 @@ type C2CReceivedMsgAckEvent struct {
 	AckTime     int64  `json:"ackTime"`     // ACK时间
 }
 
+// FriendRequestPushEvent 好友申请推送事件（对应 Java 的 FriendRequestPushAO）
+type FriendRequestPushEvent struct {
+	RequestID      string `json:"requestId"`      // 申请ID
+	FromUserID     string `json:"fromUserId"`     // 申请人用户ID
+	ToUserID       string `json:"toUserId"`       // 被申请人用户ID
+	FromUserName   string `json:"fromUserName"`   // 申请人昵称
+	FromUserAvatar string `json:"fromUserAvatar"` // 申请人头像
+	RequestMessage string `json:"requestMessage"` // 申请消息
+	Status         int32  `json:"status"`         // 状态：0-待处理 1-已同意 2-已拒绝
+	CreateTime     int64  `json:"createTime"`     // 创建时间
+	PushTitle      string `json:"pushTitle"`      // 推送标题
+	PushContent    string `json:"pushContent"`    // 推送内容
+}
+
 // SendC2CMsg 发送单聊消息事件（对应 Java 的 C2CMsgProvider.sendC2CMsg()）
 func (p *Producer) SendC2CMsg(event *C2CMsgEvent) error {
 	// 1. 序列化消息数据
@@ -175,6 +191,42 @@ func (p *Producer) SendClientReceivedAck(event *C2CReceivedMsgAckEvent) error {
 
 	// 3. 发送到 RocketMQ
 	return p.sendClusterEvent(C2C_MSG_TOPIC, clusterEvent, event.MsgID, "C2C_ACK")
+}
+
+// SendFriendRequestPush 发送好友申请推送消息（对应 Java 的 FriendRequestPushProvider.sendFriendRequestPush()）
+func (p *Producer) SendFriendRequestPush(event *FriendRequestPushEvent) error {
+	// 1. 序列化消息数据
+	dataJSON, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("序列化好友申请失败: %w", err)
+	}
+
+	// 2. 构建 ClusterEvent
+	clusterEvent := &ClusterEvent{
+		ClusterEventType: ClusterEventType_FRIEND_REQUEST_PUSH,
+		Data:             string(dataJSON),
+	}
+
+	// 3. 发送到 RocketMQ
+	return p.sendClusterEvent(C2C_MSG_TOPIC, clusterEvent, event.RequestID, "FRIEND_REQUEST")
+}
+
+// SendFriendRequestHandlePush 发送好友申请处理结果推送消息（对应 Java 的 FriendRequestPushProvider.sendFriendRequestHandlePush()）
+func (p *Producer) SendFriendRequestHandlePush(event *FriendRequestPushEvent) error {
+	// 1. 序列化消息数据
+	dataJSON, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("序列化好友申请处理结果失败: %w", err)
+	}
+
+	// 2. 构建 ClusterEvent
+	clusterEvent := &ClusterEvent{
+		ClusterEventType: ClusterEventType_FRIEND_REQUEST_HANDLE,
+		Data:             string(dataJSON),
+	}
+
+	// 3. 发送到 RocketMQ
+	return p.sendClusterEvent(C2C_MSG_TOPIC, clusterEvent, event.RequestID, "FRIEND_REQUEST_HANDLE")
 }
 
 // sendClusterEvent 发送集群事件到 RocketMQ（对应 Java 的 RocketMqProducerWrap.sendClusterEvent()）
