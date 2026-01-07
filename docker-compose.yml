@@ -135,11 +135,11 @@ services:
           memory: 6G
     # =========================================================
     environment:
-      # JVM 高性能参数（百万连接 + 高QPS 优化）
+      # JVM 高性能参数（百万连接 + 高QPS 优化）- JDK 21 版本
       # 内存：堆4G + 直接内存2G（Netty零拷贝）
-      # GC：ZGC低延迟（<1ms停顿）注：ZGenerational需要Java21+，已移除
-      # 吞吐优化：JIT编译优化 + 大页内存 + 偏向锁禁用
-      - JAVA_OPTS=-Xms4g -Xmx4g -XX:MaxDirectMemorySize=2g -XX:+UseZGC -Xss512k -XX:+AlwaysPreTouch -XX:-UseBiasedLocking -XX:+UseStringDeduplication -XX:ConcGCThreads=4 -XX:ParallelGCThreads=8 -XX:+PerfDisableSharedMem -Djdk.nio.maxCachedBufferSize=262144 -Dio.netty.leakDetection.level=disabled -Dio.netty.allocator.type=pooled -Dio.netty.allocator.numHeapArenas=16 -Dio.netty.allocator.numDirectArenas=16 -Dio.netty.recycler.maxCapacityPerThread=4096 -Dio.netty.eventLoopThreads=0
+      # GC：ZGC低延迟（<1ms停顿）
+      # 注：JDK 21 已移除 UseBiasedLocking 参数
+      - JAVA_OPTS=-Xms4g -Xmx4g -XX:MaxDirectMemorySize=2g -XX:+UseZGC -Xss512k -XX:+AlwaysPreTouch -XX:+UseStringDeduplication -XX:ConcGCThreads=4 -XX:ParallelGCThreads=8 -XX:+PerfDisableSharedMem -Djdk.nio.maxCachedBufferSize=262144 -Dio.netty.leakDetection.level=disabled -Dio.netty.allocator.type=pooled -Dio.netty.allocator.numHeapArenas=16 -Dio.netty.allocator.numDirectArenas=16 -Dio.netty.recycler.maxCapacityPerThread=4096 -Dio.netty.eventLoopThreads=0
 
   im-console:
     build:
