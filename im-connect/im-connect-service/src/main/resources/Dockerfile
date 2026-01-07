@@ -1,6 +1,6 @@
 # connect的 Dockerfile 内容（百万连接优化版）
 # jdk镜像
-FROM openjdk:21-jdk
+FROM eclipse-temurin:21-jdk
 # 挂载
 VOLUME /tmp
 COPY im-connect-service.jar im-connect-service.jar

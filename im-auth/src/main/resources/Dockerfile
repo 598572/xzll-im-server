@@ -1,6 +1,6 @@
 # business 的  Dockerfile 内容
 # jdk镜像
-FROM openjdk:21-jdk
+FROM eclipse-temurin:21-jdk
 # 挂载
 VOLUME /tmp
 
