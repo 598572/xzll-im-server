@@ -13,7 +13,7 @@ import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import com.xzll.business.config.MinioConfig;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;

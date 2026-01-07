@@ -115,11 +115,10 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!---此处需要指定版本为5.7.0 否则报错：Caused by: java.lang.ClassNotFoundException: org.springframework.security.oauth2.core.ClaimAccessor-->
+        <!--Spring Boot 3.x / Spring Security 6.x 不再需要固定版本，父pom统一管理-->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-oauth2-core</artifactId>
-            <version>5.7.0</version>
         </dependency>
 
         <!--添加 Micrometer Prometheus 依赖，以便将指标导出到 Prometheus-->
@@ -130,14 +129,8 @@
 
 
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-        </dependency>
-
-        <!-- 添加Gson依赖，解决Dubbo升级后（3.0.7升级到3.2）Gson依赖丢失问题 -->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
 

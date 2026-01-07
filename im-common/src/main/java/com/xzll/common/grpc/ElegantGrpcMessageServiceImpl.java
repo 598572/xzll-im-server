@@ -5,7 +5,7 @@ import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.grpc.MessageServiceGrpc;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 

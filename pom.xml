@@ -6,7 +6,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <!--        <version>2.1.13.RELEASE</version>-->
-        <version>2.7.0</version>
+        <version>3.3.7</version>
         <relativePath/>
     </parent>
     <packaging>pom</packaging>
@@ -29,7 +29,7 @@
 
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
 
         <!--老版本-->
         <!--        <spring.cloud.version>Greenwich.SR6</spring.cloud.version>-->
@@ -38,37 +38,38 @@
         <!--        <dubbo.version>2.7.13</dubbo.version>-->
         <!--        <netty.version>4.1.21.Final</netty.version> -->
 
-        <!--升级后的新版本-->
-        <spring.cloud.version>2021.0.3</spring.cloud.version>
-        <alibaba.cloud.version>2021.0.1.0</alibaba.cloud.version>
-        <springboot.version>2.7.0</springboot.version>
+        <!--升级后的新版本 - Spring Boot 3.3.x + JDK 21-->
+        <spring.cloud.version>2023.0.4</spring.cloud.version>
+        <alibaba.cloud.version>2023.0.1.2</alibaba.cloud.version>
+        <springboot.version>3.3.7</springboot.version>
 
-        <grpc.version>1.58.0</grpc.version>
-        <protobuf.version>3.25.1</protobuf.version>
-        <grpc.version>1.58.0</grpc.version>
-        <protobuf.version>3.25.1</protobuf.version>
-        <curator.version>4.3.0</curator.version>
-        <netty.version>4.1.75.Final</netty.version>
+        <grpc.version>1.62.2</grpc.version>
+        <protobuf.version>3.25.3</protobuf.version>
+        <curator.version>5.6.0</curator.version>
+        <netty.version>4.1.108.Final</netty.version>
 
         <!--暂时不用新版本es客户端-->
         <!--        <elasticsearch.java.client.version>7.17.5</elasticsearch.java.client.version>-->
 
         <xzll.im.version>0.0.1-SNAPSHOT</xzll.im.version>
-        <fastjson.version>1.2.46</fastjson.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <redisson.version>3.14.0</redisson.version>
-        <mapstruct.version>1.4.2.Final</mapstruct.version>
-        <mapstruct.extensions.spring.version>0.1.1</mapstruct.extensions.spring.version>
+        <fastjson.version>2.0.47</fastjson.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <redisson.version>3.27.2</redisson.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <mapstruct.extensions.spring.version>1.1.1</mapstruct.extensions.spring.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <nacos.group.name>xzll-im</nacos.group.name>
 
-        <druid..version>1.2.8</druid..version>
-        <shardingsphere.version>5.2.1</shardingsphere.version>
+        <druid.version>1.2.21</druid.version>
+        <shardingsphere.version>5.4.1</shardingsphere.version>
 
-
-        <spring-cloud-starter-oauth2.version>2.2.5.RELEASE</spring-cloud-starter-oauth2.version>
-        <nimbus-jose-jwt.version>9.23</nimbus-jose-jwt.version>
+        <!-- Spring Boot 3.x 使用 Spring Authorization Server 替代 spring-cloud-starter-oauth2 -->
+        <spring-authorization-server.version>1.2.2</spring-authorization-server.version>
+        <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
+        
+        <!-- Jakarta EE 依赖版本 -->
+        <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
 
         <!--prometheus抓取依赖的jar版本，注：无需指定版本，spring-boot-starter-parent 父项目中已经定义了。 -->
 <!--        <prometheus-client.version>0.16.0</prometheus-client.version>-->
@@ -128,7 +129,7 @@
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-starter-bootstrap</artifactId>
-                <version>3.0.0</version>
+                <version>4.1.4</version>
             </dependency>
 
 
@@ -141,20 +142,20 @@
 
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
-                <version>3.5.0</version>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+                <version>3.5.5</version>
             </dependency>
 
             <dependency>
-                <groupId>mysql</groupId>
-                <artifactId>mysql-connector-java</artifactId>
-                <version>8.0.23</version>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>8.3.0</version>
             </dependency>
 
             <dependency>
                 <groupId>com.alibaba</groupId>
-                <artifactId>druid</artifactId>
-                <version>${druid..version}</version>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <version>${druid.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.shardingsphere</groupId>
@@ -165,14 +166,14 @@
             <dependency>
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
-                <version>1.33</version>
+                <version>2.2</version>
             </dependency>
 
             <!--The dependencies of some of the beans in the application context form a cycle: | com.github.pagehelper.autoconfigure.PageHelperAutoConfiguration-->
             <dependency>
                 <groupId>com.github.pagehelper</groupId>
                 <artifactId>pagehelper-spring-boot-starter</artifactId>
-                <version>1.4.1</version>
+                <version>2.1.0</version>
             </dependency>
 
             <dependency>
@@ -275,9 +276,28 @@
                 <version>${grpc.version}</version>
             </dependency>
             <dependency>
-                <groupId>javax.annotation</groupId>
-                <artifactId>javax.annotation-api</artifactId>
-                <version>1.3.2</version>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>${jakarta.annotation.version}</version>
+            </dependency>
+
+            <!-- Dropwizard Metrics for JVM monitoring -->
+            <dependency>
+                <groupId>io.dropwizard.metrics</groupId>
+                <artifactId>metrics-core</artifactId>
+                <version>4.2.25</version>
+            </dependency>
+            <dependency>
+                <groupId>io.dropwizard.metrics</groupId>
+                <artifactId>metrics-jvm</artifactId>
+                <version>4.2.25</version>
+            </dependency>
+
+            <!-- Elasticsearch Rest High Level Client (deprecated but still usable) -->
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-high-level-client</artifactId>
+                <version>7.17.18</version>
             </dependency>
 
             <!--此客户端较新，暂时不使用 先试用elasticsearch-rest-high-level-client  因为 elasticsearch-rest-high-level-client 更稳定 虽然他标识为 ：已过时的 -->
@@ -306,15 +326,14 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <optional>true</optional>
-                <!--之前是1.18.0 编译时将报错： java.lang.ExceptionInInitializerError: Unable to make field private com.sun.tools.javac.processing.JavacProcessingEnvironment$DiscoveredProcessors com.sun.tools.javac.processing.JavacProcessingEnvironment.discoveredProcs accessible: module jdk.compiler does not "opens com.sun.tools.javac.processing" -->
-                <!--解决此报错的方法就是 升级lombook版本为 1.18.20-->
-                <version>1.18.20</version>
+                <!--Spring Boot 3.x + JDK 21 需要使用更新版本的lombok-->
+                <version>1.18.30</version>
             </dependency>
 
             <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
-                <version>5.6.6</version>
+                <version>5.8.25</version>
             </dependency>
 
             <dependency>
@@ -366,12 +385,12 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>27.0.1-jre</version>
+                <version>33.0.0-jre</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>fastjson</artifactId>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
                 <version>${fastjson.version}</version>
             </dependency>
 
@@ -538,7 +557,7 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
-                    <!-- JDK 17 兼容性配置 -->
+                    <!-- JDK 21 兼容性配置 -->
                     <compilerArgs>
                         <arg>--add-opens</arg>
                         <arg>java.base/java.nio=ALL-UNNAMED</arg>
@@ -546,6 +565,7 @@
                         <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
                         <arg>--add-opens</arg>
                         <arg>java.base/java.lang=ALL-UNNAMED</arg>
+                        <arg>--enable-preview</arg>
                     </compilerArgs>
                     <!--指定注解处理器的路径和依赖项, 告诉  编译器插件应该使用哪些注解处理器来生成代码 或  执行其他编译时的任务-->
                     <annotationProcessorPaths>

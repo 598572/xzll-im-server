@@ -21,7 +21,7 @@ import java.lang.management.ManagementFactory;
 
 
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 
 /**

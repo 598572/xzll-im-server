@@ -43,9 +43,8 @@
             <version>${grpc.version}</version>
         </dependency>
         <dependency>
-            <groupId>javax.annotation</groupId>
-            <artifactId>javax.annotation-api</artifactId>
-            <version>1.3.2</version>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
         </dependency>
 
         <dependency>
@@ -70,23 +69,23 @@
 
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
         </dependency>
-        <!--数据库连接池使用druid-->
+        <!--数据库连接池使用druid - Spring Boot 3.x版本-->
         <dependency>
             <groupId>com.alibaba</groupId>
-            <artifactId>druid</artifactId>
+            <artifactId>druid-spring-boot-3-starter</artifactId>
         </dependency>
         <!--使用ShardingSphere来分库分表-->
-        <dependency>
-            <groupId>org.apache.shardingsphere</groupId>
-            <artifactId>shardingsphere-jdbc-core-spring-boot-starter</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.shardingsphere</groupId>-->
+<!--            <artifactId>shardingsphere-jdbc-core-spring-boot-starter</artifactId>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.yaml</groupId>
@@ -223,15 +222,15 @@
                     <!-- 指定该Main Class为全局的唯一入口 -->
                     <mainClass>com.xzll.business.IMBusinessServiceApplication</mainClass>
                     <layout>ZIP</layout>
-                    <!-- JDK 17 兼容性 JVM 参数 -->
+                    <!-- JDK 21 兼容性 JVM 参数 -->
                     <jvmArguments>
                         --add-opens java.base/java.nio=ALL-UNNAMED
                         --add-opens java.base/sun.nio.ch=ALL-UNNAMED
                         --add-opens java.base/java.lang=ALL-UNNAMED
                         --add-opens java.base/java.lang.reflect=ALL-UNNAMED
-                        --add-opens java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
                         --add-opens java.base/jdk.internal.misc=ALL-UNNAMED
                         --add-opens java.base/java.time=ALL-UNNAMED
+                        --enable-preview
                     </jvmArguments>
                 </configuration>
             </plugin>

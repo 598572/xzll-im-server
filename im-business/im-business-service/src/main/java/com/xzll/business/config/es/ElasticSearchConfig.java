@@ -1,23 +1,25 @@
 package com.xzll.business.config.es;
 
-
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
 import com.xzll.business.config.nacos.ElasticSearchNacosConfig;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestHighLevelClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 
-
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 /**
  * @Author: hzz
  * @Date: 2024/6/16 14:08:54
- * @Description: es配置 本项目使用 es版本 7.17.5
+ * @Description: ES配置类（Spring Boot 3.x + Spring Data Elasticsearch 5.x）
+ * 使用新的 ElasticsearchClient 替代已废弃的 RestHighLevelClient
  */
 @Configuration
 public class ElasticSearchConfig {
@@ -26,34 +28,60 @@ public class ElasticSearchConfig {
     private ElasticSearchNacosConfig elasticSearchNacosConfig;
 
     /**
-     * es 集群配置
+     * 创建 RestClient（低级别客户端）
      *
-     * @return
+     * @return RestClient
      */
-    @Bean("restHighLevelClient")
+    @Bean("restClient")
     @Primary
     @DependsOn("elasticSearchNacosConfig")
-    public RestHighLevelClient client() {
+    public RestClient restClient() {
         HttpHost[] hosts = elasticSearchNacosConfig.getUris().stream()
                 .map(this::createHttpHost)
                 .toArray(HttpHost[]::new);
-        return new RestHighLevelClient(RestClient.builder(hosts));
+        return RestClient.builder(hosts).build();
     }
 
+    /**
+     * 创建 HttpHost
+     */
     private HttpHost createHttpHost(String uri) {
         return HttpHost.create(uri);
     }
 
     /**
-     * 虽 RestHighLevelClient被标记为过时， 但是为了稳定可靠 这里任然使用他，待到有新的 被广泛验证的客户端出现时 再修改。
+     * 创建 ElasticsearchTransport
      *
-     * @return
+     * @return ElasticsearchTransport
      */
     @Bean
-    @DependsOn(value = "restHighLevelClient")
-    @Primary
-    public ElasticsearchRestTemplate elasticsearchRestTemplate() {
-        return new ElasticsearchRestTemplate(client());
+    @DependsOn("restClient")
+    public ElasticsearchTransport elasticsearchTransport() {
+        return new RestClientTransport(restClient(), new JacksonJsonpMapper());
     }
 
+    /**
+     * 创建 ElasticsearchClient（新版ES Java客户端）
+     *
+     * @return ElasticsearchClient
+     */
+    @Bean
+    @DependsOn("elasticsearchTransport")
+    @Primary
+    public ElasticsearchClient elasticsearchClient() {
+        return new ElasticsearchClient(elasticsearchTransport());
+    }
+
+    /**
+     * 创建 ElasticsearchTemplate（Spring Data Elasticsearch 5.x）
+     * 替代原来的 ElasticsearchRestTemplate
+     *
+     * @return ElasticsearchTemplate
+     */
+    @Bean
+    @DependsOn("elasticsearchClient")
+    @Primary
+    public ElasticsearchTemplate elasticsearchTemplate() {
+        return new ElasticsearchTemplate(elasticsearchClient());
+    }
 }

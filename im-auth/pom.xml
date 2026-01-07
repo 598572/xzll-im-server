@@ -47,16 +47,12 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!--Spring Boot 3.x 使用 Spring Security 6.x + Spring Authorization Server 替代 spring-cloud-starter-oauth2-->
 		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-oauth2</artifactId>
-			<version>${spring-cloud-starter-oauth2.version}</version>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-authorization-server</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.nimbusds</groupId>
@@ -72,17 +68,17 @@
 
 		<dependency>
 			<groupId>com.baomidou</groupId>
-			<artifactId>mybatis-plus-boot-starter</artifactId>
+			<artifactId>mybatis-plus-spring-boot3-starter</artifactId>
 		</dependency>
 
 		<dependency>
-			<groupId>mysql</groupId>
-			<artifactId>mysql-connector-java</artifactId>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
 		</dependency>
-		<!--数据库连接池使用druid-->
+		<!--数据库连接池使用druid - Spring Boot 3.x版本-->
 		<dependency>
 			<groupId>com.alibaba</groupId>
-			<artifactId>druid</artifactId>
+			<artifactId>druid-spring-boot-3-starter</artifactId>
 		</dependency>
 
 
@@ -98,11 +94,10 @@
 			<scope>test</scope>
 		</dependency>
 		
-		<!-- Redisson -->
+		<!-- Redisson - Spring Boot 3.x兼容版本 -->
 		<dependency>
 			<groupId>org.redisson</groupId>
 			<artifactId>redisson-spring-boot-starter</artifactId>
-			<version>3.17.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -127,7 +122,7 @@
 					<!-- 指定该Main Class为全局的唯一入口 -->
 					<mainClass>com.xzll.auth.IMAuthServiceApplication</mainClass>
 					<layout>ZIP</layout>
-					<!-- JDK 17 兼容性 JVM 参数 -->
+					<!-- JDK 21 兼容性 JVM 参数 -->
 					<jvmArguments>
 						--add-opens java.base/java.nio=ALL-UNNAMED
 						--add-opens java.base/sun.nio.ch=ALL-UNNAMED
@@ -136,13 +131,7 @@
 						--add-opens java.base/jdk.internal.misc=ALL-UNNAMED
 						--add-opens java.base/java.time=ALL-UNNAMED
 						--add-opens java.base/java.security=ALL-UNNAMED
-						--add-opens java.xml/com.sun.org.apache.xerces.internal.jaxp=ALL-UNNAMED
-						--add-opens java.xml/javax.xml.bind=ALL-UNNAMED
-						--add-opens java.xml/com.sun.xml.bind=ALL-UNNAMED
-						--add-opens java.xml/com.sun.xml.bind.v2=ALL-UNNAMED
-						--add-opens java.xml/com.sun.xml.bind.v2.runtime=ALL-UNNAMED
-						--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect=ALL-UNNAMED
-						--add-opens java.xml/com.sun.xml.bind.v2.runtime.reflect.opt=ALL-UNNAMED
+						--enable-preview
 					</jvmArguments>
 				</configuration>
 			</plugin>
