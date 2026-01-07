@@ -68,6 +68,9 @@
         <spring-authorization-server.version>1.2.2</spring-authorization-server.version>
         <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
         
+        <!-- Nacos Client 版本 - 与 Nacos Server 2.0.3 兼容 -->
+        <nacos.client.version>2.1.2</nacos.client.version>
+        
         <!-- Jakarta EE 依赖版本 -->
         <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
 
@@ -103,6 +106,13 @@
                 <version>${alibaba.cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- 显式指定 Nacos Client 版本，解决依赖传递冲突 -->
+            <dependency>
+                <groupId>com.alibaba.nacos</groupId>
+                <artifactId>nacos-client</artifactId>
+                <version>${nacos.client.version}</version>
             </dependency>
 
 
