@@ -63,28 +63,42 @@ public class RedissonConfig {
                 timeout);
 
         Config config = new Config();
-        
+
         // 单机模式配置
-        config.useSingleServer()
+        var serverConfig = config.useSingleServer()
                 .setAddress("redis://" + host + ":" + port)
                 .setDatabase(database)
                 .setConnectionPoolSize(maxActive)
                 .setConnectionMinimumIdleSize(minIdle)
+                // 连接超时
                 .setConnectTimeout(timeout)
-                .setIdleConnectionTimeout(10000)
-                .setRetryAttempts(3)
-                .setRetryInterval(1500)
+                // 命令执行超时（关键！）
+                .setTimeout(timeout)
+                // 空闲连接超时
+                .setIdleConnectionTimeout(30000)
+                // 重试配置
+                .setRetryAttempts(5)
+                .setRetryInterval(2000)
+                // 禁用 ping 连接检测（关键！避免初始化超时）
+                .setPingConnectionInterval(0)
+                // 订阅连接池
+                .setSubscriptionConnectionPoolSize(8)
+                .setSubscriptionConnectionMinimumIdleSize(1)
+                // TCP 优化
                 .setKeepAlive(true)
                 .setTcpNoDelay(true);
         
         // 如果有密码，设置密码
         if (password != null && !password.isEmpty()) {
-            config.useSingleServer().setPassword(password);
+            serverConfig.setPassword(password);
             log.info("Redisson 已设置密码认证");
         } else {
             log.warn("Redisson 未配置密码，如果Redis需要密码认证会导致连接失败！");
         }
         
-        return Redisson.create(config);
+        log.info("正在创建 Redisson 客户端...");
+        RedissonClient client = Redisson.create(config);
+        log.info("Redisson 客户端创建成功！");
+        return client;
     }
 } 
