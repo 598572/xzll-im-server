@@ -1,5 +1,6 @@
 package com.xzll.common.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Primary;
  * 用于配置Redisson客户端
  * 支持3.x (spring.data.redis.*) 配置前缀
  */
+@Slf4j
 @Configuration
 @ConditionalOnExpression("'${spring.data.redis.host:}' != '' or '${spring.redis.host:}' != ''")
 public class RedissonConfig {
@@ -48,6 +50,18 @@ public class RedissonConfig {
     @Primary
     @ConditionalOnMissingBean(RedissonClient.class)
     public RedissonClient redissonClient() {
+        // 打印配置信息用于调试
+        log.info("\n========== Redisson 配置信息 ==========" +
+                "\n  host: {}" +
+                "\n  port: {}" +
+                "\n  database: {}" +
+                "\n  password: {}" +
+                "\n  timeout: {}" +
+                "\n=======================================",
+                host, port, database,
+                (password != null && !password.isEmpty()) ? "******(已配置)" : "(无密码)",
+                timeout);
+
         Config config = new Config();
         
         // 单机模式配置
@@ -66,6 +80,9 @@ public class RedissonConfig {
         // 如果有密码，设置密码
         if (password != null && !password.isEmpty()) {
             config.useSingleServer().setPassword(password);
+            log.info("Redisson 已设置密码认证");
+        } else {
+            log.warn("Redisson 未配置密码，如果Redis需要密码认证会导致连接失败！");
         }
         
         return Redisson.create(config);
