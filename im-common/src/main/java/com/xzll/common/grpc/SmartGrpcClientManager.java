@@ -26,10 +26,33 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class SmartGrpcClientManager {
     
-    @Resource
     private RedissonUtils redissonUtils;
-    @Resource
     private GrpcClientConfig grpcClientConfig;
+    
+    /**
+     * 默认构造函数（用于 Spring @Resource 注入场景，不推荐）
+     */
+    public SmartGrpcClientManager() {
+    }
+    
+    /**
+     * 推荐的构造函数 - 通过构造函数注入依赖，确保依赖不为 null
+     */
+    public SmartGrpcClientManager(RedissonUtils redissonUtils, GrpcClientConfig grpcClientConfig) {
+        this.redissonUtils = redissonUtils;
+        this.grpcClientConfig = grpcClientConfig;
+    }
+    
+    // 为了兼容 @Resource 注入方式，提供 setter
+    @Resource
+    public void setRedissonUtils(RedissonUtils redissonUtils) {
+        this.redissonUtils = redissonUtils;
+    }
+    
+    @Resource
+    public void setGrpcClientConfig(GrpcClientConfig grpcClientConfig) {
+        this.grpcClientConfig = grpcClientConfig;
+    }
     
     // 连接池：key = ip:port, value = 连接信息
     private final Map<String, ChannelInfo> channelPool = new ConcurrentHashMap<>();

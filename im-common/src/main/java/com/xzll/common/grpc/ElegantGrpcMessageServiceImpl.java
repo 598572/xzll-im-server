@@ -17,11 +17,34 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 public class ElegantGrpcMessageServiceImpl implements GrpcMessageService {
 
-    @Resource
     private SmartGrpcClientManager grpcClientManager;
     
-    @Resource
     private GrpcClientConfig grpcClientConfig;
+    
+    /**
+     * 默认构造函数（用于 Spring @Resource 注入场景，不推荐）
+     */
+    public ElegantGrpcMessageServiceImpl() {
+    }
+    
+    /**
+     * 推荐的构造函数 - 通过构造函数注入依赖，确保依赖不为 null
+     */
+    public ElegantGrpcMessageServiceImpl(SmartGrpcClientManager grpcClientManager, GrpcClientConfig grpcClientConfig) {
+        this.grpcClientManager = grpcClientManager;
+        this.grpcClientConfig = grpcClientConfig;
+    }
+    
+    // 为了兼容 @Resource 注入方式，提供 setter
+    @Resource
+    public void setGrpcClientManager(SmartGrpcClientManager grpcClientManager) {
+        this.grpcClientManager = grpcClientManager;
+    }
+    
+    @Resource
+    public void setGrpcClientConfig(GrpcClientConfig grpcClientConfig) {
+        this.grpcClientConfig = grpcClientConfig;
+    }
 
     // 统计信息
     private final AtomicLong totalRequests = new AtomicLong(0);

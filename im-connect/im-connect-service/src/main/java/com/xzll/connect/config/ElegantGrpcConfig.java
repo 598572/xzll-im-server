@@ -12,6 +12,7 @@ import lombok.Data;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import jakarta.annotation.Resource;
 import java.io.IOException;
 
 /**
@@ -25,6 +26,12 @@ import java.io.IOException;
 @ConfigurationProperties(prefix = "grpc.server")
 @Data
 public class ElegantGrpcConfig {
+    
+    /**
+     * 注入 Spring 管理的 MessageServiceGrpcImpl
+     */
+    @Resource
+    private MessageServiceGrpcImpl messageServiceGrpcImpl;
     
     /**
      * gRPC服务器端口
@@ -63,7 +70,7 @@ public class ElegantGrpcConfig {
         log.info("启动gRPC服务器，端口: {}, 最大消息大小: {} bytes", port, maxInboundMessageSize);
         
         grpcServer = ServerBuilder.forPort(port)
-                .addService(new MessageServiceGrpcImpl())
+                .addService(messageServiceGrpcImpl)  // 使用 Spring 管理的 Bean，确保依赖注入正常
                 .maxInboundMessageSize(maxInboundMessageSize)
                 .maxInboundMetadataSize(maxInboundMetadataSize)
                 .keepAliveTime(keepAliveTime, java.util.concurrent.TimeUnit.SECONDS)

@@ -92,6 +92,7 @@ services:
     ports:
       - "10000:10000" # prometheus指标采集端口 http (注：不采用jmx方式采集)
       - "10001:10001" # netty端口
+      - "9091:9091"   # gRPC服务端口（im-business回送ACK需要）
     networks:
       - default_network
     volumes:
