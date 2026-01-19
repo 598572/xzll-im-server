@@ -25,6 +25,11 @@
                     <artifactId>spring-boot-starter-web</artifactId>
                     <groupId>org.springframework.boot</groupId>
                 </exclusion>
+                <!-- 排除 grpc-netty-shaded，使用 grpc-netty -->
+                <exclusion>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-netty-shaded</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -133,7 +138,22 @@
             <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
-
+        <!-- gRPC Netty 依赖 - Spring Cloud Gateway 需要 -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <version>${grpc.version}</version>
+        </dependency>
 
     </dependencies>
 

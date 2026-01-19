@@ -64,8 +64,8 @@
         <druid.version>1.2.21</druid.version>
         <shardingsphere.version>5.4.1</shardingsphere.version>
 
-        <!-- Spring Boot 3.x 使用 Spring Authorization Server 替代 spring-cloud-starter-oauth2 -->
-        <spring-authorization-server.version>1.2.2</spring-authorization-server.version>
+        <!-- Spring Boot 3.3.x 需要 Spring Authorization Server 1.3.x+ -->
+        <spring-authorization-server.version>1.3.3</spring-authorization-server.version>
         <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
         
         <!-- Nacos Client 版本 - 与 Nacos Server 2.0.3 兼容 -->

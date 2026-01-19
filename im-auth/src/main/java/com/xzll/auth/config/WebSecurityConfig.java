@@ -13,7 +13,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -23,6 +22,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * @Date: 2024/6/10 11:06:10
  * @Description: Web安全配置（Spring Boot 3.x + Spring Security 6.x）
  * 替代旧版的 WebSecurityConfigurerAdapter
+ * 
+ * 注意：PasswordEncoder 已移至 PasswordEncoderConfig，避免循环依赖
  */
 @Configuration
 @EnableWebSecurity
@@ -30,14 +31,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class WebSecurityConfig {
 
     private final UserServiceImpl userDetailsService;
-
-    /**
-     * 密码编码器
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 认证提供者 - 使用自定义的UserDetailsService和PasswordEncoder
@@ -46,7 +40,7 @@ public class WebSecurityConfig {
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
+        authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
 

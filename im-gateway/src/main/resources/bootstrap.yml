@@ -4,6 +4,10 @@ spring:
   profiles:
     active: @boot.profile@
   cloud:
+    gateway:
+      # 禁用 Gateway 的 gRPC 相关自动配置
+      grpc:
+        enabled: false
     nacos:
       config:
         server-addr: @nacos.serverAddr@   # 使用 @占位 ，最终 读取maven配置
