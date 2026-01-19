@@ -1,18 +1,15 @@
 package com.xzll.business.test;
 
 import cn.hutool.core.util.RandomUtil;
+import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch.core.GetResponse;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.json.JsonData;
 import com.xzll.business.entity.es.ImC2CMsgRecordES;
 import lombok.extern.slf4j.Slf4j;
-import org.elasticsearch.action.get.GetRequest;
-import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.search.SearchHit;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.sort.SortOrder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +21,7 @@ import java.util.List;
 /**
  * @Author: hzz
  * @Date: 2024/12/20
- * @Description: 单聊消息ES服务测试类
+ * @Description: 单聊消息ES服务测试类（Spring Boot 3.x + Elasticsearch Java Client）
  */
 @Slf4j
 @DisplayName("单聊消息ES服务测试")
@@ -51,12 +48,15 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         Assertions.assertEquals(testMessage.getId(), indexedId, "索引的文档ID应该匹配");
         
         // 5. 获取消息
-        GetRequest getRequest = new GetRequest(indexName, indexedId);
-        GetResponse getResponse = restHighLevelClient.get(getRequest, RequestOptions.DEFAULT);
+        GetResponse<ImC2CMsgRecordES> getResponse = elasticsearchClient.get(g -> g
+                .index(indexName)
+                .id(indexedId),
+                ImC2CMsgRecordES.class
+        );
         
-        Assertions.assertTrue(getResponse.isExists(), "文档应该存在");
+        Assertions.assertTrue(getResponse.found(), "文档应该存在");
         Assertions.assertEquals(testMessage.getFromUserId(), 
-                getResponse.getSourceAsMap().get("fromUserId"), "发送者ID应该匹配");
+                getResponse.source().getFromUserId(), "发送者ID应该匹配");
         
         log.info("消息CRUD测试通过，索引: {}, 文档ID: {}", indexName, indexedId);
     }
@@ -74,20 +74,22 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         // 3. 批量索引
         bulkIndexDocuments(indexName, messages);
         
-        // 4. 验证批量索引结果
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
-        searchSourceBuilder.size(20);
-        searchRequest.source(searchSourceBuilder);
+        // 4. 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
         
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+        // 5. 验证批量索引结果
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(q -> q.matchAll(m -> m))
+                .size(20),
+                ImC2CMsgRecordES.class
+        );
         
-        Assertions.assertEquals(10, searchResponse.getHits().getTotalHits().value, 
+        Assertions.assertEquals(10, response.hits().total().value(), 
                 "应该找到10个文档");
         
         log.info("批量消息操作测试通过，索引: {}, 文档数量: {}", indexName, 
-                searchResponse.getHits().getTotalHits().value);
+                response.hits().total().value());
     }
 
     @Test
@@ -101,22 +103,24 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         List<ImC2CMsgRecordES> messages = createBulkTestMessages(TEST_CHAT_ID, 5);
         bulkIndexDocuments(indexName, messages);
         
+        // 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
+        
         // 2. 精确匹配查询 - 按发送者ID
         String targetUserId = messages.get(0).getFromUserId();
         
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.termQuery("fromUserId", targetUserId));
-        searchSourceBuilder.size(10);
-        searchRequest.source(searchSourceBuilder);
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(q -> q.term(t -> t.field("fromUserId").value(targetUserId)))
+                .size(10),
+                ImC2CMsgRecordES.class
+        );
         
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
-        
-        Assertions.assertTrue(searchResponse.getHits().getTotalHits().value > 0, 
+        Assertions.assertTrue(response.hits().total().value() > 0, 
                 "应该找到匹配的文档");
         
         log.info("精确匹配搜索测试通过，发送者ID: {}, 找到文档数: {}", targetUserId,
-                searchResponse.getHits().getTotalHits().value);
+                response.hits().total().value());
     }
 
     @Test
@@ -135,20 +139,22 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         
         bulkIndexDocuments(indexName, messages);
         
+        // 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
+        
         // 2. 全文搜索查询
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchQuery("msgContent", "重要"));
-        searchSourceBuilder.size(10);
-        searchRequest.source(searchSourceBuilder);
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(q -> q.match(m -> m.field("msgContent").query("重要")))
+                .size(10),
+                ImC2CMsgRecordES.class
+        );
         
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
-        
-        Assertions.assertTrue(searchResponse.getHits().getTotalHits().value > 0, 
+        Assertions.assertTrue(response.hits().total().value() > 0, 
                 "应该找到包含关键词的文档");
         
         log.info("全文搜索测试通过，关键词: '重要', 找到文档数: {}", 
-                searchResponse.getHits().getTotalHits().value);
+                response.hits().total().value());
     }
 
     @Test
@@ -168,25 +174,27 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         
         bulkIndexDocuments(indexName, messages);
         
+        // 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
+        
         // 2. 复合查询：格式=1 AND 状态=1
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        Query query = BoolQuery.of(b -> b
+                .must(m -> m.term(t -> t.field("msgFormat").value(1)))
+                .must(m -> m.term(t -> t.field("msgStatus").value(1)))
+        )._toQuery();
+
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(query)
+                .size(10),
+                ImC2CMsgRecordES.class
+        );
         
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
-                .must(QueryBuilders.termQuery("msgFormat", 1))
-                .must(QueryBuilders.termQuery("msgStatus", 1));
-        
-        searchSourceBuilder.query(boolQuery);
-        searchSourceBuilder.size(10);
-        searchRequest.source(searchSourceBuilder);
-        
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
-        
-        Assertions.assertEquals(1, searchResponse.getHits().getTotalHits().value, 
+        Assertions.assertEquals(1, response.hits().total().value(), 
                 "应该找到1个符合条件的文档");
         
         log.info("复合查询测试通过，条件: 格式=1 AND 状态=1, 找到文档数: {}", 
-                searchResponse.getHits().getTotalHits().value);
+                response.hits().total().value());
     }
 
     @Test
@@ -200,25 +208,27 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         List<ImC2CMsgRecordES> messages = createBulkTestMessages(TEST_CHAT_ID, 15);
         bulkIndexDocuments(indexName, messages);
         
+        // 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
+        
         // 2. 分页查询，按时间倒序
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchAllQuery());
-        searchSourceBuilder.from(0);  // 第一页
-        searchSourceBuilder.size(5);  // 每页5条
-        searchSourceBuilder.sort("msgCreateTime", SortOrder.DESC);  // 按时间倒序
-        searchRequest.source(searchSourceBuilder);
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(q -> q.matchAll(m -> m))
+                .from(0)
+                .size(5)
+                .sort(so -> so.field(f -> f.field("msgCreateTime").order(SortOrder.Desc))),
+                ImC2CMsgRecordES.class
+        );
         
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
-        
-        Assertions.assertEquals(15, searchResponse.getHits().getTotalHits().value, 
+        Assertions.assertEquals(15, response.hits().total().value(), 
                 "总文档数应该是15");
-        Assertions.assertEquals(5, searchResponse.getHits().getHits().length, 
+        Assertions.assertEquals(5, response.hits().hits().size(), 
                 "当前页应该显示5个文档");
         
         log.info("分页排序测试通过，总文档数: {}, 当前页文档数: {}", 
-                searchResponse.getHits().getTotalHits().value,
-                searchResponse.getHits().getHits().length);
+                response.hits().total().value(),
+                response.hits().hits().size());
     }
 
     @Test
@@ -239,24 +249,26 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         
         bulkIndexDocuments(indexName, messages);
         
+        // 刷新索引
+        elasticsearchClient.indices().refresh(r -> r.index(indexName));
+        
         // 2. 时间范围查询：最近30分钟
         long thirtyMinutesAgo = currentTime - 1800000;
         
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(s -> s
+                .index(indexName)
+                .query(q -> q.range(r -> r
+                        .field("msgCreateTime")
+                        .gte(JsonData.of(thirtyMinutesAgo))))
+                .size(10),
+                ImC2CMsgRecordES.class
+        );
         
-        searchSourceBuilder.query(QueryBuilders.rangeQuery("msgCreateTime")
-                .gte(thirtyMinutesAgo));
-        searchSourceBuilder.size(10);
-        searchRequest.source(searchSourceBuilder);
-        
-        SearchResponse searchResponse = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
-        
-        Assertions.assertEquals(3, searchResponse.getHits().getTotalHits().value, 
+        Assertions.assertEquals(3, response.hits().total().value(), 
                 "应该找到3个最近30分钟内的文档");
         
         log.info("时间范围查询测试通过，时间范围: 最近30分钟, 找到文档数: {}", 
-                searchResponse.getHits().getTotalHits().value);
+                response.hits().total().value());
     }
 
     // ==================== 辅助方法 ====================
@@ -288,4 +300,4 @@ public class ImC2CMsgRecordESServiceTest extends BaseElasticsearchTest {
         message.setMsgCreateTime(msgCreateTime);
         return message;
     }
-} 
+}

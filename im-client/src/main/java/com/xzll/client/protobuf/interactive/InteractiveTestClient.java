@@ -32,13 +32,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class InteractiveTestClient {
 
-    public static final String IP = "127.0.0.1";
-    public static final String PORT = "10001";
+//    public static final String IP = "127.0.0.1";
+//    public static final String PORT = "10001";
 
 
 //    public static final String IP = "www.okim.site";
-//    public static final String IP = "120.46.85.43";
-//    public static final String PORT = "8090";
+    public static final String IP = "47.93.209.60";
+    public static final String PORT = "8090";
 
 
     private static String currentUserId;

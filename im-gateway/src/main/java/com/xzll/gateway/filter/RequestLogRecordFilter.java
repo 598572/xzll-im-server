@@ -71,7 +71,7 @@ public class RequestLogRecordFilter implements WebFilter {
             if (StringUtils.isNotBlank(sb)) {
                 String requestUri = exchange.getRequest().getURI().getRawPath();
                 String ipAddress = NetUtils.getIpAddress(exchange);
-                String requestMethod = exchange.getRequest().getMethodValue();
+                String requestMethod = exchange.getRequest().getMethod().name();
                 log.info("网关请求日志_uri:{} ip:{} method:{} contentType:{} requestData:{}", requestUri, ipAddress, requestMethod, contentType, sb);
             }
             if (HttpMethod.POST.equals(exchange.getRequest().getMethod())) {
@@ -97,7 +97,7 @@ public class RequestLogRecordFilter implements WebFilter {
         MediaType contentType = exchange.getRequest().getHeaders().getContentType();
         String requestUri = exchange.getRequest().getURI().getRawPath();
         String ipAddress = NetUtils.getIpAddress(exchange);
-        String requestMethod = exchange.getRequest().getMethodValue();
+        String requestMethod = exchange.getRequest().getMethod().name();
         return DataBufferUtils.join(exchange.getRequest().getBody())
                 .flatMap(dataBuffer -> {
                     DataBufferUtils.retain(dataBuffer);

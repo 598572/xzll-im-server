@@ -24,8 +24,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import com.xzll.common.utils.RedissonUtils;
 import org.springframework.stereotype.Component;
-import javax.annotation.PreDestroy;
-import javax.annotation.Resource;
+import jakarta.annotation.PreDestroy;
+import jakarta.annotation.Resource;
 import java.net.InetSocketAddress;
 
 

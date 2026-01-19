@@ -7,6 +7,8 @@ import com.xzll.auth.domain.TokenRequest;
 import com.xzll.auth.domain.LogoutRequest;
 import com.xzll.auth.domain.BatchLogoutRequest;
 import com.xzll.auth.domain.RefreshTokenRequest;
+import com.xzll.auth.domain.SecurityUser;
+import com.xzll.auth.service.JwtTokenService;
 import com.xzll.auth.util.DeviceTypeContext;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.constant.answercode.AnswerCode;
@@ -16,14 +18,14 @@ import com.xzll.common.utils.RedissonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.provider.endpoint.TokenEndpoint;
-import org.springframework.security.oauth2.provider.token.TokenStore;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
-import java.security.Principal;
+import jakarta.annotation.Resource;
 
 import org.redisson.api.RedissonClient;
 import org.redisson.api.RLock;
@@ -39,7 +41,8 @@ import cn.hutool.crypto.digest.DigestUtil;
 /**
  * @Author: hzz
  * @Date: 2024/6/10 11:05:14
- * @Description: 登录认证相关信息
+ * @Description: 登录认证相关信息（Spring Boot 3.x + Spring Security 6.x 版本）
+ * 替代原来基于 TokenEndpoint 的实现，使用 JwtTokenService 进行 JWT 生成和验证
  */
 @RestController
 @Slf4j
@@ -47,10 +50,13 @@ import cn.hutool.crypto.digest.DigestUtil;
 public class AuthController {
 
     @Resource
-    private TokenEndpoint tokenEndpoint;
+    private AuthenticationManager authenticationManager;
 
     @Resource
-    private TokenStore tokenStore;
+    private JwtTokenService jwtTokenService;
+
+    @Resource
+    private UserDetailsService userDetailsService;
 
     @Autowired
     private RedissonUtils redissonUtils;
@@ -65,9 +71,9 @@ public class AuthController {
      * OAuth2登录认证接口（支持多端登录）
      * <p>
      * 登录流程：
-     * 1. 验证请求参数（用户名、密码、grant_type、device_type等）
-     * 2. 调用OAuth2认证端点验证用户凭据
-     * 3. 生成JWT访问令牌和刷新令牌
+     * 1. 验证请求参数（用户名、密码、device_type等）
+     * 2. 使用 AuthenticationManager 进行用户认证
+     * 3. 认证成功后使用 JwtTokenService 生成 JWT 访问令牌和刷新令牌
      * 4. 将token和用户ID存储到Redis中（支持多端）
      * 5. 返回token信息给客户端
      * <p>
@@ -77,22 +83,28 @@ public class AuthController {
      * 必传参数：
      * - username: 用户名
      * - password: 密码
-     * - grant_type: 授权类型（password）
-     * - client_id: 客户端ID
      * - device_type: 设备类型（1-4，必传）
      *
-     * @param principal  当前认证主体（为空，因为这是登录接口）
-     * @param parameters 登录参数，包含：username、password、grant_type、client_id、device_type等
+     * @param parameters 登录参数，包含：username、password、device_type等
      * @return 包含访问令牌的响应对象
      */
     @RequestMapping(value = "/token", method = RequestMethod.POST)
-    public WebBaseResponse<Oauth2TokenDto> postAccessToken(Principal principal, @RequestParam Map<String, String> parameters) {
+    public WebBaseResponse<Oauth2TokenDto> postAccessToken(@RequestParam Map<String, String> parameters) {
         try {
             // 第一步：验证请求参数
             if (parameters == null || parameters.isEmpty()) {
                 log.error("登录参数为空");
                 return WebBaseResponse.returnResultError("登录参数不能为空");
             }
+
+            String username = parameters.get("username");
+            String password = parameters.get("password");
+
+            if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
+                log.error("用户名或密码为空");
+                return WebBaseResponse.returnResultError("用户名和密码不能为空");
+            }
+
             ImTerminalType deviceType = getDeviceTypeFromParameters(parameters);
             // 验证设备类型是否在支持范围内
             if (!isValidDeviceType(deviceType)) {
@@ -100,27 +112,42 @@ public class AuthController {
                 return WebBaseResponse.returnResultError(getDeviceTypeErrorMessage(deviceType));
             }
 
-            // 第二步：调用OAuth2认证端点，验证用户凭据并生成访问令牌
-            OAuth2AccessToken oAuth2AccessToken = tokenEndpoint.postAccessToken(principal, parameters).getBody();
-
-            // 第三步：验证获取到的访问令牌
-            if (oAuth2AccessToken == null) {
-                log.error("获取OAuth2AccessToken失败");
-                return WebBaseResponse.returnResultError("获取访问令牌失败");
+            // 第二步：使用 AuthenticationManager 进行用户认证
+            Authentication authentication;
+            try {
+                UsernamePasswordAuthenticationToken authRequest = 
+                        new UsernamePasswordAuthenticationToken(username, password);
+                authentication = authenticationManager.authenticate(authRequest);
+            } catch (AuthenticationException e) {
+                log.error("用户认证失败，用户名: {}", username, e);
+                return WebBaseResponse.returnResultError("用户名或密码错误");
             }
+
+            // 第三步：获取认证后的用户信息并生成Token
+            SecurityUser securityUser = (SecurityUser) authentication.getPrincipal();
+            
+            // 验证用户ID
+            if (securityUser.getId() == null) {
+                log.error("用户ID为空，用户名: {}", username);
+                return WebBaseResponse.returnResultError("用户数据异常");
+            }
+
+            // 生成访问令牌和刷新令牌
+            String accessToken = jwtTokenService.generateAccessToken(securityUser, deviceType);
+            String refreshToken = jwtTokenService.generateRefreshToken(securityUser, deviceType);
 
             // 第四步：构建返回给客户端的token信息
             Oauth2TokenDto oauth2TokenDto = Oauth2TokenDto.builder()
-                    .token(oAuth2AccessToken.getValue())  // JWT访问令牌
-                    .refreshToken(oAuth2AccessToken.getRefreshToken() != null ? oAuth2AccessToken.getRefreshToken().getValue() : null)  // 刷新令牌
+                    .token(accessToken)  // JWT访问令牌
+                    .refreshToken(refreshToken)  // 刷新令牌
                     .expiresIn(oauth2Config.getTokenTimeOut())  // 过期时间（秒）
                     .tokenHead(AuthConstant.TOKEN_PREFIX).build();  // Token前缀 "Bearer "
 
             // 第五步：将token和用户ID存储到Redis中（支持多端）
-            saveTokenToRedis(oAuth2AccessToken, oauth2TokenDto, deviceType);
+            saveTokenToRedis(securityUser.getId().toString(), accessToken, deviceType);
 
             // 第六步：返回成功响应
-            log.info("用户登录成功，用户ID: {}", getUserIdFromToken(oAuth2AccessToken));
+            log.info("用户登录成功，用户ID: {}", securityUser.getId());
             return WebBaseResponse.returnResultSuccess(oauth2TokenDto);
 
         } catch (Exception e) {
@@ -139,41 +166,39 @@ public class AuthController {
      * 4. 存储映射关系：user_token_key + userId + deviceType + token_hash -> 用户ID
      * 5. 设置过期时间，与token过期时间一致
      *
-     * @param oAuth2AccessToken OAuth2访问令牌
-     * @param oauth2TokenDto    返回给客户端的token信息
-     * @param deviceType        设备类型
+     * @param userId     用户ID
+     * @param token      访问令牌
+     * @param deviceType 设备类型
      */
-    private void saveTokenToRedis(OAuth2AccessToken oAuth2AccessToken, Oauth2TokenDto oauth2TokenDto, ImTerminalType deviceType) {
-        String uid = getUserIdFromToken(oAuth2AccessToken);
-        if (StringUtils.isBlank(uid)) {
-            log.warn("无法从token中获取用户ID，跳过Redis存储");
+    private void saveTokenToRedis(String userId, String token, ImTerminalType deviceType) {
+        if (StringUtils.isBlank(userId)) {
+            log.warn("用户ID为空，跳过Redis存储");
             return;
         }
 
         // 构建分布式锁的key
-        String lockKey = "user_token_lock:" + uid;
+        String lockKey = "user_token_lock:" + userId;
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
             // 获取分布式锁，等待5秒，持有锁30秒
             boolean locked = lock.tryLock(5, 30, TimeUnit.SECONDS);
             if (!locked) {
-                log.warn("获取用户{}的token操作锁失败", uid);
+                log.warn("获取用户{}的token操作锁失败", userId);
                 throw new RuntimeException("系统繁忙，请稍后重试");
             }
 
             // 第一步：删除该用户指定端的旧token
-            deleteUserDeviceTokens(uid, deviceType);
+            deleteUserDeviceTokens(userId, deviceType);
 
             // 第二步：计算token的MD5哈希值
-            String token = oAuth2AccessToken.getValue();
             String tokenMd5 = calculateTokenMd5(token);
 
             // 第三步：构建Redis key：USER_TOKEN_KEY + userId + deviceType + MD5(token)
-            String redisKey = ImConstant.RedisKeyConstant.USER_TOKEN_KEY + uid + ":" + deviceType.getCode() + ":" + tokenMd5;
+            String redisKey = ImConstant.RedisKeyConstant.USER_TOKEN_KEY + userId + ":" + deviceType.getCode() + ":" + tokenMd5;
 
             // 第四步：存储映射关系：key -> 用户ID，并设置过期时间
-            redissonUtils.setString(redisKey, uid, oauth2Config.getTokenTimeOut(), TimeUnit.SECONDS);
+            redissonUtils.setString(redisKey, userId, oauth2Config.getTokenTimeOut(), TimeUnit.SECONDS);
             log.info("Token已保存到Redis，key: {}, deviceType: {}, tokenMd5: {}", redisKey, deviceType.getCode(), tokenMd5);
 
         } catch (InterruptedException e) {
@@ -196,9 +221,11 @@ public class AuthController {
      * <p>
      * 刷新流程：
      * 1. 验证刷新令牌和设备类型参数
-     * 2. 使用OAuth2标准流程生成新的访问令牌和刷新令牌
-     * 3. 更新Redis中的token信息（保持设备类型）
-     * 4. 返回新的token信息给客户端
+     * 2. 验证刷新令牌的有效性
+     * 3. 从刷新令牌中获取用户信息
+     * 4. 重新生成新的访问令牌和刷新令牌
+     * 5. 更新Redis中的token信息
+     * 6. 返回新的token信息给客户端
      * <p>
      * 请求格式：
      * JSON格式：{"refreshToken": "xxx.yyy.zzz", "deviceType": 1}
@@ -231,70 +258,60 @@ public class AuthController {
                 return WebBaseResponse.returnResultError(getDeviceTypeErrorMessage(refreshTokenRequest.getDeviceType()));
             }
 
-            // 第二步：使用OAuth2标准流程刷新token
-            // 构建OAuth2标准参数，让框架自然处理
-            Map<String, String> parameters = new HashMap<>();
-            parameters.put("grant_type", "refresh_token");
-            parameters.put("refresh_token", refreshTokenRequest.getRefreshToken());
-            // 注意：client_id 和 client_secret 不应该放在parameters中，应该通过认证头传递
+            // 第二步：验证刷新令牌的有效性
+            String oldRefreshToken = refreshTokenRequest.getRefreshToken();
+            if (!jwtTokenService.isRefreshToken(oldRefreshToken)) {
+                log.error("不是有效的刷新令牌");
+                return WebBaseResponse.returnResultError("无效的刷新令牌");
+            }
 
-            // 将设备类型存储到ThreadLocal中，供JwtTokenEnhancer使用
-            DeviceTypeContext.setDeviceType(refreshTokenRequest.getDeviceType());
+            // 从刷新令牌中获取用户信息
+            Long userId = jwtTokenService.getUserIdFromToken(oldRefreshToken);
+            String username = jwtTokenService.getUsernameFromToken(oldRefreshToken);
+            
+            if (userId == null || StringUtils.isBlank(username)) {
+                log.error("无法从刷新令牌中获取用户信息");
+                return WebBaseResponse.returnResultError("刷新令牌无效或已过期");
+            }
 
-            // 创建客户端认证信息 - OAuth2框架会使用这个认证信息进行客户端验证
-            UsernamePasswordAuthenticationToken clientAuth = new UsernamePasswordAuthenticationToken(
-                    oauth2Config.getClientId(),
-                    oauth2Config.getPassword(),
-                    null
-            );
-
-            OAuth2AccessToken newAccessToken;
+            // 第三步：重新加载用户信息并生成新Token
+            SecurityUser securityUser;
             try {
-                // 调用OAuth2的token端点进行刷新，传入客户端认证信息
-                newAccessToken = tokenEndpoint.postAccessToken(clientAuth, parameters).getBody();
+                securityUser = (SecurityUser) userDetailsService.loadUserByUsername(username);
+            } catch (Exception e) {
+                log.error("加载用户信息失败，用户名: {}", username, e);
+                return WebBaseResponse.returnResultError("用户不存在或已禁用");
+            }
+
+            // 将设备类型存储到ThreadLocal中（兼容旧逻辑）
+            DeviceTypeContext.setDeviceType(refreshTokenRequest.getDeviceType());
+            
+            try {
+                // 生成新的访问令牌和刷新令牌
+                String newAccessToken = jwtTokenService.generateAccessToken(securityUser, refreshTokenRequest.getDeviceType());
+                String newRefreshToken = jwtTokenService.generateRefreshToken(securityUser, refreshTokenRequest.getDeviceType());
+
+                // 第四步：构建返回给客户端的token信息
+                Oauth2TokenDto oauth2TokenDto = Oauth2TokenDto.builder()
+                        .token(newAccessToken)  // 新的JWT访问令牌
+                        .refreshToken(newRefreshToken)  // 新的刷新令牌
+                        .expiresIn(oauth2Config.getTokenTimeOut())  // 过期时间（秒）
+                        .tokenHead(AuthConstant.TOKEN_PREFIX).build();  // Token前缀 "Bearer "
+
+                // 第五步：更新Redis中的token信息（保持设备类型）
+                saveTokenToRedis(securityUser.getId().toString(), newAccessToken, refreshTokenRequest.getDeviceType());
+
+                // 第六步：返回成功响应
+                log.info("Token刷新成功，用户ID: {}", securityUser.getId());
+                return WebBaseResponse.returnResultSuccess(oauth2TokenDto);
             } finally {
-                // 无论成功还是失败，都要清除ThreadLocal
+                // 清除ThreadLocal
                 DeviceTypeContext.clear();
             }
-            
-            if (newAccessToken == null) {
-                log.error("刷新token失败，无法获取新的访问令牌");
-                return WebBaseResponse.returnResultError("刷新token失败");
-            }
-
-            // 第三步：构建返回给客户端的token信息
-            Oauth2TokenDto oauth2TokenDto = Oauth2TokenDto.builder()
-                    .token(newAccessToken.getValue())  // 新的JWT访问令牌
-                    .refreshToken(newAccessToken.getRefreshToken() != null ? newAccessToken.getRefreshToken().getValue() : null)  // 新的刷新令牌
-                    .expiresIn(oauth2Config.getTokenTimeOut())  // 过期时间（秒）
-                    .tokenHead(AuthConstant.TOKEN_PREFIX).build();  // Token前缀 "Bearer "
-
-            // 第四步：更新Redis中的token信息（保持设备类型）
-            saveTokenToRedis(newAccessToken, oauth2TokenDto, refreshTokenRequest.getDeviceType());
-
-            // 第五步：返回成功响应
-            log.info("Token刷新成功，用户ID: {}", getUserIdFromToken(newAccessToken));
-            return WebBaseResponse.returnResultSuccess(oauth2TokenDto);
 
         } catch (Exception e) {
             log.error("Token刷新异常，refreshToken: {}", refreshTokenRequest.getRefreshToken(), e);
             return WebBaseResponse.returnResultError("Token刷新失败：" + e.getMessage());
-        }
-    }
-
-    /**
-     * 从token中获取用户ID
-     */
-    private String getUserIdFromToken(OAuth2AccessToken token) {
-        try {
-            Map<String, Object> additionalInfo = token.getAdditionalInformation();
-            if (additionalInfo != null && additionalInfo.containsKey(AuthConstant.JWT_USER_ID_KEY)) {
-                return additionalInfo.get(AuthConstant.JWT_USER_ID_KEY).toString();
-            }
-            return null;
-        } catch (Exception e) {
-            log.error("从token中获取用户ID失败", e);
-            return null;
         }
     }
 
@@ -306,11 +323,6 @@ public class AuthController {
      * 2. 验证设备类型是否在支持范围内
      * 3. 删除该用户指定设备类型的所有token
      * 4. 返回登出结果
-     * <p>
-     * 安全机制：
-     * - 设备类型验证：确保只能登出指定设备类型的token
-     * - 用户身份验证：确保只能登出自己的token
-     * - JWT设备类型验证：如果JWT中包含设备类型信息，会进行额外验证
      *
      * @param logoutRequest 登出请求对象（包含userId和deviceType）
      * @return 登出结果
@@ -362,10 +374,6 @@ public class AuthController {
      * 1. 验证请求参数（userId）
      * 2. 删除该用户所有设备类型的所有token
      * 3. 返回登出结果
-     * <p>
-     * 安全机制：
-     * - 用户身份验证：确保只能登出自己的token
-     * - 批量操作：一次性登出所有设备的所有token
      *
      * @param batchLogoutRequest 批量登出请求对象（包含userId）
      * @return 登出结果
@@ -452,16 +460,15 @@ public class AuthController {
                 return WebBaseResponse.returnResultError(getDeviceTypeErrorMessage(deviceType));
             }
 
-            // 验证token有效性
-            OAuth2AccessToken accessToken = tokenStore.readAccessToken(token);
-            if (accessToken == null || accessToken.isExpired()) {
+            // 使用 JwtTokenService 验证token有效性
+            Long userId = jwtTokenService.getUserIdFromToken(token);
+            if (userId == null) {
                 log.warn("Token无效或已过期，token: {}", token);
                 return WebBaseResponse.returnResultError(AnswerCode.TOKEN_INVALID.getMessage());
             }
 
             // 验证Redis中是否存在该token（额外的安全检查）
             String tokenMd5 = calculateTokenMd5(token);
-
 
             // 精确匹配指定设备类型的token：userId:deviceType:tokenMd5
             String keyPattern = ImConstant.RedisKeyConstant.USER_TOKEN_KEY + "*:" + deviceType.getCode() + ":" + tokenMd5;
@@ -483,8 +490,6 @@ public class AuthController {
 
             if (StringUtils.isBlank(storedUserId)) {
                 log.warn("Token在Redis中不存在或获取失败，可能已被登出或数据损坏，deviceType: {}, tokenMd5: {}", deviceType.getDescription(), tokenMd5);
-                // 注意：这里可以选择是否返回错误，或者继续验证token本身的有效性
-                // 暂时继续验证，因为JWT本身是自包含的
                 return WebBaseResponse.returnResultError(AnswerCode.TOKEN_INVALID.getMessage());
             }
 
@@ -497,7 +502,6 @@ public class AuthController {
         }
     }
 
-
     /**
      * 计算字符串的MD5哈希值
      */
@@ -505,22 +509,16 @@ public class AuthController {
         return DigestUtil.md5Hex(token);
     }
 
-        /**
+    /**
      * 验证设备类型是否在支持范围内
-     * 
-     * @param deviceType 设备类型枚举
-     * @return 验证结果，true表示有效，false表示无效
      */
     private boolean isValidDeviceType(ImTerminalType deviceType) {
         return deviceType != null && (deviceType == ImTerminalType.ANDROID || deviceType == ImTerminalType.IOS || 
                 deviceType == ImTerminalType.MINI_PROGRAM || deviceType == ImTerminalType.WEB);
     }
 
-        /**
+    /**
      * 获取设备类型支持的说明信息
-     * 
-     * @param deviceType 设备类型枚举
-     * @return 支持的设备类型说明
      */
     private String getDeviceTypeErrorMessage(ImTerminalType deviceType) {
         return "不支持的设备类型，支持的设备类型：1-Android, 2-iOS, 3-小程序, 4-Web";
@@ -528,10 +526,6 @@ public class AuthController {
 
     /**
      * 从请求参数中获取设备类型（必传）
-     *
-     * @param parameters 请求参数
-     * @return 设备类型枚举
-     * @throws RuntimeException 当设备类型未传或无效时抛出异常
      */
     private ImTerminalType getDeviceTypeFromParameters(Map<String, String> parameters) {
         String deviceTypeStr = parameters.get("device_type");
@@ -540,7 +534,6 @@ public class AuthController {
             throw new RuntimeException("设备类型参数device_type不能为空");
         }
         Integer deviceTypeCode = Integer.valueOf(deviceTypeStr);
-        // 使用枚举的fromCode方法验证设备类型是否有效
         ImTerminalType deviceType = ImTerminalType.fromCode(deviceTypeCode);
         if (deviceType == null || (deviceType != ImTerminalType.ANDROID && deviceType != ImTerminalType.IOS && 
                 deviceType != ImTerminalType.MINI_PROGRAM && deviceType != ImTerminalType.WEB)) {
@@ -552,21 +545,10 @@ public class AuthController {
 
     /**
      * 删除用户指定端的旧token（用于登录时覆盖旧token）
-     * <p>
-     * 删除策略：
-     * 1. 使用模式匹配查找该用户指定端的所有token key
-     * 2. 批量删除所有匹配的key
-     * 3. 确保同一用户同一端只有一个有效token
-     *
-     * @param userId     用户ID
-     * @param deviceType 设备类型
      */
     private void deleteUserDeviceTokens(String userId, ImTerminalType deviceType) {
         try {
-            // 构建用户指定端token的key模式：USER_TOKEN_KEY + userId + deviceType + *
             String keyPattern = ImConstant.RedisKeyConstant.USER_TOKEN_KEY + userId + ":" + deviceType.getCode() + ":*";
-
-            // 使用RedissonClient直接查找匹配的keys
             Iterable<String> keys = redissonClient.getKeys().getKeysByPattern(keyPattern);
 
             if (keys != null) {
@@ -576,35 +558,21 @@ public class AuthController {
                 }
 
                 if (!keyList.isEmpty()) {
-                    // 批量删除所有匹配的key
                     redissonUtils.deleteKeys(keyList.toArray(new String[0]));
                     log.debug("删除用户{}端{}的旧token，共删除{}个key", userId, deviceType.getDescription(), keyList.size());
                 }
             }
         } catch (Exception e) {
             log.warn("删除用户{}端{}的旧token失败，继续执行新token存储", userId, deviceType.getDescription(), e);
-            // 删除失败不影响新token的存储，继续执行
         }
     }
 
     /**
      * 删除用户指定端的所有token并返回删除数量（用于登出操作）
-     * <p>
-     * 删除策略：
-     * 1. 使用模式匹配查找该用户指定端的所有token key
-     * 2. 批量删除所有匹配的key
-     * 3. 返回删除的token数量
-     *
-     * @param userId     用户ID
-     * @param deviceType 设备类型
-     * @return 删除的token数量
      */
     private int deleteUserDeviceTokensForLogout(String userId, ImTerminalType deviceType) {
         try {
-            // 构建用户指定端token的key模式：USER_TOKEN_KEY + userId + deviceType + *
             String keyPattern = ImConstant.RedisKeyConstant.USER_TOKEN_KEY + userId + ":" + deviceType.getCode() + ":*";
-
-            // 使用RedissonClient直接查找匹配的keys
             Iterable<String> keys = redissonClient.getKeys().getKeysByPattern(keyPattern);
 
             if (keys != null) {
@@ -614,7 +582,6 @@ public class AuthController {
                 }
 
                 if (!keyList.isEmpty()) {
-                    // 批量删除所有匹配的key
                     redissonUtils.deleteKeys(keyList.toArray(new String[0]));
                     log.debug("登出删除用户{}端{}的token，共删除{}个key", userId, deviceType.getDescription(), keyList.size());
                     return keyList.size();
@@ -627,7 +594,6 @@ public class AuthController {
         }
     }
 
-
     /**
      * 验证JWT格式是否有效
      */
@@ -635,7 +601,6 @@ public class AuthController {
         if (StringUtils.isBlank(token)) {
             return false;
         }
-        // JWT格式：xxx.yyy.zzz（三个部分用点分隔）
         String[] parts = token.split("\\.");
         return parts.length == 3;
     }

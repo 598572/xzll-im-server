@@ -8,7 +8,7 @@ import com.xzll.common.pojo.base.WebBaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 /**
  * 用户个人信息管理控制器

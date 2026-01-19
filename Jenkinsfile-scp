@@ -1,0 +1,161 @@
+pipeline {
+    agent any
+
+    environment {
+        PROJECT_DIR = "/home/hzz/im/jenkins_way_build_docker_compose/xzll-im"
+        JAVA_HOME = "/home/hzz/jdk/jdk-21.0.8"
+        MAVEN_HOME = "/home/hzz/maven/apache-maven-3.9.11"
+    }
+
+    stages {
+        stage('Check Code Upload') {
+            steps {
+                script {
+                    log("检查代码是否已通过 SCP 上传")
+                    
+                    if (!fileExists("${PROJECT_DIR}/pom.xml")) {
+                        error("""
+                        ❌ 未检测到代码！
+                        
+                        请先在本地执行上传脚本：
+                        ./scp_upload.sh
+                        
+                        然后重新触发构建
+                        """)
+                    }
+                    
+                    log("✅ 检测到代码，准备开始构建")
+                }
+            }
+        }
+
+        stage('Build Project') {
+            steps {
+                script {
+                    dir(PROJECT_DIR) {
+                        log("开始 Maven 打包")
+                        
+                        sh """
+                            export JAVA_HOME=${env.JAVA_HOME}
+                            export PATH=${env.JAVA_HOME}/bin:\${PATH}
+                            
+                            ${env.MAVEN_HOME}/bin/mvn clean package -P test -DskipTests
+                        """
+                        
+                        exit_on_error("Maven 打包失败")
+                        log("✅ Maven 打包完成")
+                    }
+                }
+            }
+        }
+
+        stage('Copy JAR Files') {
+            steps {
+                script {
+                    def jarFiles = [
+                        'im-gateway/target/im-gateway.jar': 'im-gateway/src/main/resources',
+                        'im-connect/im-connect-service/target/im-connect-service.jar': 'im-connect/im-connect-service/src/main/resources',
+                        'im-auth/target/im-auth.jar': 'im-auth/src/main/resources',
+                        'im-business/im-business-service/target/im-business-service.jar': 'im-business/im-business-service/src/main/resources',
+                        'im-console/im-console-service/target/im-console-service.jar': 'im-console/im-console-service/src/main/resources',
+                        'im-data-sync/target/im-data-sync.jar': 'im-data-sync/src/main/resources'
+                    ]
+                    
+                    dir(PROJECT_DIR) {
+                        jarFiles.each { jar, targetDir ->
+                            log("复制 ${jar} -> ${targetDir}")
+                            sh "cp ${jar} ${targetDir}"
+                            exit_on_error("复制 ${jar} 失败")
+                        }
+                        log("✅ JAR 文件复制完成")
+                    }
+                }
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            steps {
+                script {
+                    dir(PROJECT_DIR) {
+                        log("停止现有容器")
+                        sh "docker compose down"
+                        exit_on_error("停止容器失败")
+                        
+                        log("构建镜像并启动容器")
+                        sh "docker compose up -d --build"
+                        exit_on_error("启动容器失败")
+                        
+                        log("✅ 容器启动成功")
+                    }
+                }
+            }
+        }
+
+        stage('Clean Up') {
+            steps {
+                script {
+                    log("清理 Docker 垃圾")
+                    sh "docker system prune -f --volumes"
+                    exit_on_error("清理失败")
+                    log("✅ 清理完成")
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                log("========================================")
+                log("部署流程结束")
+                log("========================================")
+            }
+        }
+        success {
+            script {
+                log("🎉 构建成功！")
+            }
+            emailext (
+                subject: "✅ Jenkins 构建成功 (SCP模式): ${currentBuild.fullDisplayName}",
+                body: """
+                Jenkins 构建成功通知 (SCP上传模式):
+                
+                项目: ${env.JOB_NAME}
+                构建编号: ${env.BUILD_NUMBER}
+                构建URL: ${env.BUILD_URL}
+                
+                提示: 本次构建使用 SCP 上传的代码
+                """,
+                to: 'h163361631@163.com'
+            )
+        }
+        failure {
+            script {
+                log("❌ 构建失败")
+            }
+            emailext (
+                subject: "❌ Jenkins 构建失败 (SCP模式): ${currentBuild.fullDisplayName}",
+                body: """
+                Jenkins 构建失败通知 (SCP上传模式):
+                
+                项目: ${env.JOB_NAME}
+                构建编号: ${env.BUILD_NUMBER}
+                构建URL: ${env.BUILD_URL}
+                
+                请检查构建日志
+                """,
+                to: 'h163361631@163.com'
+            )
+        }
+    }
+}
+
+def log(message) {
+    echo "[${new Date().format('yyyy-MM-dd HH:mm:ss')}] ${message}"
+}
+
+def exit_on_error(message) {
+    if (currentBuild.result == 'FAILURE') {
+        error(message)
+    }
+}

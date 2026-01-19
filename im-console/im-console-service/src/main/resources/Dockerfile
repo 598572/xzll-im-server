@@ -1,10 +1,10 @@
 # business 的  Dockerfile 内容
 # jdk镜像
-FROM openjdk:17-jdk
+FROM eclipse-temurin:21-jdk
 # 挂载
 VOLUME /tmp
 COPY im-console-service.jar im-console-service.jar
-# 启动命令 - 添加JDK17模块开放参数（包含HBase和JAXB支持）
+# 启动命令 - 添加JDK21模块开放参数
 ENTRYPOINT ["java", \
     "--add-opens", "java.base/java.nio=ALL-UNNAMED", \
     "--add-opens", "java.base/java.lang=ALL-UNNAMED", \

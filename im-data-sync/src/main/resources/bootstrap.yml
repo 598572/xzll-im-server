@@ -1,8 +1,8 @@
 spring:
   application:
     name: imDataSync
-    profiles:
-      active: @boot.profile@
+  profiles:
+    active: @boot.profile@
   cloud:
     nacos:
       config:

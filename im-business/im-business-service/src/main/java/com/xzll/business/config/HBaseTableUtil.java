@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 
 import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import java.io.IOException;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;

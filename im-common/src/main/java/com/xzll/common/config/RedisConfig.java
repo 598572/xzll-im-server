@@ -3,9 +3,11 @@ package com.xzll.common.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -20,32 +22,53 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 /**
  * @Author: hzz
  * @Date: 2024/5/30 13:27:55
- * @Description:
+ * @Description: Redis配置类
+ * 支持 Spring Boot 3.x (spring.data.redis.*) 和 2.x (spring.redis.*) 配置前缀
  */
+@Slf4j
 @Setter
 @Getter
 @Configuration
-@ConfigurationProperties(prefix = "spring.redis")
+@ConditionalOnExpression("'${spring.data.redis.host:}' != ''")
 public class RedisConfig {
 
+    // Spring Boot 3.x 新配置前缀
+    @Value("${spring.data.redis.database:0}")
     private int database;
+    
+    @Value("${spring.data.redis.host:}")
     private String host;
+    
+    @Value("${spring.data.redis.port:6379}")
     private int port;
+    
+    @Value("${spring.data.redis.password:}")
     private String password;
+    
+    @Value("${spring.data.redis.timeout:10000}")
     private int timeout;
-    private Pool pool = new Pool();
-
-    @Setter
-    @Getter
-    public static class Pool {
-        private int maxActive;
-        private int maxIdle;
-        private int minIdle;
-    }
+    
+    @Value("${spring.data.redis.lettuce.pool.max-active:8}")
+    private int maxActive;
+    
+    @Value("${spring.data.redis.lettuce.pool.max-idle:8}")
+    private int maxIdle;
+    
+    @Value("${spring.data.redis.lettuce.pool.min-idle:0}")
+    private int minIdle;
 
     @Bean
     @Primary
     public RedisConnectionFactory redisConnectionFactory() {
+        log.info("\n========== RedisConfig 配置信息 ==========" +
+                "\n  host: {}" +
+                "\n  port: {}" +
+                "\n  database: {}" +
+                "\n  password: {}" +
+                "\n=======================================",
+                host, port, database,
+                (password != null && !password.isEmpty()) ? "******(已配置)" : "(无密码)");
+        
         RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
         configuration.setHostName(this.getHost());
         configuration.setPort(this.getPort());

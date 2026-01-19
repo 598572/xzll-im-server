@@ -24,7 +24,7 @@ import com.xzll.business.cluster.mq.RocketMqProducerWrap;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
