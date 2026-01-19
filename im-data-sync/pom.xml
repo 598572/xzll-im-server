@@ -79,14 +79,15 @@
             <artifactId>im-common</artifactId>
             <version>${project.version}</version>
             <exclusions>
-<!--                <exclusion>-->
-<!--                    <artifactId>spring-boot-starter-data-redis</artifactId>-->
-<!--                    <groupId>org.springframework.boot</groupId>-->
-<!--                </exclusion>-->
-<!--                <exclusion>-->
-<!--                    <artifactId>redisson-spring-boot-starter</artifactId>-->
-<!--                    <groupId>org.redisson</groupId>-->
-<!--                </exclusion>-->
+                <!-- im-data-sync不需要Redis和Redisson -->
+                <exclusion>
+                    <artifactId>spring-boot-starter-data-redis</artifactId>
+                    <groupId>org.springframework.boot</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>redisson-spring-boot-starter</artifactId>
+                    <groupId>org.redisson</groupId>
+                </exclusion>
             </exclusions>
         </dependency>
 

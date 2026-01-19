@@ -2,13 +2,10 @@ package com.xzll.datasync;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration;
-import org.redisson.spring.starter.RedissonAutoConfiguration;
 
 /**
  * 数据同步服务启动类
@@ -20,9 +17,6 @@ import org.redisson.spring.starter.RedissonAutoConfiguration;
         exclude = {
                 DataSourceAutoConfiguration.class,
                 HibernateJpaAutoConfiguration.class,
-                RedisAutoConfiguration.class,
-                RedisRepositoriesAutoConfiguration.class,
-                RedissonAutoConfiguration.class,
                 ElasticsearchDataAutoConfiguration.class,
                 ElasticsearchRepositoriesAutoConfiguration.class
         })

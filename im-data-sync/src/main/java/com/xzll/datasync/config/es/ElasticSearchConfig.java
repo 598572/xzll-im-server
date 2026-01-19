@@ -7,6 +7,7 @@ import co.elastic.clients.transport.rest_client.RestClientTransport;
 import com.xzll.datasync.config.nacos.ElasticSearchNacosConfig;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -19,7 +20,7 @@ import jakarta.annotation.Resource;
  * @Author: hzz
  * @Date: 2024/12/20
  * @Description: ES配置类（Spring Boot 3.x + Spring Data Elasticsearch 5.x）
- * 使用新的 ElasticsearchClient 替代已废弃的 RestHighLevelClient
+ * 同时支持新版 ElasticsearchClient 和旧版 RestHighLevelClient
  */
 @Configuration
 public class ElasticSearchConfig {
@@ -47,6 +48,23 @@ public class ElasticSearchConfig {
      */
     private HttpHost createHttpHost(String uri) {
         return HttpHost.create(uri);
+    }
+
+    /**
+     * 创建 RestHighLevelClient（旧版高级客户端）
+     * BatchDataSyncConsumer 需要使用此客户端
+     *
+     * @return RestHighLevelClient
+     */
+    @Bean("restHighLevelClient")
+    @DependsOn("restClient")
+    public RestHighLevelClient restHighLevelClient() {
+        HttpHost[] hosts = elasticSearchNacosConfig.getUris().stream()
+                .map(this::createHttpHost)
+                .toArray(HttpHost[]::new);
+        return new RestHighLevelClient(
+                org.elasticsearch.client.RestClient.builder(hosts)
+        );
     }
 
     /**
