@@ -107,24 +107,6 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
-        <!-- HBase 依赖 -->
-        <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-client</artifactId>
-        </dependency>
-        
-        <!-- HBase 通用依赖 -->
-        <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-common</artifactId>
-        </dependency>
-        
-        <!-- Hadoop 3.x 核心依赖 -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-        </dependency>
-
         <!-- Elasticsearch 依赖 - Spring Boot 3.x + ES 8.x -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -141,6 +123,12 @@
         <dependency>
             <groupId>org.elasticsearch.client</groupId>
             <artifactId>elasticsearch-rest-high-level-client</artifactId>
+        </dependency>
+
+        <!-- MongoDB 依赖 - 消息主查询存储 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
         <!-- Hutool工具类 -->

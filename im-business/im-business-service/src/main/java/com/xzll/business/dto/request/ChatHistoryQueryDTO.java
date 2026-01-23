@@ -2,11 +2,6 @@ package com.xzll.business.dto.request;
 
 import lombok.Data;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 /**
  * @Author: hzz
  * @Date: 2025/10/30
@@ -18,7 +13,6 @@ public class ChatHistoryQueryDTO {
     /**
      * 聊天ID (必填)
      */
-    @NotBlank(message = "chatId不能为空")
     private String chatId;
 
     /**
@@ -35,20 +29,17 @@ public class ChatHistoryQueryDTO {
     /**
      * 每页大小 (默认50，最大100)
      */
-    @Min(value = 1, message = "pageSize最小为1")
-    @Max(value = 100, message = "pageSize最大为100")
-    @NotNull(message = "pageSize不能为空")
     private Integer pageSize = 50;
 
     /**
      * 开始时间戳 (可选)
-     * 毫秒级时间戳，用于RowKey范围查询优化
+     * 毫秒级时间戳
      */
     private Long startTime;
 
     /**
      * 结束时间戳 (可选)
-     * 毫秒级时间戳，用于RowKey范围查询优化
+     * 毫秒级时间戳
      */
     private Long endTime;
 

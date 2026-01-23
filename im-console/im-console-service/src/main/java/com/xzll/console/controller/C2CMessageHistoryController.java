@@ -3,10 +3,9 @@ package com.xzll.console.controller;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.console.dto.MessageSearchDTO;
 import com.xzll.console.entity.ImC2CMsgRecord;
-import com.xzll.console.service.ImC2CMsgRecordHBaseService;
 import com.xzll.console.service.MessageESQueryService;
+import com.xzll.console.service.MessageMongoQueryService;
 import com.xzll.console.service.MessageQueryRouter;
-import com.xzll.console.util.HBaseHealthChecker;
 import com.xzll.console.vo.MessagePageResultVO;
 import com.xzll.console.vo.MessageSearchResultVO;
 import com.xzll.console.vo.HealthCheckVO;
@@ -17,8 +16,6 @@ import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
 /**
  * @Author: hzz
@@ -32,10 +29,7 @@ import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECOR
 public class C2CMessageHistoryController {
 
     @Resource
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
-    
-    @Resource
-    private HBaseHealthChecker hBaseHealthChecker;
+    private MessageMongoQueryService messageMongoQueryService;
 
     @Resource
     private MessageQueryRouter messageQueryRouter;
@@ -45,6 +39,7 @@ public class C2CMessageHistoryController {
 
     /**
      * 分页查询单聊历史消息
+     * 数据来源: MongoDB
      */
     @GetMapping("/history/page")
     public WebBaseResponse<MessagePageResultVO> getMessageHistoryByPage(
@@ -57,22 +52,15 @@ public class C2CMessageHistoryController {
                 log.warn("查询数量超过100，自动调整为100");
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getAllMessagesWithPagination(limit, lastRowKey);
+            // 使用MongoDB查询最新消息
+            List<ImC2CMsgRecord> messages = messageMongoQueryService.getLatestMessages(limit);
             
             MessagePageResultVO resultVO = new MessagePageResultVO();
             resultVO.setData(messages);
             resultVO.setCount(messages.size());
             resultVO.setLimit(limit);
             resultVO.setHasMore(messages.size() == limit);
-            resultVO.setDataSource("HBASE");
-            
-            if (messages.size() == limit && !messages.isEmpty()) {
-                ImC2CMsgRecord lastMessage = messages.get(messages.size() - 1);
-                String nextRowKey = lastMessage.getChatId() + "_" + 
-                    (Long.MAX_VALUE - lastMessage.getMsgCreateTime()) + "_" + 
-                    lastMessage.getMsgId();
-                resultVO.setNextRowKey(nextRowKey);
-            }
+            resultVO.setDataSource("MongoDB");
             
             log.info("分页查询单聊历史消息成功，返回 {} 条记录", messages.size());
             return WebBaseResponse.returnResultSuccess(resultVO);
@@ -115,6 +103,7 @@ public class C2CMessageHistoryController {
 
     /**
      * 根据会话ID查询单聊历史消息
+     * 数据来源: MongoDB（分片优化查询）
      */
     @GetMapping("/history/chat/{chatId}")
     public WebBaseResponse<MessagePageResultVO> getMessageHistoryByChatId(
@@ -130,14 +119,15 @@ public class C2CMessageHistoryController {
                 limit = 100;
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getMessagesByChatId(chatId, limit);
+            // 使用MongoDB按chatId查询（分片优化）
+            List<ImC2CMsgRecord> messages = messageMongoQueryService.getMessagesByChatId(chatId, limit);
             
             MessagePageResultVO resultVO = new MessagePageResultVO();
             resultVO.setData(messages);
             resultVO.setCount(messages.size());
             resultVO.setChatId(chatId);
             resultVO.setLimit(limit);
-            resultVO.setDataSource("HBASE");
+            resultVO.setDataSource("MongoDB");
             
             return WebBaseResponse.returnResultSuccess(resultVO);
             
@@ -150,7 +140,7 @@ public class C2CMessageHistoryController {
     /**
      * 条件查询单聊历史消息（智能路由版）
      * 根据查询条件自动选择最优存储：
-     * - 仅chatId条件 → HBase（RowKey前缀扫描）
+     * - 仅chatId条件 → MongoDB（复合查询）
      * - 其他条件 → ES（复合查询）
      */
     @GetMapping("/history/search")
@@ -299,15 +289,13 @@ public class C2CMessageHistoryController {
     }
 
     /**
-     * 健康检查（HBase + ES）
+     * 健康检查（MongoDB + ES）
      */
     @GetMapping("/health")
     public WebBaseResponse<HealthCheckVO> checkHealth() {
         try {
-            // HBase 健康检查
-            boolean hbaseHealthy = hBaseHealthChecker.isConnectionHealthy();
-            String hbaseStatus = hBaseHealthChecker.getConnectionStatus();
-            boolean tableExists = hBaseHealthChecker.isTableExists(IM_C2C_MSG_RECORD);
+            // MongoDB 健康检查
+            boolean mongoHealthy = messageMongoQueryService.isConnectionHealthy();
             
             // ES 健康检查
             boolean esHealthy = messageESQueryService.isConnectionHealthy();
@@ -316,12 +304,12 @@ public class C2CMessageHistoryController {
             HealthCheckVO vo = new HealthCheckVO();
             vo.setTimestamp(System.currentTimeMillis());
             
-            // HBase 状态
-            HealthCheckVO.StorageHealth hbaseHealth = new HealthCheckVO.StorageHealth();
-            hbaseHealth.setHealthy(hbaseHealthy);
-            hbaseHealth.setStatus(hbaseStatus);
-            hbaseHealth.setTableExists(tableExists);
-            vo.setHbase(hbaseHealth);
+            // MongoDB 状态（复用hbase字段，避免修改VO）
+            HealthCheckVO.StorageHealth mongoHealth = new HealthCheckVO.StorageHealth();
+            mongoHealth.setHealthy(mongoHealthy);
+            mongoHealth.setStatus(mongoHealthy ? "MongoDB连接正常" : "MongoDB连接异常");
+            mongoHealth.setTableExists(true);
+            vo.setHbase(mongoHealth);
             
             // ES 状态
             HealthCheckVO.StorageHealth esHealth = new HealthCheckVO.StorageHealth();
@@ -330,11 +318,11 @@ public class C2CMessageHistoryController {
             vo.setElasticsearch(esHealth);
             
             // 总体状态
-            boolean allHealthy = hbaseHealthy && esHealthy;
+            boolean allHealthy = mongoHealthy && esHealthy;
             vo.setAllHealthy(allHealthy);
             
-            String msg = allHealthy ? "HBase和ES连接均正常" : 
-                    "HBase: " + (hbaseHealthy ? "正常" : "异常") + ", ES: " + (esHealthy ? "正常" : "异常");
+            String msg = allHealthy ? "MongoDB和ES连接均正常" : 
+                    "MongoDB: " + (mongoHealthy ? "正常" : "异常") + ", ES: " + (esHealthy ? "正常" : "异常");
             
             return WebBaseResponse.returnResultSuccess(msg, vo);
             

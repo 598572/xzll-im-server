@@ -1,8 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ChatListService;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
-import com.xzll.business.service.UnreadCountService;
+import com.xzll.business.service.ImC2CMsgRecordService;
 
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2CReceivedMsgAckAO;
@@ -25,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
 public class C2CClientReceivedAckMsgHandler {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
+    private ImC2CMsgRecordService imC2CMsgRecordService;
     @Resource
     private GrpcMessageService grpcMessageService;
     @Resource

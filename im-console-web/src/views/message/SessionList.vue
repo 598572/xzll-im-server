@@ -49,28 +49,13 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="userId" label="用户ID" width="140" />
-        <el-table-column prop="otherUserId" label="对方用户ID" width="140" />
-        <el-table-column prop="otherUserName" label="对方昵称" width="140" />
-        <el-table-column prop="lastMessageContent" label="最后消息" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="fromUserId" label="发起方ID" width="140" />
+        <el-table-column prop="fromUserName" label="发起方昵称" width="120" />
+        <el-table-column prop="toUserId" label="接收方ID" width="140" />
+        <el-table-column prop="toUserName" label="接收方昵称" width="120" />
+        <el-table-column label="创建时间" width="180">
           <template #default="{ row }">
-            <div class="last-msg">
-              <el-tag v-if="row.lastMsgFormat === 1" type="info" size="small">文本</el-tag>
-              <el-tag v-else-if="row.lastMsgFormat === 2" type="warning" size="small">图片</el-tag>
-              <el-tag v-else-if="row.lastMsgFormat === 3" type="success" size="small">语音</el-tag>
-              <span>{{ row.lastMessageContent || '暂无消息' }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="未读数" width="100" align="center">
-          <template #default="{ row }">
-            <el-badge v-if="row.unReadCount > 0" :value="row.unReadCount" class="unread-badge" />
-            <span v-else>0</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="最后消息时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.lastMsgTime) }}
+            {{ formatDateTime(row.createTime) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right">
@@ -108,20 +93,12 @@
             {{ currentSession?.chatType === 1 ? '单聊' : '群聊' }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="用户ID">{{ currentSession?.userId }}</el-descriptions-item>
-        <el-descriptions-item label="对方用户ID">{{ currentSession?.otherUserId }}</el-descriptions-item>
-        <el-descriptions-item label="对方昵称">{{ currentSession?.otherUserName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="未读消息数">
-          <el-tag :type="currentSession?.unReadCount > 0 ? 'danger' : 'info'">
-            {{ currentSession?.unReadCount || 0 }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="最后消息ID">{{ currentSession?.lastMsgId || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="最后消息时间" :span="2">
-          {{ formatTime(currentSession?.lastMsgTime) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="最后消息内容" :span="2">
-          <div class="detail-content">{{ currentSession?.lastMessageContent || '暂无消息' }}</div>
+        <el-descriptions-item label="发起方ID">{{ currentSession?.fromUserId }}</el-descriptions-item>
+        <el-descriptions-item label="发起方昵称">{{ currentSession?.fromUserName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="接收方ID">{{ currentSession?.toUserId }}</el-descriptions-item>
+        <el-descriptions-item label="接收方昵称">{{ currentSession?.toUserName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间" :span="2">
+          {{ formatDateTime(currentSession?.createTime) }}
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -150,23 +127,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getMessagesByChatId, getLatestMessages, searchMessages } from '../../api'
+import { getMessagesByChatId, pageSessionList } from '../../api'
 
 interface Session {
+  id: number
   chatId: string
   chatType: number
-  userId: string
-  otherUserId: string
-  otherUserName: string
-  otherUserAvatar: string
-  lastMessageContent: string
-  lastMsgFormat: number
-  lastMsgId: string
-  lastMsgTime: number
-  unReadCount: number
+  fromUserId: string
+  fromUserName: string
+  fromUserAvatar: string
+  toUserId: string
+  toUserName: string
+  toUserAvatar: string
+  createTime: string
+  updateTime: string
 }
 
 interface Message {
@@ -213,6 +190,13 @@ const formatTime = (timestamp: number | undefined) => {
   })
 }
 
+// 格式化日期时间字符串
+const formatDateTime = (dateStr: string | undefined) => {
+  if (!dateStr) return '-'
+  // 后端返回的是LocalDateTime格式，如: 2026-01-23T10:30:00
+  return dateStr.replace('T', ' ')
+}
+
 // 获取消息格式文本
 const getMsgFormatText = (format: number) => {
   const formatMap: Record<number, string> = {
@@ -225,59 +209,26 @@ const getMsgFormatText = (format: number) => {
   return formatMap[format] || '未知'
 }
 
-// 加载数据 - 从ES获取最新消息，按chatId聚合成会话列表
+// 加载数据 - 从MySQL查询会话列表
 const loadData = async () => {
   loading.value = true
   try {
-    // 调用后端接口获取最新消息
-    // 返回格式: { code: 1, msg: "...", data: { data: [...], count: ..., dataSource: "ES" } }
-    const res = await getLatestMessages(100)
+    // 调用后端接口查询会话列表（数据源：MySQL im_chat表）
+    const res = await pageSessionList({
+      current: queryParams.pageNum,
+      size: queryParams.pageSize,
+      userId: queryParams.userId || undefined,
+      chatType: queryParams.chatType
+    })
     
     // 注意: 拦截器已经检查了 code=1，这里直接获取 data
-    const resultVO = res.data
-    if (resultVO && resultVO.data && resultVO.data.length > 0) {
-      // 按chatId聚合消息，生成会话列表
-      const sessionMap = new Map<string, Session>()
-      
-      for (const msg of resultVO.data) {
-        const chatId = msg.chatId
-        if (!chatId) continue
-        
-        // 如果该会话还没有记录，或者当前消息更新，则更新会话信息
-        const existing = sessionMap.get(chatId)
-        if (!existing || msg.msgCreateTime > existing.lastMsgTime) {
-          sessionMap.set(chatId, {
-            chatId: chatId,
-            chatType: 1, // 单聊
-            userId: msg.fromUserId,
-            otherUserId: msg.toUserId,
-            otherUserName: msg.toUserId, // 暂时用ID代替昵称
-            otherUserAvatar: '',
-            lastMessageContent: msg.msgContent || '',
-            lastMsgFormat: msg.msgFormat || 1,
-            lastMsgId: msg.msgId,
-            lastMsgTime: msg.msgCreateTime,
-            unReadCount: 0
-          })
-        }
-      }
-      
-      // 转换为数组并排序（按最后消息时间倒序）
-      tableData.value = Array.from(sessionMap.values())
-        .sort((a, b) => b.lastMsgTime - a.lastMsgTime)
-      
-      // 如果有搜索条件，进行过滤
-      if (queryParams.userId) {
-        tableData.value = tableData.value.filter(s => 
-          s.userId === queryParams.userId || s.otherUserId === queryParams.userId
-        )
-      }
-      
-      total.value = tableData.value.length
+    const pageData = res.data
+    if (pageData && pageData.records) {
+      tableData.value = pageData.records
+      total.value = pageData.total || 0
     } else {
       tableData.value = []
       total.value = 0
-      ElMessage.warning('暂无会话数据')
     }
   } catch (error) {
     console.error('加载会话列表失败:', error)
@@ -332,6 +283,11 @@ const handleViewDetail = (row: Session) => {
 }
 
 onMounted(() => {
+  loadData()
+})
+
+// 添加 onActivated 钩子，在使用 keep-alive 时也会触发
+onActivated(() => {
   loadData()
 })
 </script>

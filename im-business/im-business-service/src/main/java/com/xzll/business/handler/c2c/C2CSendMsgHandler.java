@@ -1,7 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ChatListService;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
@@ -27,7 +27,7 @@ public class C2CSendMsgHandler {
     private ImChatService imChatService;
     
     @Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordService;
+    private ImC2CMsgRecordService imC2CMsgRecordService;
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;
     @Resource

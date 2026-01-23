@@ -17,7 +17,8 @@ import java.util.Map;
  * @Description: 好友管理Controller
  */
 @RestController
-@RequestMapping("/api/console/friend")
+@RequestMapping("/api/admin/friend")
+@CrossOrigin(origins = "*")
 public class FriendManageController {
     
     @Resource

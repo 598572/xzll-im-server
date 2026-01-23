@@ -107,6 +107,22 @@ export const pageMessageHistory = (params: { limit?: number; lastRowKey?: string
   return request.get('/c2c/message/history/page', { params })
 }
 
+// ==================== 会话管理 ====================
+// 分页查询会话列表（来源：MySQL im_chat表）
+export const pageSessionList = (params: { current?: number; size?: number; userId?: string; chatType?: number }) => {
+  return request.get('/admin/session/page', { params })
+}
+
+// 获取会话统计信息
+export const getSessionStats = () => {
+  return request.get('/admin/session/stats')
+}
+
+// 获取会话详情
+export const getSessionDetail = (chatId: string) => {
+  return request.get(`/admin/session/${chatId}`)
+}
+
 // 获取最新消息
 export const getLatestMessages = (limit: number = 20) => {
   return request.get('/c2c/message/history/latest', { params: { limit } })

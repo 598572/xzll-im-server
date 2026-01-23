@@ -1,7 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ChatListService;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 public class C2COffLineMsgHandler {
     
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
+    private ImC2CMsgRecordService imC2CMsgRecordHBaseService;
 
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;

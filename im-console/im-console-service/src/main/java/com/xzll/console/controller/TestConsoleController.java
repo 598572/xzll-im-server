@@ -3,8 +3,7 @@ package com.xzll.console.controller;
 
 import cn.hutool.json.JSONUtil;
 import com.xzll.console.entity.ImC2CMsgRecord;
-import com.xzll.console.service.ImC2CMsgRecordHBaseService;
-import com.xzll.console.util.HBaseHealthChecker;
+import com.xzll.console.service.MessageMongoQueryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -14,8 +13,6 @@ import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
 
 /**
@@ -31,47 +28,41 @@ public class TestConsoleController {
 
 	@Value("${timeOutConfig}")
 	private Long timeOutConfig;
-	@Resource
-	private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
 	
 	@Resource
-	private HBaseHealthChecker hBaseHealthChecker;
+	private MessageMongoQueryService messageMongoQueryService;
 
 
 	@GetMapping("/get")
 	public List<ImC2CMsgRecord> get() {
 		log.info("测试管理后台服务，nacos timeOutConfig：{}",timeOutConfig);
-		List<ImC2CMsgRecord> imC2CMsgRecords = imC2CMsgRecordHBaseService.getAllMessages();
-		log.info("测试HBase查询结果:{}", JSONUtil.toJsonStr(imC2CMsgRecords));
+		List<ImC2CMsgRecord> imC2CMsgRecords = messageMongoQueryService.getLatestMessages(20);
+		log.info("测试MongoDB查询结果:{}", JSONUtil.toJsonStr(imC2CMsgRecords));
 		return imC2CMsgRecords;
 	}
 
 	/**
-	 * HBase连接健康检查接口
+	 * MongoDB连接健康检查接口
 	 */
-	@GetMapping("/hbase/health")
-	public Map<String, Object> checkHBaseHealth() {
+	@GetMapping("/mongo/health")
+	public Map<String, Object> checkMongoHealth() {
 		Map<String, Object> result = new HashMap<>();
 		
 		try {
-			boolean isHealthy = hBaseHealthChecker.isConnectionHealthy();
-			String status = hBaseHealthChecker.getConnectionStatus();
-			boolean tableExists = hBaseHealthChecker.isTableExists(IM_C2C_MSG_RECORD);
+			boolean isHealthy = messageMongoQueryService.isConnectionHealthy();
 			
 			result.put("success", true);
-			result.put("hbaseHealthy", isHealthy);
-			result.put("connectionStatus", status);
-			result.put("tableExists", tableExists);
+			result.put("mongoHealthy", isHealthy);
 			result.put("timestamp", System.currentTimeMillis());
 			
 			if (!isHealthy) {
-				result.put("message", "HBase连接异常，请检查配置");
+				result.put("message", "MongoDB连接异常，请检查配置");
 			} else {
-				result.put("message", "HBase连接正常");
+				result.put("message", "MongoDB连接正常");
 			}
 			
 		} catch (Exception e) {
-			log.error("HBase健康检查失败", e);
+			log.error("MongoDB健康检查失败", e);
 			result.put("success", false);
 			result.put("message", "健康检查失败: " + e.getMessage());
 			result.put("error", e.toString());

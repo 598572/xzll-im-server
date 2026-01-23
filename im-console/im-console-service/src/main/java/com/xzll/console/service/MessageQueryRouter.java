@@ -14,18 +14,18 @@ import java.util.List;
  * 消息查询路由服务
  * 根据查询条件智能选择最优存储进行查询
  * 
- * 路由策略:
+ * 路由策略 (MongoDB 版本):
  * ┌─────────────────────────────────────────────────────────────────┐
- * │  查询条件                        │  路由目标  │  原因            │
+ * │  查询条件                        │  路由目标   │  原因            │
  * ├─────────────────────────────────────────────────────────────────┤
- * │  仅 chatId（无其他条件）          │  HBase    │  RowKey前缀扫描   │
- * │  chatId + 时间范围                │  HBase    │  RowKey范围扫描   │
- * │  fromUserId / toUserId           │  ES       │  Keyword精确查询  │
- * │  消息内容搜索                     │  ES       │  全文搜索        │
- * │  复合条件组合                     │  ES       │  Bool复合查询    │
- * │  消息统计                         │  ES       │  聚合统计        │
- * │  最新消息列表                     │  ES       │  排序分页        │
+ * │  所有查询条件                    │  MongoDB   │  索引匹配查询     │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │  chatId + 条件组合               │  MongoDB   │  复合索引查询     │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │  消息内容搜索                     │  MongoDB   │  正则模糊匹配     │
  * └─────────────────────────────────────────────────────────────────┘
+ *
+ * 注意：已将查询存储从 ES 迁移到 MongoDB，ES 仅作为异步同步目标
  *
  * @Author: hzz
  * @Date: 2024/12/20
@@ -35,20 +35,16 @@ import java.util.List;
 public class MessageQueryRouter {
 
     @Resource
-    private ImC2CMsgRecordHBaseService hBaseService;
-
-    @Resource
-    private MessageESQueryService esQueryService;
+    private MessageMongoQueryService mongoQueryService;
 
     /**
      * 数据来源标识
      */
-    public static final String SOURCE_HBASE = "HBASE";
-    public static final String SOURCE_ES = "ES";
+    public static final String SOURCE_MONGODB = "MongoDB";
 
     /**
      * 智能路由查询
-     * 根据查询条件自动选择最优存储
+     * 现在统一使用 MongoDB 查询
      *
      * @param searchDTO 搜索条件
      * @return 搜索结果
@@ -56,101 +52,18 @@ public class MessageQueryRouter {
     public MessageSearchResultVO smartSearch(MessageSearchDTO searchDTO) {
         long startTime = System.currentTimeMillis();
         
-        // 确定路由策略
-        String routeTarget = determineRoute(searchDTO);
-        log.info("查询路由决策: {} -> {}", summarizeConditions(searchDTO), routeTarget);
+        log.info("查询路由决策: {} -> MongoDB", summarizeConditions(searchDTO));
 
-        MessageSearchResultVO result;
-        
-        if (SOURCE_HBASE.equals(routeTarget)) {
-            // 走 HBase 查询
-            result = searchFromHBase(searchDTO);
-        } else {
-            // 走 ES 查询
-            result = esQueryService.search(searchDTO);
-        }
-
-        result.setDataSource(routeTarget);
+        // 统一使用 MongoDB 查询
+        MessageSearchResultVO result = mongoQueryService.search(searchDTO);
+        result.setDataSource(SOURCE_MONGODB);
         result.setCostMs(System.currentTimeMillis() - startTime);
         
         return result;
     }
 
     /**
-     * 确定路由目标
-     * 
-     * 核心路由规则:
-     * 1. 仅 chatId 条件 → HBase（RowKey前缀扫描最高效）
-     * 2. 其他所有情况 → ES（复合查询能力强）
-     */
-    private String determineRoute(MessageSearchDTO searchDTO) {
-        // 规则1: 仅有 chatId 条件，走 HBase
-        if (searchDTO.isOnlyChatIdCondition()) {
-            return SOURCE_HBASE;
-        }
-        
-        // 规则2: 有 chatId + 时间范围，且无其他复杂条件，走 HBase
-        // （HBase 支持 RowKey 范围扫描，时间是 RowKey 的一部分）
-        if (StrUtil.isNotBlank(searchDTO.getChatId()) 
-                && (searchDTO.getStartTime() != null || searchDTO.getEndTime() != null)
-                && StrUtil.isBlank(searchDTO.getFromUserId())
-                && StrUtil.isBlank(searchDTO.getToUserId())
-                && StrUtil.isBlank(searchDTO.getContent())
-                && searchDTO.getMsgStatus() == null
-                && searchDTO.getMsgFormat() == null
-                && searchDTO.getWithdrawFlag() == null) {
-            // 注意: 当前 HBase 实现可能不支持时间范围，降级到 ES
-            // 如果 HBase 有时间范围查询能力，可以返回 SOURCE_HBASE
-            return SOURCE_ES;
-        }
-        
-        // 规则3: 其他情况都走 ES
-        return SOURCE_ES;
-    }
-
-    /**
-     * 从 HBase 查询
-     */
-    private MessageSearchResultVO searchFromHBase(MessageSearchDTO searchDTO) {
-        try {
-            int pageSize = searchDTO.getPageSize() != null ? searchDTO.getPageSize() : 20;
-            if (pageSize > 100) {
-                pageSize = 100;
-            }
-
-            List<ImC2CMsgRecord> records;
-            
-            if (StrUtil.isNotBlank(searchDTO.getChatId())) {
-                // 按 chatId 查询
-                records = hBaseService.getMessagesByChatId(searchDTO.getChatId(), pageSize);
-            } else {
-                // 无条件查询（降级处理）
-                records = hBaseService.getLatestMessages(pageSize);
-            }
-
-            // HBase 不支持精确总数统计，返回当前页数量
-            long total = records.size();
-            
-            MessageSearchResultVO result = MessageSearchResultVO.success(
-                    records, 
-                    total, 
-                    searchDTO.getPageNum() != null ? searchDTO.getPageNum() : 1, 
-                    pageSize
-            );
-            result.setDataSource(SOURCE_HBASE);
-            
-            return result;
-
-        } catch (Exception e) {
-            log.error("HBase查询失败，降级到ES", e);
-            // HBase 查询失败，降级到 ES
-            return esQueryService.search(searchDTO);
-        }
-    }
-
-    /**
-     * 按 chatId 查询（路由版）
-     * 优先走 HBase，因为这是 RowKey 前缀扫描的最佳场景
+     * 按 chatId 查询（使用 MongoDB）
      *
      * @param chatId   会话ID
      * @param pageNum  页码
@@ -167,7 +80,7 @@ public class MessageQueryRouter {
 
     /**
      * 按用户ID查询（发送方或接收方）
-     * 始终走 ES，因为 HBase 不支持非 RowKey 字段查询
+     * 使用 MongoDB 查询
      *
      * @param userId   用户ID
      * @param pageNum  页码
@@ -177,15 +90,14 @@ public class MessageQueryRouter {
     public MessageSearchResultVO searchByUserId(String userId, int pageNum, int pageSize) {
         long startTime = System.currentTimeMillis();
         
-        // 构建 OR 查询：发送方 OR 接收方
-        MessageSearchDTO dtoFrom = new MessageSearchDTO();
-        dtoFrom.setFromUserId(userId);
-        dtoFrom.setPageNum(pageNum);
-        dtoFrom.setPageSize(pageSize);
+        // 构建查询条件：发送方
+        MessageSearchDTO dto = new MessageSearchDTO();
+        dto.setFromUserId(userId);
+        dto.setPageNum(pageNum);
+        dto.setPageSize(pageSize);
         
-        // 使用 ES 的 should 查询
-        MessageSearchResultVO result = esQueryService.search(dtoFrom);
-        result.setDataSource(SOURCE_ES);
+        MessageSearchResultVO result = mongoQueryService.search(dto);
+        result.setDataSource(SOURCE_MONGODB);
         result.setCostMs(System.currentTimeMillis() - startTime);
         
         log.info("按用户ID查询完成: userId={}, 命中={}, 耗时={}ms", userId, result.getTotal(), result.getCostMs());
@@ -194,7 +106,7 @@ public class MessageQueryRouter {
 
     /**
      * 消息内容搜索
-     * 始终走 ES，因为只有 ES 支持全文搜索
+     * 使用 MongoDB 正则匹配
      *
      * @param content  搜索关键词
      * @param pageNum  页码
@@ -204,8 +116,8 @@ public class MessageQueryRouter {
     public MessageSearchResultVO searchByContent(String content, int pageNum, int pageSize) {
         long startTime = System.currentTimeMillis();
         
-        MessageSearchResultVO result = esQueryService.searchByContent(content, pageNum, pageSize);
-        result.setDataSource(SOURCE_ES);
+        MessageSearchResultVO result = mongoQueryService.searchByContent(content, pageNum, pageSize);
+        result.setDataSource(SOURCE_MONGODB);
         result.setCostMs(System.currentTimeMillis() - startTime);
         
         log.info("内容搜索完成: content={}, 命中={}, 耗时={}ms", content, result.getTotal(), result.getCostMs());
@@ -214,13 +126,13 @@ public class MessageQueryRouter {
 
     /**
      * 获取最新消息
-     * 走 ES，因为需要全局排序
+     * 使用 MongoDB 查询
      *
      * @param limit 数量限制
      * @return 消息列表
      */
     public List<ImC2CMsgRecord> getLatestMessages(int limit) {
-        return esQueryService.getLatestMessages(limit);
+        return mongoQueryService.getLatestMessages(limit);
     }
 
     /**
@@ -245,6 +157,6 @@ public class MessageQueryRouter {
      * 获取健康状态
      */
     public boolean isHealthy() {
-        return esQueryService.isConnectionHealthy();
+        return mongoQueryService.isConnectionHealthy();
     }
 }
