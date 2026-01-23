@@ -12,9 +12,14 @@ import com.xzll.business.entity.mysql.ImPersonalChatOpt;
 import com.xzll.business.mapper.ImChatMapper;
 import com.xzll.business.mapper.ImUserMapper;
 import com.xzll.business.service.ChatListService;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
 import com.xzll.business.service.ImChatService;
 import com.xzll.business.service.ImPersonalChatOptService;
+import com.xzll.business.repository.ImC2CMsgRecordMongoRepository;
+import com.xzll.business.entity.mongo.ImC2CMsgRecordMongo;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.Sort;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.C2CSendMsgAO;
 import com.xzll.common.pojo.request.LastChatListAO;
@@ -46,8 +51,9 @@ public class ImChatServiceImpl implements ImChatService {
     @Resource
     private ImPersonalChatOptService imPersonalChatOptService;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
+    @Resource(name = "mongoTemplate")
+    private MongoTemplate mongoTemplate;
+    
     @Resource
     private ChatListService chatListService;
 
@@ -97,7 +103,7 @@ public class ImChatServiceImpl implements ImChatService {
      * 新的查询流程：
      * 1. 从 Redis 读取会话列表元数据（msgId + 未读数 + 时间戳）
      * 2. 如果Redis为空，从MySQL查询用户的所有会话
-     * 3. 从 HBase 批量查询消息内容（根据chatId+msgId）
+     * 3. 从 MongoDB 批量查询消息内容（根据chatId+msgId）
      * 4. 查询用户对这些会话的个人操作（置顶、隐藏、删除等）
      * 5. 在内存中组装数据并按最后消息时间排序
      * 6. 处理置顶逻辑
@@ -138,11 +144,11 @@ public class ImChatServiceImpl implements ImChatService {
         queryOpt.setUserId(ao.getUserId());
         List<ImPersonalChatOpt> allPersonalChats = imPersonalChatOptService.findPersonalChatByUserId(queryOpt, null, null);
         
-        // 4. 【关键】从HBase批量查询消息内容（根据chatId+msgId）
+        // 4. 【关键】从MongoDB批量查询消息内容（根据chatId+msgId）
         final Map<String, ImC2CMsgRecord> lastMsgMap;
-        if (imC2CMsgRecordHBaseService != null && !chatMetadataMap.isEmpty()) {
-            // 构建rowKeys：chatId_msgId
-            List<String> rowKeys = chatMetadataMap.entrySet().stream()
+        if (!chatMetadataMap.isEmpty()) {
+            // 构建documentIds：chatId_msgId
+            List<String> documentIds = chatMetadataMap.entrySet().stream()
                     .map(entry -> {
                         String chatId = entry.getKey();
                         JSONObject metadata = JSONUtil.parseObj(entry.getValue());
@@ -151,15 +157,14 @@ public class ImChatServiceImpl implements ImChatService {
                     })
                     .collect(Collectors.toList());
             
-            log.info("从HBase批量查询消息内容，数量：{}", rowKeys.size());
-            lastMsgMap = imC2CMsgRecordHBaseService.batchGetMessages(rowKeys);
-        } else if (imC2CMsgRecordHBaseService != null && chatMetadataMap.isEmpty()) {
+            log.info("从MongoDB批量查询消息内容，数量：{}", documentIds.size());
+            lastMsgMap = batchGetMessagesFromMongo(documentIds);
+        } else if (!chatIds.isEmpty()) {
             // Redis为空，使用旧逻辑：查询每个会话的最后一条消息
             log.info("Redis为空，使用旧逻辑查询最后一条消息");
-            lastMsgMap = imC2CMsgRecordHBaseService.batchGetLastMessagesByChatIds(chatIds);
-            //TODO mysql查完后，需要更新到redis
+            lastMsgMap = batchGetLastMessagesFromMongo(chatIds);
         } else {
-            log.warn("HBase服务未启用，无法查询消息内容");
+            log.warn("没有会话需要查询");
             lastMsgMap = new HashMap<>();
         }
         
@@ -192,7 +197,7 @@ public class ImChatServiceImpl implements ImChatService {
                     JSONObject metadata = chatMetadataMap.containsKey(chatId) ? 
                             JSONUtil.parseObj(chatMetadataMap.get(chatId)) : null;
                     
-                    // 根据chatId+msgId构建rowKey查询HBase消息
+                    // 根据chatId+msgId构建rowKey查询MongoDB消息
                     String rowKey = metadata != null ? (chatId + "_" + metadata.getStr("m")) : null;
                     ImC2CMsgRecord lastMsg = rowKey != null ? lastMsgMap.get(rowKey) : null;
                     
@@ -233,7 +238,7 @@ public class ImChatServiceImpl implements ImChatService {
                         vo.setMsgId(lastMsg.getMsgId());
                         vo.setMsgCreateTime(lastMsg.getMsgCreateTime());
                     } else if (metadata != null) {
-                        // HBase中没找到，但Redis有元数据，使用元数据中的时间和msgId
+                        // MongoDB中没找到，但Redis有元数据，使用元数据中的时间和msgId
                         log.warn("会话{}未找到消息记录，使用Redis元数据", chatId);
                         vo.setLastMessageContent("[点击查看]");
                         vo.setLastMsgFormat(0);
@@ -242,7 +247,7 @@ public class ImChatServiceImpl implements ImChatService {
                         vo.setMsgId(metadata.getStr("m", ""));
                         vo.setMsgCreateTime(lastMsgTime);
                     } else {
-                        // 既没有HBase数据也没有Redis元数据
+                        // 既没有MongoDB数据也没有Redis元数据
                         log.warn("会话{}既无消息记录也无元数据", chatId);
                         vo.setLastMessageContent("");
                         vo.setLastMsgFormat(0);
@@ -374,6 +379,66 @@ public class ImChatServiceImpl implements ImChatService {
         result.addAll(normalChats);
 
         log.info("置顶处理完成，置顶会话数:{}, 普通会话数:{}", topChats.size(), normalChats.size());
+        return result;
+    }
+
+    /**
+     * 从MongoDB批量查询消息
+     * @param documentIds 文档ID列表（格式：chatId_msgId）
+     * @return 消息记录映射
+     */
+    private Map<String, ImC2CMsgRecord> batchGetMessagesFromMongo(List<String> documentIds) {
+        Map<String, ImC2CMsgRecord> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(documentIds)) {
+            return result;
+        }
+        
+        try {
+            Query query = new Query(Criteria.where("_id").in(documentIds));
+            List<ImC2CMsgRecordMongo> mongoRecords = mongoTemplate.find(query, ImC2CMsgRecordMongo.class);
+            
+            for (ImC2CMsgRecordMongo mongo : mongoRecords) {
+                String key = mongo.getChatId() + "_" + mongo.getMsgId();
+                result.put(key, mongo.toRecord());
+            }
+            
+            log.info("MongoDB批量查询消息完成，请求{}条，返回{}条", documentIds.size(), result.size());
+        } catch (Exception e) {
+            log.error("MongoDB批量查询消息失败", e);
+        }
+        
+        return result;
+    }
+
+    /**
+     * 从MongoDB查询每个会话的最后一条消息
+     * @param chatIds 会话ID列表
+     * @return 消息记录映射
+     */
+    private Map<String, ImC2CMsgRecord> batchGetLastMessagesFromMongo(List<String> chatIds) {
+        Map<String, ImC2CMsgRecord> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(chatIds)) {
+            return result;
+        }
+        
+        try {
+            for (String chatId : chatIds) {
+                Query query = new Query(Criteria.where("chatId").is(chatId))
+                        .with(Sort.by(Sort.Direction.DESC, "msgCreateTime"))
+                        .limit(1);
+                ImC2CMsgRecordMongo mongo = mongoTemplate.findOne(query, ImC2CMsgRecordMongo.class);
+                
+                if (mongo != null) {
+                    String key = chatId + "_" + mongo.getMsgId();
+                    result.put(key, mongo.toRecord());
+                }
+            }
+            
+            log.info("MongoDB查询最后消息完成，查询{}个会话，返回{}条", chatIds.size(), result.size());
+        } catch (Exception e) {
+            log.error("MongoDB查询最后消息失败", e);
+        }
+        
         return result;
     }
 }

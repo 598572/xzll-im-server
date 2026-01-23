@@ -157,6 +157,10 @@ services:
       - "8084:8084"
     networks:
       - default_network
+    extra_hosts:
+      - "hadoop01:192.168.1.130"
+      - "hadoop02:192.168.1.131"
+      - "hadoop03:192.168.1.132"
     volumes:
       - "/tmp/data/logs:/logs"
     environment:
@@ -179,6 +183,10 @@ services:
       - "8085:8085"
     networks:
       - default_network
+    extra_hosts:
+      - "hadoop01:192.168.1.130"
+      - "hadoop02:192.168.1.131"
+      - "hadoop03:192.168.1.132"
     volumes:
       - "/tmp/data/logs:/logs"
     environment:

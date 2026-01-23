@@ -54,7 +54,9 @@ public class InteractiveTestClient {
         System.out.println("║     交互式 IM 测试客户端 - 启动配置               ║");
         System.out.println("╚════════════════════════════════════════════════════╝");
         System.out.println();
-        System.out.print("请输入当前用户ID（发送方，例如: user1）: ");
+        System.out.print("请输入当" +
+                "" +
+                "前用户ID（发送方，例如: user1）: ");
         currentUserId = scanner.nextLine().trim();
         
         if (currentUserId.isEmpty()) {

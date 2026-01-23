@@ -2,6 +2,7 @@ package com.xzll.datasync.consumer;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
+import com.xzll.datasync.config.nacos.ElasticSearchNacosConfig;
 import com.xzll.datasync.entity.ImC2CMsgRecordES;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
@@ -30,6 +31,12 @@ import static com.xzll.common.constant.ImConstant.TableConstant.*;
  * 批量数据同步消费者
  * 直接利用RocketMQ的批量消费能力，实现高性能批量写入ES
  * 
+ * ES同步开关说明：
+ * - 通过 im.elasticsearch.syncEnabled 配置控制
+ * - 默认为 false，不同步到ES
+ * - 设为 true 时启用ES同步
+ * - 支持 Nacos 配置热更新
+ * 
  * @Author: hzz
  * @Date: 2024/12/20
  */
@@ -39,6 +46,9 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
     
     @Resource
     private RestHighLevelClient restHighLevelClient;
+    
+    @Resource
+    private ElasticSearchNacosConfig elasticSearchNacosConfig;
     
     // 统计信息
     private final AtomicLong totalProcessed = new AtomicLong(0);
@@ -56,7 +66,12 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
         int errorCount = 0;
         
         try {
-            log.info("开始批量消费消息，消息数量: {}, 批次ID: {}", msgs.size(), context.getMessageQueue().getQueueId());
+            log.info("开始批量消费消息，消息数量: {}, 批次ID: {}, ES同步开关: {}", 
+                    msgs.size(), context.getMessageQueue().getQueueId(), 
+                    elasticSearchNacosConfig.getSyncEnabled());
+            
+            // 检查ES同步开关
+            boolean esSyncEnabled = Boolean.TRUE.equals(elasticSearchNacosConfig.getSyncEnabled());
             
             // 按操作类型分组，预分配容量以提高性能
             List<ImC2CMsgRecordES> insertRecords = new ArrayList<>(msgs.size());
@@ -103,48 +118,56 @@ public class BatchDataSyncConsumer implements MessageListenerConcurrently {
                 }
             }
             
-            // 批量写入ES - 使用 RestHighLevelClient 的 BulkRequest，性能更高
-            if (!insertRecords.isEmpty()) {
-                try {
-                    BulkRequest bulkRequest = new BulkRequest();
-                    for (ImC2CMsgRecordES record : insertRecords) {
-                        IndexRequest indexRequest = new IndexRequest(IM_C2C_MSG_RECORD)
-                                .id(record.getId())
-                                .source(JSONUtil.toJsonStr(record), XContentType.JSON);
-                        bulkRequest.add(indexRequest);
+            // 批量写入ES - 仅当ES同步开关开启时才执行
+            if (esSyncEnabled) {
+                if (!insertRecords.isEmpty()) {
+                    try {
+                        BulkRequest bulkRequest = new BulkRequest();
+                        for (ImC2CMsgRecordES record : insertRecords) {
+                            IndexRequest indexRequest = new IndexRequest(IM_C2C_MSG_RECORD)
+                                    .id(record.getId())
+                                    .source(JSONUtil.toJsonStr(record), XContentType.JSON);
+                            bulkRequest.add(indexRequest);
+                        }
+                        
+                        BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+                        if (bulkResponse.hasFailures()) {
+                            log.warn("批量插入ES存在部分失败，总数: {}, 失败数: {}", 
+                                    insertRecords.size(), bulkResponse.getItems().length - bulkResponse.getItems().length);
+                        }
+                        log.debug("批量插入ES成功，数量: {}, 索引: im_c2c_msg_record", insertRecords.size());
+                    } catch (Exception e) {
+                        log.error("批量插入ES失败，数量: {}", insertRecords.size(), e);
+                        errorCount += insertRecords.size();
                     }
-                    
-                    BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
-                    if (bulkResponse.hasFailures()) {
-                        log.warn("批量插入ES存在部分失败，总数: {}, 失败数: {}", 
-                                insertRecords.size(), bulkResponse.getItems().length - bulkResponse.getItems().length);
-                    }
-                    log.debug("批量插入ES成功，数量: {}, 索引: im_c2c_msg_record", insertRecords.size());
-                } catch (Exception e) {
-                    log.error("批量插入ES失败，数量: {}", insertRecords.size(), e);
-                    errorCount += insertRecords.size();
                 }
-            }
-            
-            if (!updateRecords.isEmpty()) {
-                try {
-                    BulkRequest bulkRequest = new BulkRequest();
-                    for (ImC2CMsgRecordES record : updateRecords) {
-                        UpdateRequest updateRequest = new UpdateRequest(IM_C2C_MSG_RECORD, record.getId())
-                                .doc(JSONUtil.toJsonStr(record), XContentType.JSON)
-                                .docAsUpsert(true);
-                        bulkRequest.add(updateRequest);
+                
+                if (!updateRecords.isEmpty()) {
+                    try {
+                        BulkRequest bulkRequest = new BulkRequest();
+                        for (ImC2CMsgRecordES record : updateRecords) {
+                            UpdateRequest updateRequest = new UpdateRequest(IM_C2C_MSG_RECORD, record.getId())
+                                    .doc(JSONUtil.toJsonStr(record), XContentType.JSON)
+                                    .docAsUpsert(true);
+                            bulkRequest.add(updateRequest);
+                        }
+                        
+                        BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+                        if (bulkResponse.hasFailures()) {
+                            log.warn("批量更新ES存在部分失败，总数: {}, 失败数: {}", 
+                                    updateRecords.size(), bulkResponse.getItems().length - bulkResponse.getItems().length);
+                        }
+                        log.debug("批量更新ES成功，数量: {}, 索引: im_c2c_msg_record", updateRecords.size());
+                    } catch (Exception e) {
+                        log.error("批量更新ES失败，数量: {}", updateRecords.size(), e);
+                        errorCount += updateRecords.size();
                     }
-                    
-                    BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
-                    if (bulkResponse.hasFailures()) {
-                        log.warn("批量更新ES存在部分失败，总数: {}, 失败数: {}", 
-                                updateRecords.size(), bulkResponse.getItems().length - bulkResponse.getItems().length);
-                    }
-                    log.debug("批量更新ES成功，数量: {}, 索引: im_c2c_msg_record", updateRecords.size());
-                } catch (Exception e) {
-                    log.error("批量更新ES失败，数量: {}", updateRecords.size(), e);
-                    errorCount += updateRecords.size();
+                }
+            } else {
+                // ES同步关闭，记录日志但不写入ES
+                if (!insertRecords.isEmpty() || !updateRecords.isEmpty()) {
+                    log.info("ES同步开关关闭，跳过ES写入。待插入: {}, 待更新: {}", 
+                            insertRecords.size(), updateRecords.size());
                 }
             }
             

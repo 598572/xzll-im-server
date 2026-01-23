@@ -1,8 +1,14 @@
 package com.xzll.console.controller;
 
+import com.xzll.common.pojo.base.WebBaseResponse;
+import com.xzll.console.dto.MessageSearchDTO;
 import com.xzll.console.entity.ImC2CMsgRecord;
-import com.xzll.console.service.ImC2CMsgRecordHBaseService;
-import com.xzll.console.util.HBaseHealthChecker;
+import com.xzll.console.service.MessageESQueryService;
+import com.xzll.console.service.MessageMongoQueryService;
+import com.xzll.console.service.MessageQueryRouter;
+import com.xzll.console.vo.MessagePageResultVO;
+import com.xzll.console.vo.MessageSearchResultVO;
+import com.xzll.console.vo.HealthCheckVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,8 +16,6 @@ import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
 /**
  * @Author: hzz
@@ -25,20 +29,22 @@ import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECOR
 public class C2CMessageHistoryController {
 
     @Resource
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
-    
+    private MessageMongoQueryService messageMongoQueryService;
+
     @Resource
-    private HBaseHealthChecker hBaseHealthChecker;
+    private MessageQueryRouter messageQueryRouter;
+
+    @Resource
+    private MessageESQueryService messageESQueryService;
 
     /**
      * 分页查询单聊历史消息
+     * 数据来源: MongoDB
      */
     @GetMapping("/history/page")
-    public Map<String, Object> getMessageHistoryByPage(
+    public WebBaseResponse<MessagePageResultVO> getMessageHistoryByPage(
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(required = false) String lastRowKey) {
-        
-        Map<String, Object> result = new HashMap<>();
         
         try {
             if (limit > 100) {
@@ -46,158 +52,283 @@ public class C2CMessageHistoryController {
                 log.warn("查询数量超过100，自动调整为100");
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getAllMessagesWithPagination(limit, lastRowKey);
+            // 使用MongoDB查询最新消息
+            List<ImC2CMsgRecord> messages = messageMongoQueryService.getLatestMessages(limit);
             
-            result.put("success", true);
-            result.put("data", messages);
-            result.put("count", messages.size());
-            result.put("limit", limit);
-            result.put("hasMore", messages.size() == limit);
-            
-            if (messages.size() == limit && !messages.isEmpty()) {
-                ImC2CMsgRecord lastMessage = messages.get(messages.size() - 1);
-                String nextRowKey = lastMessage.getChatId() + "_" + 
-                    (Long.MAX_VALUE - lastMessage.getMsgCreateTime()) + "_" + 
-                    lastMessage.getMsgId();
-                result.put("nextRowKey", nextRowKey);
-            }
+            MessagePageResultVO resultVO = new MessagePageResultVO();
+            resultVO.setData(messages);
+            resultVO.setCount(messages.size());
+            resultVO.setLimit(limit);
+            resultVO.setHasMore(messages.size() == limit);
+            resultVO.setDataSource("MongoDB");
             
             log.info("分页查询单聊历史消息成功，返回 {} 条记录", messages.size());
+            return WebBaseResponse.returnResultSuccess(resultVO);
             
         } catch (Exception e) {
             log.error("分页查询单聊历史消息失败", e);
-            result.put("success", false);
-            result.put("message", "查询失败: " + e.getMessage());
+            return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
         }
-        
-        return result;
     }
 
     /**
      * 获取最新单聊消息
+     * 数据来源: ES（全局排序效率高）
      */
     @GetMapping("/history/latest")
-    public Map<String, Object> getLatestMessages(
+    public WebBaseResponse<MessagePageResultVO> getLatestMessages(
             @RequestParam(defaultValue = "20") int limit) {
-        
-        Map<String, Object> result = new HashMap<>();
         
         try {
             if (limit > 100) {
                 limit = 100;
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getLatestMessages(limit);
+            // 使用ES查询最新消息（全局排序效率更高）
+            List<ImC2CMsgRecord> messages = messageQueryRouter.getLatestMessages(limit);
             
-            result.put("success", true);
-            result.put("data", messages);
-            result.put("count", messages.size());
-            result.put("limit", limit);
+            MessagePageResultVO resultVO = new MessagePageResultVO();
+            resultVO.setData(messages);
+            resultVO.setCount(messages.size());
+            resultVO.setLimit(limit);
+            resultVO.setDataSource("ES");
+            
+            return WebBaseResponse.returnResultSuccess(resultVO);
             
         } catch (Exception e) {
             log.error("获取最新单聊消息失败", e);
-            result.put("success", false);
-            result.put("message", "查询失败: " + e.getMessage());
+            return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
         }
-        
-        return result;
     }
 
     /**
      * 根据会话ID查询单聊历史消息
+     * 数据来源: MongoDB（分片优化查询）
      */
     @GetMapping("/history/chat/{chatId}")
-    public Map<String, Object> getMessageHistoryByChatId(
+    public WebBaseResponse<MessagePageResultVO> getMessageHistoryByChatId(
             @PathVariable String chatId,
             @RequestParam(defaultValue = "50") int limit) {
         
-        Map<String, Object> result = new HashMap<>();
-        
         try {
             if (chatId == null || chatId.trim().isEmpty()) {
-                result.put("success", false);
-                result.put("message", "会话ID不能为空");
-                return result;
+                return WebBaseResponse.returnResultError("会话ID不能为空");
             }
             
             if (limit > 100) {
                 limit = 100;
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getMessagesByChatId(chatId, limit);
+            // 使用MongoDB按chatId查询（分片优化）
+            List<ImC2CMsgRecord> messages = messageMongoQueryService.getMessagesByChatId(chatId, limit);
             
-            result.put("success", true);
-            result.put("data", messages);
-            result.put("count", messages.size());
-            result.put("chatId", chatId);
-            result.put("limit", limit);
+            MessagePageResultVO resultVO = new MessagePageResultVO();
+            resultVO.setData(messages);
+            resultVO.setCount(messages.size());
+            resultVO.setChatId(chatId);
+            resultVO.setLimit(limit);
+            resultVO.setDataSource("MongoDB");
+            
+            return WebBaseResponse.returnResultSuccess(resultVO);
             
         } catch (Exception e) {
             log.error("根据会话ID查询单聊历史消息失败，chatId: {}", chatId, e);
-            result.put("success", false);
-            result.put("message", "查询失败: " + e.getMessage());
+            return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
         }
-        
-        return result;
     }
 
     /**
-     * 条件查询单聊历史消息
+     * 条件查询单聊历史消息（智能路由版）
+     * 根据查询条件自动选择最优存储：
+     * - 仅chatId条件 → MongoDB（复合查询）
+     * - 其他条件 → ES（复合查询）
      */
     @GetMapping("/history/search")
-    public Map<String, Object> searchMessageHistory(
+    public WebBaseResponse<MessageSearchResultVO> searchMessageHistory(
             @RequestParam(required = false) String fromUserId,
             @RequestParam(required = false) String toUserId,
-            @RequestParam(required = false) String chatId) {
-        
-        Map<String, Object> result = new HashMap<>();
+            @RequestParam(required = false) String chatId,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) Integer msgStatus,
+            @RequestParam(required = false) Integer msgFormat,
+            @RequestParam(required = false) Long startTime,
+            @RequestParam(required = false) Long endTime,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
         
         try {
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getMessagesByCondition(fromUserId, toUserId, chatId);
+            // 构建搜索条件
+            MessageSearchDTO searchDTO = new MessageSearchDTO();
+            searchDTO.setFromUserId(fromUserId);
+            searchDTO.setToUserId(toUserId);
+            searchDTO.setChatId(chatId);
+            searchDTO.setContent(content);
+            searchDTO.setMsgStatus(msgStatus);
+            searchDTO.setMsgFormat(msgFormat);
+            searchDTO.setStartTime(startTime);
+            searchDTO.setEndTime(endTime);
+            searchDTO.setPageNum(pageNum);
+            searchDTO.setPageSize(pageSize);
             
-            result.put("success", true);
-            result.put("data", messages);
-            result.put("count", messages.size());
+            // 使用智能路由查询
+            MessageSearchResultVO resultVO = messageQueryRouter.smartSearch(searchDTO);
+            return WebBaseResponse.returnResultSuccess(resultVO);
             
         } catch (Exception e) {
             log.error("条件查询单聊历史消息失败", e);
-            result.put("success", false);
-            result.put("message", "查询失败: " + e.getMessage());
+            return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
         }
-        
-        return result;
     }
 
     /**
-     * HBase连接健康检查
+     * 消息内容全文搜索
+     * 数据来源: ES（支持中文分词）
      */
-    @GetMapping("/health")
-    public Map<String, Object> checkHBaseHealth() {
-        Map<String, Object> result = new HashMap<>();
+    @GetMapping("/history/search/content")
+    public WebBaseResponse<MessageSearchResultVO> searchByContent(
+            @RequestParam String content,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
         
         try {
-            boolean isHealthy = hBaseHealthChecker.isConnectionHealthy();
-            String status = hBaseHealthChecker.getConnectionStatus();
-            boolean tableExists = hBaseHealthChecker.isTableExists(IM_C2C_MSG_RECORD);
+            MessageSearchResultVO resultVO = messageQueryRouter.searchByContent(content, pageNum, pageSize);
+            return WebBaseResponse.returnResultSuccess(resultVO);
+        } catch (Exception e) {
+            log.error("消息内容搜索失败", e);
+            return WebBaseResponse.returnResultError("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 按用户ID搜索消息
+     * 数据来源: ES
+     */
+    @GetMapping("/history/search/user/{userId}")
+    public WebBaseResponse<MessageSearchResultVO> searchByUserId(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        
+        try {
+            MessageSearchResultVO resultVO = messageQueryRouter.searchByUserId(userId, pageNum, pageSize);
+            return WebBaseResponse.returnResultSuccess(resultVO);
+        } catch (Exception e) {
+            log.error("按用户ID搜索消息失败", e);
+            return WebBaseResponse.returnResultError("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 按时间范围搜索消息
+     * 数据来源: ES
+     */
+    @GetMapping("/history/search/time")
+    public WebBaseResponse<MessageSearchResultVO> searchByTimeRange(
+            @RequestParam Long startTime,
+            @RequestParam Long endTime,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        
+        try {
+            MessageSearchResultVO resultVO = messageESQueryService.searchByTimeRange(startTime, endTime, pageNum, pageSize);
+            return WebBaseResponse.returnResultSuccess(resultVO);
+        } catch (Exception e) {
+            log.error("按时间范围搜索消息失败", e);
+            return WebBaseResponse.returnResultError("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取消息统计信息
+     * 数据来源: ES
+     */
+    @GetMapping("/statistics")
+    public WebBaseResponse<Map<String, Object>> getMessageStatistics() {
+        try {
+            Map<String, Object> stats = messageESQueryService.getMessageStatistics();
+            stats.put("dataSource", "ES");
+            return WebBaseResponse.returnResultSuccess(stats);
+        } catch (Exception e) {
+            log.error("获取消息统计失败", e);
+            return WebBaseResponse.returnResultError("统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取用户消息统计
+     * 数据来源: ES
+     */
+    @GetMapping("/statistics/user/{userId}")
+    public WebBaseResponse<Map<String, Object>> getUserMessageStatistics(@PathVariable String userId) {
+        try {
+            Map<String, Object> stats = messageESQueryService.getUserMessageStatistics(userId);
+            stats.put("userId", userId);
+            stats.put("dataSource", "ES");
+            return WebBaseResponse.returnResultSuccess(stats);
+        } catch (Exception e) {
+            log.error("获取用户消息统计失败", e);
+            return WebBaseResponse.returnResultError("统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取会话消息统计
+     * 数据来源: ES
+     */
+    @GetMapping("/statistics/chat/{chatId}")
+    public WebBaseResponse<Map<String, Object>> getChatMessageStatistics(@PathVariable String chatId) {
+        try {
+            Map<String, Object> stats = messageESQueryService.getChatMessageStatistics(chatId);
+            stats.put("chatId", chatId);
+            stats.put("dataSource", "ES");
+            return WebBaseResponse.returnResultSuccess(stats);
+        } catch (Exception e) {
+            log.error("获取会话消息统计失败", e);
+            return WebBaseResponse.returnResultError("统计失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 健康检查（MongoDB + ES）
+     */
+    @GetMapping("/health")
+    public WebBaseResponse<HealthCheckVO> checkHealth() {
+        try {
+            // MongoDB 健康检查
+            boolean mongoHealthy = messageMongoQueryService.isConnectionHealthy();
             
-            result.put("success", true);
-            result.put("hbaseHealthy", isHealthy);
-            result.put("connectionStatus", status);
-            result.put("tableExists", tableExists);
-            result.put("timestamp", System.currentTimeMillis());
+            // ES 健康检查
+            boolean esHealthy = messageESQueryService.isConnectionHealthy();
+            Map<String, Object> esIndexInfo = messageESQueryService.getIndexInfo();
             
-            if (!isHealthy) {
-                result.put("message", "HBase连接异常，请检查配置");
-            } else {
-                result.put("message", "HBase连接正常");
-            }
+            HealthCheckVO vo = new HealthCheckVO();
+            vo.setTimestamp(System.currentTimeMillis());
+            
+            // MongoDB 状态（复用hbase字段，避免修改VO）
+            HealthCheckVO.StorageHealth mongoHealth = new HealthCheckVO.StorageHealth();
+            mongoHealth.setHealthy(mongoHealthy);
+            mongoHealth.setStatus(mongoHealthy ? "MongoDB连接正常" : "MongoDB连接异常");
+            mongoHealth.setTableExists(true);
+            vo.setHbase(mongoHealth);
+            
+            // ES 状态
+            HealthCheckVO.StorageHealth esHealth = new HealthCheckVO.StorageHealth();
+            esHealth.setHealthy(esHealthy);
+            esHealth.setIndexInfo(esIndexInfo);
+            vo.setElasticsearch(esHealth);
+            
+            // 总体状态
+            boolean allHealthy = mongoHealthy && esHealthy;
+            vo.setAllHealthy(allHealthy);
+            
+            String msg = allHealthy ? "MongoDB和ES连接均正常" : 
+                    "MongoDB: " + (mongoHealthy ? "正常" : "异常") + ", ES: " + (esHealthy ? "正常" : "异常");
+            
+            return WebBaseResponse.returnResultSuccess(msg, vo);
             
         } catch (Exception e) {
-            log.error("HBase健康检查失败", e);
-            result.put("success", false);
-            result.put("message", "健康检查失败: " + e.getMessage());
+            log.error("健康检查失败", e);
+            return WebBaseResponse.returnResultError("健康检查失败: " + e.getMessage());
         }
-        
-        return result;
     }
 } 

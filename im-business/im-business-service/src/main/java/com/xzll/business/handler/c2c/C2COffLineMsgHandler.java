@@ -1,7 +1,7 @@
 package com.xzll.business.handler.c2c;
 
 import com.xzll.business.service.ChatListService;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.ImC2CMsgRecordService;
 import com.xzll.business.service.impl.ServerAckSimpleRetryService;
 import com.xzll.common.constant.MsgStatusEnum;
 import com.xzll.common.pojo.request.C2COffLineMsgAO;
@@ -25,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 public class C2COffLineMsgHandler {
     
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
+    private ImC2CMsgRecordService imC2CMsgRecordService;
 
     @Resource
     private ServerAckSimpleRetryService serverAckSimpleRetryService;
@@ -52,14 +52,10 @@ public class C2COffLineMsgHandler {
 
         // 2. 更新消息状态为离线
         boolean updateMsg = true;
-        if (imC2CMsgRecordHBaseService != null) {
-            updateMsg = imC2CMsgRecordHBaseService.updateC2CMsgOffLineStatus(dto);
-            log.debug("【C2COffLineMsgHandler-消息状态更新】HBase消息状态更新结果: {} - clientMsgId: {}, msgId: {}, status: {}",
+
+        updateMsg = imC2CMsgRecordService.updateC2CMsgOffLineStatus(dto);
+        log.debug("【C2COffLineMsgHandler-消息状态更新】Mongodb消息状态更新结果: {} - clientMsgId: {}, msgId: {}, status: {}",
                 updateMsg, dto.getClientMsgId(), dto.getMsgId(), dto.getMsgStatus());
-        } else {
-            log.warn("【C2COffLineMsgHandler-跳过HBase】HBase服务未启用，跳过离线消息状态更新到HBase - clientMsgId: {}, msgId: {}", 
-                dto.getClientMsgId(), dto.getMsgId());
-        }
         
         // 3. 【关键】更新Redis会话列表元数据（接收方）
         try {

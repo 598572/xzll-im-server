@@ -142,6 +142,20 @@
                 <version>4.1.4</version>
             </dependency>
 
+            <!-- Spring Boot 3.x 需要显式添加validation依赖 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${springboot.version}</version>
+            </dependency>
+
+            <!-- Spring Security Crypto (用于BCrypt密码加密) -->
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-crypto</artifactId>
+                <version>6.2.1</version>
+            </dependency>
+
 
             <dependency>
                 <groupId>org.apache.rocketmq</groupId>
@@ -486,65 +500,6 @@
             </dependency>
 
 
-
-
-
-            <!-- HBase 依赖 - 专门为Hadoop 3.x设计 -->
-            <dependency>
-                <groupId>org.apache.hbase</groupId>
-                <artifactId>hbase</artifactId>
-                <version>2.5.7-hadoop3</version>
-                <type>pom</type>
-            </dependency>
-
-            <!-- 具体的HBase客户端依赖 -->
-            <dependency>
-                <groupId>org.apache.hbase</groupId>
-                <artifactId>hbase-client</artifactId>
-                <version>2.5.7-hadoop3</version>
-            </dependency>
-
-            <!-- https://mvnrepository.com/artifact/org.apache.hbase/hbase-common -->
-            <dependency>
-                <groupId>org.apache.hbase</groupId>
-                <artifactId>hbase-common</artifactId>
-                <version>2.5.7-hadoop3</version>
-            </dependency>
-
-            <!-- https://mvnrepository.com/artifact/org.apache.hbase/hbase-server -->
-            <dependency>
-                <groupId>org.apache.hbase</groupId>
-                <artifactId>hbase-server</artifactId>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>hadoop-mapreduce-client-core</artifactId>
-                        <groupId>org.apache.hadoop</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>reload4j</artifactId>
-                        <groupId>ch.qos.reload4j</groupId>
-                    </exclusion>
-                </exclusions>
-                <version>2.5.7-hadoop3</version>
-            </dependency>
-
-            <!-- Hadoop 3.x 核心依赖 -->
-            <dependency>
-                <groupId>org.apache.hadoop</groupId>
-                <artifactId>hadoop-common</artifactId>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>slf4j-reload4j</artifactId>
-                        <groupId>org.slf4j</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>reload4j</artifactId>
-                        <groupId>ch.qos.reload4j</groupId>
-                    </exclusion>
-                </exclusions>
-                <version>3.2.4</version>
-            </dependency>
-
         </dependencies>
     </dependencyManagement>
 
@@ -681,7 +636,7 @@
             <activation>
             </activation>
             <properties>
-                <!--模拟test环境  内网 zk RocketMQ hbase hadoop都已集群部署， redis es 暂时单机-->
+                <!--模拟test环境  内网 zk RocketMQ MongoDB都已集群部署， redis es 暂时单机-->
 
                 <!--替换bootstrap.properties中的 ${nacos.serverAddr}变量-->
                 <!--test对应内网环境 各个服务都部署在内网，所以nacos也配内网地址-->

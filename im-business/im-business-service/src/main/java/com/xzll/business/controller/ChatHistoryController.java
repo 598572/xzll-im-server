@@ -2,7 +2,7 @@ package com.xzll.business.controller;
 
 import com.xzll.business.dto.request.ChatHistoryQueryDTO;
 import com.xzll.business.dto.response.ChatHistoryResponseDTO;
-import com.xzll.business.service.ImC2CMsgRecordHBaseService;
+import com.xzll.business.service.impl.ImC2CMsgRecordMongoServiceImpl;
 import com.xzll.common.controller.BaseController;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.common.util.ChatIdUtils;
@@ -10,14 +10,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 /**
  * @Author: hzz
  * @Date: 2025/10/30
- * @Description: 聊天历史记录查询控制器 (基于HBase)
- *
+ * @Description: 聊天历史记录查询控制器 (基于MongoDB)
  */
 @RestController
 @RequestMapping("/api/chat/c2c")
@@ -25,8 +23,8 @@ import java.util.List;
 @Slf4j
 public class ChatHistoryController extends BaseController {
 
-    @Autowired(required = false)
-    private ImC2CMsgRecordHBaseService imC2CMsgRecordHBaseService;
+    @Autowired
+    private ImC2CMsgRecordMongoServiceImpl imC2CMsgRecordMongoService;
 
     /**
      * 查询聊天历史记录
@@ -36,7 +34,7 @@ public class ChatHistoryController extends BaseController {
      * @return 聊天历史记录响应
      */
     @PostMapping("/history")
-    public WebBaseResponse<ChatHistoryResponseDTO> queryChatHistory(@Valid @RequestBody ChatHistoryQueryDTO queryDTO) {
+    public WebBaseResponse<ChatHistoryResponseDTO> queryChatHistory(@RequestBody ChatHistoryQueryDTO queryDTO) {
         // 从网关获取当前登录用户ID（安全）
         String currentUserId = getCurrentUserIdWithValidation();
         if (currentUserId == null) {
@@ -74,7 +72,7 @@ public class ChatHistoryController extends BaseController {
             }
 
             // 调用服务查询
-            ChatHistoryResponseDTO response = imC2CMsgRecordHBaseService.queryChatHistory(queryDTO);
+            ChatHistoryResponseDTO response = imC2CMsgRecordMongoService.queryChatHistory(queryDTO);
             
             log.info("聊天历史查询完成: chatId={}, userId={}, 查询到{}条记录, hasMore={}", 
                     queryDTO.getChatId(), currentUserId, 
