@@ -211,66 +211,26 @@ const getMsgStatusType = (status: number | undefined) => {
 const loadLatestMessages = async () => {
   loading.value = true
   try {
+    // 返回格式: { code: 1, msg: "...", data: { data: [...], count: ..., dataSource: "ES" } }
     const res = await getLatestMessages(50)
-    if (res.success) {
-      tableData.value = res.data || []
-      hasMore.value = res.hasMore || false
-      lastRowKey.value = res.nextRowKey || ''
+    // 拦截器已检查 code=1，直接获取内层数据
+    const resultVO = res.data
+    if (resultVO && resultVO.data && resultVO.data.length > 0) {
+      tableData.value = resultVO.data
+      hasMore.value = resultVO.hasMore || false
+      lastRowKey.value = resultVO.nextRowKey || ''
       ElMessage.success(`加载了 ${tableData.value.length} 条最新消息`)
     } else {
-      ElMessage.warning(res.message || '暂无数据')
-      // 使用模拟数据
-      loadMockData()
+      tableData.value = []
+      ElMessage.warning('暂无消息数据')
     }
   } catch (error) {
     console.error('加载消息失败:', error)
-    loadMockData()
+    tableData.value = []
+    ElMessage.error('加载消息失败')
   } finally {
     loading.value = false
   }
-}
-
-// 模拟数据
-const loadMockData = () => {
-  tableData.value = [
-    {
-      msgId: '1-111-1960687134775255385',
-      chatId: '100-1-111-222',
-      fromUserId: '111',
-      toUserId: '222',
-      msgContent: '你好，在吗？',
-      msgFormat: 1,
-      msgStatus: 4,
-      msgCreateTime: Date.now() - 3600000,
-      createTime: Date.now() - 3600000,
-      updateTime: Date.now() - 3600000
-    },
-    {
-      msgId: '1-222-1960687134775255386',
-      chatId: '100-1-111-222',
-      fromUserId: '222',
-      toUserId: '111',
-      msgContent: '在的，有什么事吗？',
-      msgFormat: 1,
-      msgStatus: 4,
-      msgCreateTime: Date.now() - 3500000,
-      createTime: Date.now() - 3500000,
-      updateTime: Date.now() - 3500000
-    },
-    {
-      msgId: '1-111-1960687134775255387',
-      chatId: '100-1-111-222',
-      fromUserId: '111',
-      toUserId: '222',
-      msgContent: '想问一下明天的会议几点开始？',
-      msgFormat: 1,
-      msgStatus: 3,
-      msgCreateTime: Date.now() - 3400000,
-      createTime: Date.now() - 3400000,
-      updateTime: Date.now() - 3400000
-    }
-  ]
-  hasMore.value = false
 }
 
 // 搜索
@@ -282,16 +242,19 @@ const handleSearch = async () => {
   
   loading.value = true
   try {
+    // 返回格式: { code: 1, msg: "...", data: { data: [...], total: ..., ... } }
     const res = await searchMessages({
       fromUserId: queryParams.fromUserId || undefined,
       toUserId: queryParams.toUserId || undefined,
       chatId: queryParams.chatId || undefined
     })
-    if (res.success) {
-      tableData.value = res.data || []
+    const resultVO = res.data
+    if (resultVO && resultVO.data) {
+      tableData.value = resultVO.data
       ElMessage.success(`搜索到 ${tableData.value.length} 条消息`)
     } else {
-      ElMessage.warning(res.message || '暂无数据')
+      tableData.value = []
+      ElMessage.warning('暂无数据')
     }
   } catch (error) {
     console.error('搜索失败:', error)
@@ -316,10 +279,11 @@ const loadMore = async () => {
   loading.value = true
   try {
     const res = await getLatestMessages(50)
-    if (res.success && res.data) {
-      tableData.value = [...tableData.value, ...res.data]
-      hasMore.value = res.hasMore || false
-      lastRowKey.value = res.nextRowKey || ''
+    const resultVO = res.data
+    if (resultVO && resultVO.data) {
+      tableData.value = [...tableData.value, ...resultVO.data]
+      hasMore.value = resultVO.hasMore || false
+      lastRowKey.value = resultVO.nextRowKey || ''
     }
   } catch (error) {
     console.error('加载更多失败:', error)
@@ -343,9 +307,12 @@ const handleViewChat = async (row: Message) => {
   loading.value = true
   try {
     const res = await getMessagesByChatId(row.chatId, 100)
-    if (res.success) {
-      tableData.value = res.data || []
+    const resultVO = res.data
+    if (resultVO && resultVO.data) {
+      tableData.value = resultVO.data
       ElMessage.success(`会话 ${row.chatId} 共 ${tableData.value.length} 条消息`)
+    } else {
+      tableData.value = []
     }
   } catch (error) {
     console.error('查询会话消息失败:', error)

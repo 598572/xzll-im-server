@@ -153,7 +153,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getMessagesByChatId } from '../../api'
+import { getMessagesByChatId, getLatestMessages, searchMessages } from '../../api'
 
 interface Session {
   chatId: string
@@ -225,60 +225,65 @@ const getMsgFormatText = (format: number) => {
   return formatMap[format] || '未知'
 }
 
-// 加载数据
+// 加载数据 - 从ES获取最新消息，按chatId聚合成会话列表
 const loadData = async () => {
   loading.value = true
   try {
-    // 这里使用模拟数据，实际应调用后端API
-    // 后端的会话查询在 im-business 服务中，路径是 /api/chat/lastChatList
-    // 但那是给客户端用的，管理后台可能需要单独的接口
+    // 调用后端接口获取最新消息
+    // 返回格式: { code: 1, msg: "...", data: { data: [...], count: ..., dataSource: "ES" } }
+    const res = await getLatestMessages(100)
     
-    // 使用模拟数据展示效果
-    await new Promise(resolve => setTimeout(resolve, 500))
-    tableData.value = [
-      {
-        chatId: '100-1-111-222',
-        chatType: 1,
-        userId: '111',
-        otherUserId: '222',
-        otherUserName: '李四',
-        otherUserAvatar: '',
-        lastMessageContent: '你好，在吗？',
-        lastMsgFormat: 1,
-        lastMsgId: '1-111-1960687134775255385',
-        lastMsgTime: Date.now() - 3600000,
-        unReadCount: 2
-      },
-      {
-        chatId: '100-1-111-333',
-        chatType: 1,
-        userId: '111',
-        otherUserId: '333',
-        otherUserName: '王五',
-        otherUserAvatar: '',
-        lastMessageContent: '明天见',
-        lastMsgFormat: 1,
-        lastMsgId: '1-111-1960687134775255390',
-        lastMsgTime: Date.now() - 7200000,
-        unReadCount: 0
-      },
-      {
-        chatId: '100-1-222-444',
-        chatType: 1,
-        userId: '222',
-        otherUserId: '444',
-        otherUserName: '赵六',
-        otherUserAvatar: '',
-        lastMessageContent: '[图片]',
-        lastMsgFormat: 2,
-        lastMsgId: '1-222-1960687134775255395',
-        lastMsgTime: Date.now() - 10800000,
-        unReadCount: 5
+    // 注意: 拦截器已经检查了 code=1，这里直接获取 data
+    const resultVO = res.data
+    if (resultVO && resultVO.data && resultVO.data.length > 0) {
+      // 按chatId聚合消息，生成会话列表
+      const sessionMap = new Map<string, Session>()
+      
+      for (const msg of resultVO.data) {
+        const chatId = msg.chatId
+        if (!chatId) continue
+        
+        // 如果该会话还没有记录，或者当前消息更新，则更新会话信息
+        const existing = sessionMap.get(chatId)
+        if (!existing || msg.msgCreateTime > existing.lastMsgTime) {
+          sessionMap.set(chatId, {
+            chatId: chatId,
+            chatType: 1, // 单聊
+            userId: msg.fromUserId,
+            otherUserId: msg.toUserId,
+            otherUserName: msg.toUserId, // 暂时用ID代替昵称
+            otherUserAvatar: '',
+            lastMessageContent: msg.msgContent || '',
+            lastMsgFormat: msg.msgFormat || 1,
+            lastMsgId: msg.msgId,
+            lastMsgTime: msg.msgCreateTime,
+            unReadCount: 0
+          })
+        }
       }
-    ]
-    total.value = 3
+      
+      // 转换为数组并排序（按最后消息时间倒序）
+      tableData.value = Array.from(sessionMap.values())
+        .sort((a, b) => b.lastMsgTime - a.lastMsgTime)
+      
+      // 如果有搜索条件，进行过滤
+      if (queryParams.userId) {
+        tableData.value = tableData.value.filter(s => 
+          s.userId === queryParams.userId || s.otherUserId === queryParams.userId
+        )
+      }
+      
+      total.value = tableData.value.length
+    } else {
+      tableData.value = []
+      total.value = 0
+      ElMessage.warning('暂无会话数据')
+    }
   } catch (error) {
     console.error('加载会话列表失败:', error)
+    ElMessage.error('加载会话列表失败')
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -305,42 +310,12 @@ const handleViewMessages = async (row: Session) => {
   
   try {
     const res = await getMessagesByChatId(row.chatId, 100)
-    if (res.success) {
-      sessionMessages.value = res.data || []
+    // 返回格式: { code: 1, msg: "...", data: { data: [...], ... } }
+    const resultVO = res.data
+    if (resultVO && resultVO.data) {
+      sessionMessages.value = resultVO.data || []
     } else {
-      // 使用模拟数据
-      sessionMessages.value = [
-        {
-          msgId: '1-111-001',
-          chatId: row.chatId,
-          fromUserId: row.userId,
-          toUserId: row.otherUserId,
-          msgContent: '你好',
-          msgFormat: 1,
-          msgStatus: 4,
-          msgCreateTime: Date.now() - 7200000
-        },
-        {
-          msgId: '1-222-002',
-          chatId: row.chatId,
-          fromUserId: row.otherUserId,
-          toUserId: row.userId,
-          msgContent: '你好，有什么事？',
-          msgFormat: 1,
-          msgStatus: 4,
-          msgCreateTime: Date.now() - 7100000
-        },
-        {
-          msgId: '1-111-003',
-          chatId: row.chatId,
-          fromUserId: row.userId,
-          toUserId: row.otherUserId,
-          msgContent: row.lastMessageContent,
-          msgFormat: row.lastMsgFormat,
-          msgStatus: 3,
-          msgCreateTime: row.lastMsgTime
-        }
-      ]
+      sessionMessages.value = []
     }
   } catch (error) {
     console.error('加载消息失败:', error)

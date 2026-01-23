@@ -30,10 +30,11 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse) => {
     const res = response.data
-    // 后端返回 code=1 表示成功，兼容 200 和 0
-    if (res.code !== 1 && res.code !== 200 && res.code !== 0) {
-      ElMessage.error(res.msg || res.message || '请求失败')
-      return Promise.reject(new Error(res.msg || res.message || '请求失败'))
+    // 后端统一返回格式: { code: 1, msg: "xxx", data: {...} }
+    // code=1 表示成功
+    if (res.code !== 1) {
+      ElMessage.error(res.msg || '请求失败')
+      return Promise.reject(new Error(res.msg || '请求失败'))
     }
     return res
   },
