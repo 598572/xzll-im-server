@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getLatestMessages, searchMessages, getMessagesByChatId } from '../../api'
 
@@ -322,6 +322,11 @@ const handleViewChat = async (row: Message) => {
 }
 
 onMounted(() => {
+  loadLatestMessages()
+})
+
+// keep-alive 组件激活时重新加载数据
+onActivated(() => {
   loadLatestMessages()
 })
 </script>
