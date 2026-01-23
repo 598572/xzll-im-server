@@ -142,6 +142,20 @@
                 <version>4.1.4</version>
             </dependency>
 
+            <!-- Spring Boot 3.x 需要显式添加validation依赖 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>${springboot.version}</version>
+            </dependency>
+
+            <!-- Spring Security Crypto (用于BCrypt密码加密) -->
+            <dependency>
+                <groupId>org.springframework.security</groupId>
+                <artifactId>spring-security-crypto</artifactId>
+                <version>6.2.1</version>
+            </dependency>
+
 
             <dependency>
                 <groupId>org.apache.rocketmq</groupId>

@@ -1,8 +1,12 @@
 package com.xzll.console.controller;
 
+import com.xzll.console.dto.MessageSearchDTO;
 import com.xzll.console.entity.ImC2CMsgRecord;
 import com.xzll.console.service.ImC2CMsgRecordHBaseService;
+import com.xzll.console.service.MessageESQueryService;
+import com.xzll.console.service.MessageQueryRouter;
 import com.xzll.console.util.HBaseHealthChecker;
+import com.xzll.console.vo.MessageSearchResultVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +33,12 @@ public class C2CMessageHistoryController {
     
     @Resource
     private HBaseHealthChecker hBaseHealthChecker;
+
+    @Resource
+    private MessageQueryRouter messageQueryRouter;
+
+    @Resource
+    private MessageESQueryService messageESQueryService;
 
     /**
      * 分页查询单聊历史消息
@@ -75,6 +85,7 @@ public class C2CMessageHistoryController {
 
     /**
      * 获取最新单聊消息
+     * 数据来源: ES（全局排序效率高）
      */
     @GetMapping("/history/latest")
     public Map<String, Object> getLatestMessages(
@@ -87,12 +98,14 @@ public class C2CMessageHistoryController {
                 limit = 100;
             }
             
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getLatestMessages(limit);
+            // 使用ES查询最新消息（全局排序效率更高）
+            List<ImC2CMsgRecord> messages = messageQueryRouter.getLatestMessages(limit);
             
             result.put("success", true);
             result.put("data", messages);
             result.put("count", messages.size());
             result.put("limit", limit);
+            result.put("dataSource", "ES");
             
         } catch (Exception e) {
             log.error("获取最新单聊消息失败", e);
@@ -142,58 +155,215 @@ public class C2CMessageHistoryController {
     }
 
     /**
-     * 条件查询单聊历史消息
+     * 条件查询单聊历史消息（智能路由版）
+     * 根据查询条件自动选择最优存储：
+     * - 仅chatId条件 → HBase（RowKey前缀扫描）
+     * - 其他条件 → ES（复合查询）
      */
     @GetMapping("/history/search")
-    public Map<String, Object> searchMessageHistory(
+    public MessageSearchResultVO searchMessageHistory(
             @RequestParam(required = false) String fromUserId,
             @RequestParam(required = false) String toUserId,
-            @RequestParam(required = false) String chatId) {
-        
-        Map<String, Object> result = new HashMap<>();
+            @RequestParam(required = false) String chatId,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) Integer msgStatus,
+            @RequestParam(required = false) Integer msgFormat,
+            @RequestParam(required = false) Long startTime,
+            @RequestParam(required = false) Long endTime,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
         
         try {
-            List<ImC2CMsgRecord> messages = imC2CMsgRecordHBaseService.getMessagesByCondition(fromUserId, toUserId, chatId);
+            // 构建搜索条件
+            MessageSearchDTO searchDTO = new MessageSearchDTO();
+            searchDTO.setFromUserId(fromUserId);
+            searchDTO.setToUserId(toUserId);
+            searchDTO.setChatId(chatId);
+            searchDTO.setContent(content);
+            searchDTO.setMsgStatus(msgStatus);
+            searchDTO.setMsgFormat(msgFormat);
+            searchDTO.setStartTime(startTime);
+            searchDTO.setEndTime(endTime);
+            searchDTO.setPageNum(pageNum);
+            searchDTO.setPageSize(pageSize);
             
-            result.put("success", true);
-            result.put("data", messages);
-            result.put("count", messages.size());
+            // 使用智能路由查询
+            return messageQueryRouter.smartSearch(searchDTO);
             
         } catch (Exception e) {
             log.error("条件查询单聊历史消息失败", e);
+            return MessageSearchResultVO.fail("查询失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 消息内容全文搜索
+     * 数据来源: ES（支持中文分词）
+     */
+    @GetMapping("/history/search/content")
+    public MessageSearchResultVO searchByContent(
+            @RequestParam String content,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        
+        try {
+            return messageQueryRouter.searchByContent(content, pageNum, pageSize);
+        } catch (Exception e) {
+            log.error("消息内容搜索失败", e);
+            return MessageSearchResultVO.fail("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 按用户ID搜索消息
+     * 数据来源: ES
+     */
+    @GetMapping("/history/search/user/{userId}")
+    public MessageSearchResultVO searchByUserId(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        
+        try {
+            return messageQueryRouter.searchByUserId(userId, pageNum, pageSize);
+        } catch (Exception e) {
+            log.error("按用户ID搜索消息失败", e);
+            return MessageSearchResultVO.fail("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 按时间范围搜索消息
+     * 数据来源: ES
+     */
+    @GetMapping("/history/search/time")
+    public MessageSearchResultVO searchByTimeRange(
+            @RequestParam Long startTime,
+            @RequestParam Long endTime,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        
+        try {
+            return messageESQueryService.searchByTimeRange(startTime, endTime, pageNum, pageSize);
+        } catch (Exception e) {
+            log.error("按时间范围搜索消息失败", e);
+            return MessageSearchResultVO.fail("搜索失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取消息统计信息
+     * 数据来源: ES
+     */
+    @GetMapping("/statistics")
+    public Map<String, Object> getMessageStatistics() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            Map<String, Object> stats = messageESQueryService.getMessageStatistics();
+            result.put("success", true);
+            result.put("data", stats);
+            result.put("dataSource", "ES");
+        } catch (Exception e) {
+            log.error("获取消息统计失败", e);
             result.put("success", false);
-            result.put("message", "查询失败: " + e.getMessage());
+            result.put("message", "统计失败: " + e.getMessage());
         }
         
         return result;
     }
 
     /**
-     * HBase连接健康检查
+     * 获取用户消息统计
+     * 数据来源: ES
      */
-    @GetMapping("/health")
-    public Map<String, Object> checkHBaseHealth() {
+    @GetMapping("/statistics/user/{userId}")
+    public Map<String, Object> getUserMessageStatistics(@PathVariable String userId) {
         Map<String, Object> result = new HashMap<>();
         
         try {
-            boolean isHealthy = hBaseHealthChecker.isConnectionHealthy();
-            String status = hBaseHealthChecker.getConnectionStatus();
+            Map<String, Object> stats = messageESQueryService.getUserMessageStatistics(userId);
+            result.put("success", true);
+            result.put("data", stats);
+            result.put("userId", userId);
+            result.put("dataSource", "ES");
+        } catch (Exception e) {
+            log.error("获取用户消息统计失败", e);
+            result.put("success", false);
+            result.put("message", "统计失败: " + e.getMessage());
+        }
+        
+        return result;
+    }
+
+    /**
+     * 获取会话消息统计
+     * 数据来源: ES
+     */
+    @GetMapping("/statistics/chat/{chatId}")
+    public Map<String, Object> getChatMessageStatistics(@PathVariable String chatId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            Map<String, Object> stats = messageESQueryService.getChatMessageStatistics(chatId);
+            result.put("success", true);
+            result.put("data", stats);
+            result.put("chatId", chatId);
+            result.put("dataSource", "ES");
+        } catch (Exception e) {
+            log.error("获取会话消息统计失败", e);
+            result.put("success", false);
+            result.put("message", "统计失败: " + e.getMessage());
+        }
+        
+        return result;
+    }
+
+    /**
+     * 健康检查（HBase + ES）
+     */
+    @GetMapping("/health")
+    public Map<String, Object> checkHealth() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // HBase 健康检查
+            boolean hbaseHealthy = hBaseHealthChecker.isConnectionHealthy();
+            String hbaseStatus = hBaseHealthChecker.getConnectionStatus();
             boolean tableExists = hBaseHealthChecker.isTableExists(IM_C2C_MSG_RECORD);
             
+            // ES 健康检查
+            boolean esHealthy = messageESQueryService.isConnectionHealthy();
+            Map<String, Object> esIndexInfo = messageESQueryService.getIndexInfo();
+            
             result.put("success", true);
-            result.put("hbaseHealthy", isHealthy);
-            result.put("connectionStatus", status);
-            result.put("tableExists", tableExists);
             result.put("timestamp", System.currentTimeMillis());
             
-            if (!isHealthy) {
-                result.put("message", "HBase连接异常，请检查配置");
+            // HBase 状态
+            Map<String, Object> hbaseInfo = new HashMap<>();
+            hbaseInfo.put("healthy", hbaseHealthy);
+            hbaseInfo.put("status", hbaseStatus);
+            hbaseInfo.put("tableExists", tableExists);
+            result.put("hbase", hbaseInfo);
+            
+            // ES 状态
+            Map<String, Object> esInfo = new HashMap<>();
+            esInfo.put("healthy", esHealthy);
+            esInfo.put("indexInfo", esIndexInfo);
+            result.put("elasticsearch", esInfo);
+            
+            // 总体状态
+            boolean allHealthy = hbaseHealthy && esHealthy;
+            result.put("allHealthy", allHealthy);
+            if (allHealthy) {
+                result.put("message", "HBase和ES连接均正常");
             } else {
-                result.put("message", "HBase连接正常");
+                result.put("message", "HBase: " + (hbaseHealthy ? "正常" : "异常") + 
+                        ", ES: " + (esHealthy ? "正常" : "异常"));
             }
             
         } catch (Exception e) {
-            log.error("HBase健康检查失败", e);
+            log.error("健康检查失败", e);
             result.put("success", false);
             result.put("message", "健康检查失败: " + e.getMessage());
         }
