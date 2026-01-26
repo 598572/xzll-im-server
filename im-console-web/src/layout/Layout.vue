@@ -12,10 +12,11 @@
         :default-active="activeMenu"
         :collapse="isCollapsed"
         :collapse-transition="false"
-        background-color="#304156"
-        text-color="#bfcbd9"
+        background-color="#ffffff"
+        text-color="#4b5563"
         active-text-color="#409EFF"
         router
+        class="sidebar-menu"
       >
         <!-- 数据看板 -->
         <el-menu-item index="/dashboard">
@@ -151,11 +152,7 @@
       <!-- 内容区 -->
       <main class="content">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </transition>
+          <component :is="Component" :key="$route.fullPath" />
         </router-view>
       </main>
     </div>
@@ -198,11 +195,13 @@ const handleLogout = () => {
 
 .sidebar {
   width: 220px;
-  background-color: #304156;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
   transition: width 0.3s;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
 }
 
 .sidebar.collapsed {
@@ -214,8 +213,9 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 16px;
-  background-color: #263445;
+  padding: 0 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .logo-img {
@@ -227,7 +227,7 @@ const handleLogout = () => {
   margin-left: 12px;
   font-size: 16px;
   font-weight: 600;
-  color: #fff;
+  color: #1f2937;
   white-space: nowrap;
 }
 
@@ -235,6 +235,7 @@ const handleLogout = () => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  background-color: #ffffff;
 }
 
 .menu-wrapper::-webkit-scrollbar {
@@ -242,16 +243,20 @@ const handleLogout = () => {
 }
 
 .menu-wrapper::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
+}
+
+.menu-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.25);
 }
 
 .menu-wrapper::-webkit-scrollbar-track {
   background-color: transparent;
 }
 
-.el-menu {
-  border-right: none;
+.sidebar-menu {
+  border-right: none !important;
 }
 
 .main-container {
@@ -309,16 +314,5 @@ const handleLogout = () => {
   padding: 20px;
   background-color: #f0f2f5;
   overflow-y: auto;
-}
-
-/* 路由过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

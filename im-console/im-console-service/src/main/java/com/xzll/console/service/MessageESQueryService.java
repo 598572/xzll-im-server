@@ -132,4 +132,18 @@ public interface MessageESQueryService {
      * @return 索引信息（文档数、大小等）
      */
     Map<String, Object> getIndexInfo();
+
+    /**
+     * 获取今日消息数（用于数据看板）
+     *
+     * @return 今日消息数
+     */
+    Long getTodayMessageCount();
+
+    /**
+     * 获取消息趋势（近7天，用于数据看板）
+     *
+     * @return Map<日期(MM-dd), 消息数>
+     */
+    Map<String, Long> getMessagesTrend(int days);
 }

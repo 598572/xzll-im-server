@@ -33,7 +33,19 @@ public interface ImUserMapper extends BaseMapper<ImUserDO> {
      */
     @Select("SELECT register_terminal_type, COUNT(*) as count FROM im_user GROUP BY register_terminal_type")
     List<Object[]> countByTerminalType();
-    
+
+    /**
+     * 统计指定日期范围内的每日注册用户数
+     * @param days 天数（近N天）
+     * @return List of [date, count]
+     */
+    @Select("SELECT DATE(register_time) as reg_date, COUNT(*) as count " +
+            "FROM im_user " +
+            "WHERE register_time >= DATE_SUB(CURDATE(), INTERVAL #{days} DAY) " +
+            "GROUP BY DATE(register_time) " +
+            "ORDER BY reg_date ASC")
+    List<Object[]> countByDateRange(@Param("days") int days);
+
     /**
      * 模糊搜索用户
      */

@@ -1,0 +1,66 @@
+/* 页面切换动画 - fade-slide（默认） */
+.fade-slide-leave-active,
+.fade-slide-enter-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+/* 简单淡入淡出动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 3D滑动效果 */
+.slide-transform-enter-active,
+.slide-transform-leave-active {
+  transition: all 0.4s;
+}
+
+.slide-transform-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+}
+
+.slide-transform-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.98);
+}
+
+/* 缩放淡入效果 */
+.zoom-fade-enter-active,
+.zoom-fade-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.zoom-fade-enter-from,
+.zoom-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+/* 侧边栏折叠动画 */
+.sidebar-transform-enter-active,
+.sidebar-transform-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-transform-enter-from,
+.sidebar-transform-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
