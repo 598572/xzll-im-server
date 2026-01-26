@@ -6,7 +6,8 @@
         <img src="../assets/vue.svg" alt="Logo" class="logo-img" />
         <span v-if="!isCollapsed" class="logo-text">IM管理后台</span>
       </div>
-      
+
+      <div class="menu-wrapper">
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapsed"
@@ -106,6 +107,7 @@
           <el-menu-item index="/ai/config">AI配置中心</el-menu-item>
         </el-sub-menu>
       </el-menu>
+      </div>
     </aside>
 
     <!-- 主内容区 -->
@@ -198,7 +200,9 @@ const handleLogout = () => {
   width: 220px;
   background-color: #304156;
   transition: width 0.3s;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 
 .sidebar.collapsed {
@@ -225,6 +229,25 @@ const handleLogout = () => {
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
+}
+
+.menu-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.menu-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menu-wrapper::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.menu-wrapper::-webkit-scrollbar-track {
+  background-color: transparent;
 }
 
 .el-menu {

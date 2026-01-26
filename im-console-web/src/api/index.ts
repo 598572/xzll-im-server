@@ -69,8 +69,8 @@ export const checkFriendship = (userId: string, friendId: string) => {
 }
 
 // ==================== 敏感词管理 ====================
-export const pageSensitiveWords = (data: any) => {
-  return request.post('/admin/sensitive-word/page', data)
+export const pageSensitiveWords = (params: any) => {
+  return request.get('/admin/sensitive-word/page', { params })
 }
 
 export const addSensitiveWord = (data: any) => {
@@ -82,15 +82,15 @@ export const updateSensitiveWord = (data: any) => {
 }
 
 export const deleteSensitiveWord = (id: number) => {
-  return request.delete(`/admin/sensitive-word/${id}`)
+  return request.delete(`/admin/sensitive-word/delete/${id}`)
 }
 
-export const batchDeleteSensitiveWords = (ids: number[]) => {
-  return request.post('/admin/sensitive-word/batch-delete', ids)
+export const toggleSensitiveWord = (id: number, status: number) => {
+  return request.post(`/admin/sensitive-word/toggle/${id}`, null, { params: { status } })
 }
 
-export const batchImportSensitiveWords = (words: string[]) => {
-  return request.post('/admin/sensitive-word/batch-import', words)
+export const batchAddSensitiveWords = (words: string[], wordType?: number) => {
+  return request.post('/admin/sensitive-word/batch-add', { words, wordType })
 }
 
 export const checkSensitiveContent = (content: string) => {
@@ -216,7 +216,7 @@ export const publishNotice = (id: number) => {
 // ==================== 操作日志 ====================
 // 分页查询操作日志
 export const pageOperationLogs = (params: { current?: number; size?: number; adminId?: string; operationType?: string }) => {
-  return request.get('/admin/log/page', { params })
+  return request.get('/admin/operation-logs/page', { params })
 }
 
 // ==================== AI管理 ====================

@@ -34,6 +34,8 @@ export interface User {
   phone: string
   registerTerminalType: number
   terminalTypeDesc: string
+  status: number
+  statusDesc: string
   createTime: string
   updateTime: string
   online: boolean
@@ -74,11 +76,9 @@ export interface FriendQueryParams extends PageParams {
 export interface SensitiveWord {
   id: number
   word: string
-  category: string
-  level: number
-  levelDesc: string
+  wordType: number
+  category: string // 前端显示用，实际是wordType映射
   status: number
-  statusDesc: string
   createTime: string
   updateTime: string
 }
@@ -86,9 +86,17 @@ export interface SensitiveWord {
 // 敏感词查询参数
 export interface SensitiveWordQueryParams extends PageParams {
   keyword?: string
-  category?: string
-  level?: number
+  wordType?: number
   status?: number
+}
+
+// wordType映射表
+export const WORD_TYPE_MAP: Record<number, string> = {
+  1: '政治敏感',
+  2: '色情低俗',
+  3: '暴力血腥',
+  4: '广告营销',
+  5: '其他'
 }
 
 // 仪表盘数据

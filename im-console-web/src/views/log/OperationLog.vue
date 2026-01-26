@@ -78,8 +78,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { ElMessage } from 'element-plus'
+import { pageOperationLogs } from '../../api'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -97,32 +98,33 @@ const pagination = reactive({
   total: 0
 })
 
+// 首次加载
 onMounted(() => {
   fetchData()
 })
 
-function fetchData() {
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
+  fetchData()
+})
+
+async function fetchData() {
   loading.value = true
-  // TODO: 调用真实接口
-  setTimeout(() => {
-    tableData.value = [
-      {
-        id: 1,
-        adminId: 'ADMIN001',
-        adminName: 'admin',
-        operationType: 'USER_DISABLE',
-        operationDesc: '禁用用户 USER001',
-        targetType: 'USER',
-        targetId: 'USER001',
-        requestIp: '192.168.1.100',
-        requestParams: '{"userId":"USER001","reason":"违规"}',
-        responseResult: 'SUCCESS',
-        createTime: '2024-01-15 10:30:00'
-      }
-    ]
-    pagination.total = 1
+  try {
+    const res = await pageOperationLogs({
+      current: pagination.current,
+      size: pagination.size,
+      adminId: queryForm.adminId || undefined,
+      operationType: queryForm.operationType || undefined
+    })
+    tableData.value = res.data?.records || []
+    pagination.total = res.data?.total || 0
+  } catch (error) {
+    console.error('加载操作日志失败:', error)
+    ElMessage.error('加载操作日志失败')
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
 function handleQuery() {

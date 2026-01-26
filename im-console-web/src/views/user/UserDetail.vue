@@ -100,15 +100,7 @@ const loadUserDetail = async () => {
     user.value = res.data || {}
   } catch (error) {
     console.error('加载用户详情失败:', error)
-    // 使用模拟数据
-    user.value = {
-      id: 1, odlId: '', odlName: '', odlIconUrl: '',
-      userId: userId, userName: 'zhangsan', userFullName: '张三',
-      sex: 1, sexDesc: '男', phone: '138****8888',
-      registerTerminalType: 1, terminalTypeDesc: 'Android',
-      createTime: '2026-01-15 10:30:00', updateTime: '2026-01-20 14:00:00',
-      online: true, friendCount: 15
-    }
+    ElMessage.error('加载用户详情失败')
   } finally {
     loading.value = false
   }
@@ -120,21 +112,7 @@ const loadFriendList = async () => {
     friendList.value = res.data || []
   } catch (error) {
     console.error('加载好友列表失败:', error)
-    // 使用模拟数据
-    friendList.value = [
-      {
-        id: 1, userId: userId, userName: 'zhangsan',
-        friendId: '222', friendName: 'lisi',
-        blackFlag: 0, blackFlagDesc: '正常', delFlag: 0,
-        createTime: '2026-01-16 10:00:00', updateTime: ''
-      },
-      {
-        id: 2, userId: userId, userName: 'zhangsan',
-        friendId: '333', friendName: 'wangwu',
-        blackFlag: 0, blackFlagDesc: '正常', delFlag: 0,
-        createTime: '2026-01-17 11:00:00', updateTime: ''
-      }
-    ]
+    ElMessage.error('加载好友列表失败')
   }
 }
 

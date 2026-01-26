@@ -106,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { pageFriendRelations, checkFriendship } from '../../api'
@@ -132,6 +132,16 @@ const checkParams = reactive({
 })
 const checkResult = ref<{ isFriend: boolean; isMutualFriend: boolean } | null>(null)
 
+// 首次加载
+onMounted(() => {
+  loadData()
+})
+
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
+  loadData()
+})
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -140,28 +150,7 @@ const loadData = async () => {
     total.value = res.data?.total || 0
   } catch (error) {
     console.error('加载好友关系失败:', error)
-    // 使用模拟数据
-    tableData.value = [
-      {
-        id: 1, userId: '111', userName: 'zhangsan',
-        friendId: '222', friendName: 'lisi',
-        blackFlag: 0, blackFlagDesc: '正常', delFlag: 0,
-        createTime: '2026-01-16 10:00:00', updateTime: ''
-      },
-      {
-        id: 2, userId: '111', userName: 'zhangsan',
-        friendId: '333', friendName: 'wangwu',
-        blackFlag: 0, blackFlagDesc: '正常', delFlag: 0,
-        createTime: '2026-01-17 11:00:00', updateTime: ''
-      },
-      {
-        id: 3, userId: '222', userName: 'lisi',
-        friendId: '333', friendName: 'wangwu',
-        blackFlag: 1, blackFlagDesc: '已拉黑', delFlag: 0,
-        createTime: '2026-01-18 14:00:00', updateTime: ''
-      }
-    ]
-    total.value = 3
+    ElMessage.error('加载好友关系失败')
   } finally {
     loading.value = false
   }
@@ -189,11 +178,8 @@ const handleCheckFriendship = async () => {
     const res = await checkFriendship(checkParams.userA, checkParams.userB)
     checkResult.value = res.data
   } catch (error) {
-    // 模拟结果
-    checkResult.value = {
-      isFriend: Math.random() > 0.5,
-      isMutualFriend: Math.random() > 0.7
-    }
+    console.error('检测好友关系失败:', error)
+    ElMessage.error('检测好友关系失败')
   }
 }
 

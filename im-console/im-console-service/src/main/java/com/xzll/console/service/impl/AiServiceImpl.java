@@ -49,6 +49,7 @@ public class AiServiceImpl implements AiService {
         userMessage.setSessionId(sessionId);
         userMessage.setMessageType(1); // 用户消息
         userMessage.setContent(message);
+        userMessage.setCreateTime(java.time.LocalDateTime.now());
         aiChatMapper.insert(userMessage);
 
         // 2. 从知识库匹配答案
@@ -66,6 +67,7 @@ public class AiServiceImpl implements AiService {
         aiMessage.setSessionId(sessionId);
         aiMessage.setMessageType(2); // AI回复
         aiMessage.setContent(answer);
+        aiMessage.setCreateTime(java.time.LocalDateTime.now());
         aiChatMapper.insert(aiMessage);
 
         log.info("AI对话完成: userId={}, message={}, answer={}", userId, message, answer);
@@ -170,6 +172,9 @@ public class AiServiceImpl implements AiService {
         if (knowledge.getPriority() == null) {
             knowledge.setPriority(0);
         }
+        // 手动设置创建和更新时间，避免 MyBatis-Plus 自动填充不生效的问题
+        knowledge.setCreateTime(java.time.LocalDateTime.now());
+        knowledge.setUpdateTime(java.time.LocalDateTime.now());
         aiKnowledgeMapper.insert(knowledge);
         log.info("知识库添加成功: question={}, category={}", knowledge.getQuestion(), knowledge.getCategory());
     }
@@ -207,6 +212,12 @@ public class AiServiceImpl implements AiService {
             aiConfigMapper.updateById(existingConfig);
             log.info("AI配置更新成功: configKey={}", config.getConfigKey());
         } else {
+            // 手动设置创建和更新时间，避免 MyBatis-Plus 自动填充不生效的问题
+            config.setCreateTime(java.time.LocalDateTime.now());
+            config.setUpdateTime(java.time.LocalDateTime.now());
+            if (config.getStatus() == null) {
+                config.setStatus(1); // 默认启用
+            }
             aiConfigMapper.insert(config);
             log.info("AI配置添加成功: configKey={}", config.getConfigKey());
         }

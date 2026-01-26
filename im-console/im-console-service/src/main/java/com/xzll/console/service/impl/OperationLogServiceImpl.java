@@ -41,17 +41,19 @@ public class OperationLogServiceImpl implements OperationLogService {
     @Transactional(rollbackFor = Exception.class)
     public void recordLog(String adminId, String adminName, String operationType, String targetType,
                           String targetId, String desc, String ip, String params, String result) {
-        OperationLogDO log = new OperationLogDO();
-        log.setAdminId(adminId);
-        log.setAdminName(adminName);
-        log.setOperationType(operationType);
-        log.setTargetType(targetType);
-        log.setTargetId(targetId);
-        log.setOperationDesc(desc);
-        log.setRequestIp(ip);
-        log.setRequestParams(params);
-        log.setResponseResult(result);
+        OperationLogDO operationLog = new OperationLogDO();
+        operationLog.setAdminId(adminId);
+        operationLog.setAdminName(adminName);
+        operationLog.setOperationType(operationType);
+        operationLog.setTargetType(targetType);
+        operationLog.setTargetId(targetId);
+        operationLog.setOperationDesc(desc);
+        operationLog.setRequestIp(ip);
+        operationLog.setRequestParams(params);
+        operationLog.setResponseResult(result);
+        // 手动设置创建时间，避免 MyBatis-Plus 自动填充不生效的问题
+        operationLog.setCreateTime(java.time.LocalDateTime.now());
 
-        operationLogMapper.insert(log);
+        operationLogMapper.insert(operationLog);
     }
 }
