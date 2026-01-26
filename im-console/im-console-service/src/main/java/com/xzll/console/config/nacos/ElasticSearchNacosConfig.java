@@ -14,6 +14,7 @@ import java.util.List;
  * 配置示例:
  *   im:
  *     elasticsearch:
+ *       syncEnabled: true  # ES同步开关（默认关闭）
  *       uris:
  *         - http://192.168.1.131:9200
  *
@@ -26,6 +27,13 @@ import java.util.List;
 @RefreshScope
 @ConfigurationProperties(prefix = "im.elasticsearch")
 public class ElasticSearchNacosConfig {
+
+    /**
+     * ES同步开关
+     * true: 启用ES，查询优先使用ES
+     * false: 禁用ES，查询使用MongoDB
+     */
+    private Boolean syncEnabled = false;
 
     /**
      * ES集群地址列表

@@ -3,7 +3,6 @@ package com.xzll.console.controller;
 import com.xzll.common.pojo.base.WebBaseResponse;
 import com.xzll.console.dto.MessageSearchDTO;
 import com.xzll.console.entity.ImC2CMsgRecord;
-import com.xzll.console.service.MessageESQueryService;
 import com.xzll.console.service.MessageMongoQueryService;
 import com.xzll.console.service.MessageQueryRouter;
 import com.xzll.console.vo.MessagePageResultVO;
@@ -29,42 +28,36 @@ import java.util.Map;
 public class C2CMessageHistoryController {
 
     @Resource
-    private MessageMongoQueryService messageMongoQueryService;
-
-    @Resource
     private MessageQueryRouter messageQueryRouter;
-
-    @Resource
-    private MessageESQueryService messageESQueryService;
 
     /**
      * 分页查询单聊历史消息
-     * 数据来源: MongoDB
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/page")
     public WebBaseResponse<MessagePageResultVO> getMessageHistoryByPage(
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(required = false) String lastRowKey) {
-        
+
         try {
             if (limit > 100) {
                 limit = 100;
                 log.warn("查询数量超过100，自动调整为100");
             }
-            
-            // 使用MongoDB查询最新消息
-            List<ImC2CMsgRecord> messages = messageMongoQueryService.getLatestMessages(limit);
-            
+
+            // 使用路由器查询最新消息（自动选择数据源）
+            List<ImC2CMsgRecord> messages = messageQueryRouter.getLatestMessages(limit);
+
             MessagePageResultVO resultVO = new MessagePageResultVO();
             resultVO.setData(messages);
             resultVO.setCount(messages.size());
             resultVO.setLimit(limit);
             resultVO.setHasMore(messages.size() == limit);
-            resultVO.setDataSource("MongoDB");
-            
-            log.info("分页查询单聊历史消息成功，返回 {} 条记录", messages.size());
+            resultVO.setDataSource(messageQueryRouter.getCurrentDataSource());
+
+            log.info("分页查询单聊历史消息成功，返回 {} 条记录，数据源: {}", messages.size(), resultVO.getDataSource());
             return WebBaseResponse.returnResultSuccess(resultVO);
-            
+
         } catch (Exception e) {
             log.error("分页查询单聊历史消息失败", e);
             return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
@@ -73,28 +66,28 @@ public class C2CMessageHistoryController {
 
     /**
      * 获取最新单聊消息
-     * 数据来源: ES（全局排序效率高）
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/latest")
     public WebBaseResponse<MessagePageResultVO> getLatestMessages(
             @RequestParam(defaultValue = "20") int limit) {
-        
+
         try {
             if (limit > 100) {
                 limit = 100;
             }
-            
-            // 使用ES查询最新消息（全局排序效率更高）
+
+            // 使用路由器查询最新消息（自动选择数据源）
             List<ImC2CMsgRecord> messages = messageQueryRouter.getLatestMessages(limit);
-            
+
             MessagePageResultVO resultVO = new MessagePageResultVO();
             resultVO.setData(messages);
             resultVO.setCount(messages.size());
             resultVO.setLimit(limit);
-            resultVO.setDataSource("ES");
-            
+            resultVO.setDataSource(messageQueryRouter.getCurrentDataSource());
+
             return WebBaseResponse.returnResultSuccess(resultVO);
-            
+
         } catch (Exception e) {
             log.error("获取最新单聊消息失败", e);
             return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
@@ -103,34 +96,35 @@ public class C2CMessageHistoryController {
 
     /**
      * 根据会话ID查询单聊历史消息
-     * 数据来源: MongoDB（分片优化查询）
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/chat/{chatId}")
     public WebBaseResponse<MessagePageResultVO> getMessageHistoryByChatId(
             @PathVariable String chatId,
             @RequestParam(defaultValue = "50") int limit) {
-        
+
         try {
             if (chatId == null || chatId.trim().isEmpty()) {
                 return WebBaseResponse.returnResultError("会话ID不能为空");
             }
-            
+
             if (limit > 100) {
                 limit = 100;
             }
-            
-            // 使用MongoDB按chatId查询（分片优化）
-            List<ImC2CMsgRecord> messages = messageMongoQueryService.getMessagesByChatId(chatId, limit);
-            
+
+            // 使用路由器查询（自动选择数据源）
+            MessageSearchResultVO searchResult = messageQueryRouter.searchByChatId(chatId, 1, limit);
+            List<ImC2CMsgRecord> messages = searchResult.getData();
+
             MessagePageResultVO resultVO = new MessagePageResultVO();
             resultVO.setData(messages);
             resultVO.setCount(messages.size());
             resultVO.setChatId(chatId);
             resultVO.setLimit(limit);
-            resultVO.setDataSource("MongoDB");
-            
+            resultVO.setDataSource(messageQueryRouter.getCurrentDataSource());
+
             return WebBaseResponse.returnResultSuccess(resultVO);
-            
+
         } catch (Exception e) {
             log.error("根据会话ID查询单聊历史消息失败，chatId: {}", chatId, e);
             return WebBaseResponse.returnResultError("查询失败: " + e.getMessage());
@@ -139,9 +133,7 @@ public class C2CMessageHistoryController {
 
     /**
      * 条件查询单聊历史消息（智能路由版）
-     * 根据查询条件自动选择最优存储：
-     * - 仅chatId条件 → MongoDB（复合查询）
-     * - 其他条件 → ES（复合查询）
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/search")
     public WebBaseResponse<MessageSearchResultVO> searchMessageHistory(
@@ -182,14 +174,14 @@ public class C2CMessageHistoryController {
 
     /**
      * 消息内容全文搜索
-     * 数据来源: ES（支持中文分词）
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/search/content")
     public WebBaseResponse<MessageSearchResultVO> searchByContent(
             @RequestParam String content,
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "20") Integer pageSize) {
-        
+
         try {
             MessageSearchResultVO resultVO = messageQueryRouter.searchByContent(content, pageNum, pageSize);
             return WebBaseResponse.returnResultSuccess(resultVO);
@@ -201,14 +193,14 @@ public class C2CMessageHistoryController {
 
     /**
      * 按用户ID搜索消息
-     * 数据来源: ES
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/search/user/{userId}")
     public WebBaseResponse<MessageSearchResultVO> searchByUserId(
             @PathVariable String userId,
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "20") Integer pageSize) {
-        
+
         try {
             MessageSearchResultVO resultVO = messageQueryRouter.searchByUserId(userId, pageNum, pageSize);
             return WebBaseResponse.returnResultSuccess(resultVO);
@@ -220,7 +212,7 @@ public class C2CMessageHistoryController {
 
     /**
      * 按时间范围搜索消息
-     * 数据来源: ES
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/history/search/time")
     public WebBaseResponse<MessageSearchResultVO> searchByTimeRange(
@@ -228,9 +220,17 @@ public class C2CMessageHistoryController {
             @RequestParam Long endTime,
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "20") Integer pageSize) {
-        
+
         try {
-            MessageSearchResultVO resultVO = messageESQueryService.searchByTimeRange(startTime, endTime, pageNum, pageSize);
+            // 构建搜索条件
+            MessageSearchDTO searchDTO = new MessageSearchDTO();
+            searchDTO.setStartTime(startTime);
+            searchDTO.setEndTime(endTime);
+            searchDTO.setPageNum(pageNum);
+            searchDTO.setPageSize(pageSize);
+
+            // 使用路由器查询（自动选择数据源）
+            MessageSearchResultVO resultVO = messageQueryRouter.smartSearch(searchDTO);
             return WebBaseResponse.returnResultSuccess(resultVO);
         } catch (Exception e) {
             log.error("按时间范围搜索消息失败", e);
@@ -240,13 +240,12 @@ public class C2CMessageHistoryController {
 
     /**
      * 获取消息统计信息
-     * 数据来源: ES
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/statistics")
     public WebBaseResponse<Map<String, Object>> getMessageStatistics() {
         try {
-            Map<String, Object> stats = messageESQueryService.getMessageStatistics();
-            stats.put("dataSource", "ES");
+            Map<String, Object> stats = messageQueryRouter.getMessageStatistics();
             return WebBaseResponse.returnResultSuccess(stats);
         } catch (Exception e) {
             log.error("获取消息统计失败", e);
@@ -256,14 +255,12 @@ public class C2CMessageHistoryController {
 
     /**
      * 获取用户消息统计
-     * 数据来源: ES
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/statistics/user/{userId}")
     public WebBaseResponse<Map<String, Object>> getUserMessageStatistics(@PathVariable String userId) {
         try {
-            Map<String, Object> stats = messageESQueryService.getUserMessageStatistics(userId);
-            stats.put("userId", userId);
-            stats.put("dataSource", "ES");
+            Map<String, Object> stats = messageQueryRouter.getUserMessageStatistics(userId);
             return WebBaseResponse.returnResultSuccess(stats);
         } catch (Exception e) {
             log.error("获取用户消息统计失败", e);
@@ -273,14 +270,12 @@ public class C2CMessageHistoryController {
 
     /**
      * 获取会话消息统计
-     * 数据来源: ES
+     * 数据来源: 根据 im.elasticsearch.syncEnabled 配置自动选择（ES/MongoDB）
      */
     @GetMapping("/statistics/chat/{chatId}")
     public WebBaseResponse<Map<String, Object>> getChatMessageStatistics(@PathVariable String chatId) {
         try {
-            Map<String, Object> stats = messageESQueryService.getChatMessageStatistics(chatId);
-            stats.put("chatId", chatId);
-            stats.put("dataSource", "ES");
+            Map<String, Object> stats = messageQueryRouter.getChatMessageStatistics(chatId);
             return WebBaseResponse.returnResultSuccess(stats);
         } catch (Exception e) {
             log.error("获取会话消息统计失败", e);
@@ -289,43 +284,53 @@ public class C2CMessageHistoryController {
     }
 
     /**
-     * 健康检查（MongoDB + ES）
+     * 健康检查
+     * 根据 im.elasticsearch.syncEnabled 配置检查对应数据源
      */
     @GetMapping("/health")
     public WebBaseResponse<HealthCheckVO> checkHealth() {
         try {
-            // MongoDB 健康检查
-            boolean mongoHealthy = messageMongoQueryService.isConnectionHealthy();
-            
-            // ES 健康检查
-            boolean esHealthy = messageESQueryService.isConnectionHealthy();
-            Map<String, Object> esIndexInfo = messageESQueryService.getIndexInfo();
-            
             HealthCheckVO vo = new HealthCheckVO();
             vo.setTimestamp(System.currentTimeMillis());
-            
-            // MongoDB 状态（复用hbase字段，避免修改VO）
+
+            // 根据配置检查对应的数据源
+            boolean useES = messageQueryRouter.getCurrentDataSource().equals(MessageQueryRouter.SOURCE_ES);
+            boolean healthy = messageQueryRouter.isHealthy();
+
+            // MongoDB 状态（复用hbase字段）
             HealthCheckVO.StorageHealth mongoHealth = new HealthCheckVO.StorageHealth();
-            mongoHealth.setHealthy(mongoHealthy);
-            mongoHealth.setStatus(mongoHealthy ? "MongoDB连接正常" : "MongoDB连接异常");
-            mongoHealth.setTableExists(true);
+            if (!useES) {
+                mongoHealth.setHealthy(healthy);
+                mongoHealth.setStatus(healthy ? "MongoDB连接正常" : "MongoDB连接异常");
+                mongoHealth.setTableExists(true);
+            } else {
+                mongoHealth.setHealthy(true);
+                mongoHealth.setStatus("MongoDB未启用");
+                mongoHealth.setTableExists(false);
+            }
             vo.setHbase(mongoHealth);
-            
+
             // ES 状态
             HealthCheckVO.StorageHealth esHealth = new HealthCheckVO.StorageHealth();
-            esHealth.setHealthy(esHealthy);
-            esHealth.setIndexInfo(esIndexInfo);
+            if (useES) {
+                esHealth.setHealthy(healthy);
+                esHealth.setStatus(healthy ? "ES连接正常" : "ES连接异常");
+            } else {
+                esHealth.setHealthy(true);
+                esHealth.setStatus("ES未启用");
+            }
             vo.setElasticsearch(esHealth);
-            
+
             // 总体状态
-            boolean allHealthy = mongoHealthy && esHealthy;
-            vo.setAllHealthy(allHealthy);
-            
-            String msg = allHealthy ? "MongoDB和ES连接均正常" : 
-                    "MongoDB: " + (mongoHealthy ? "正常" : "异常") + ", ES: " + (esHealthy ? "正常" : "异常");
-            
+            vo.setAllHealthy(healthy);
+
+            String dataSource = messageQueryRouter.getCurrentDataSource();
+            String msg = healthy ?
+                    String.format("%s连接正常", dataSource) :
+                    String.format("%s连接异常", dataSource);
+
             return WebBaseResponse.returnResultSuccess(msg, vo);
-            
+
         } catch (Exception e) {
             log.error("健康检查失败", e);
             return WebBaseResponse.returnResultError("健康检查失败: " + e.getMessage());

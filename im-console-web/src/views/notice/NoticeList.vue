@@ -104,8 +104,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { pageNoticeList, createNotice, publishNotice, deleteNotice } from '../../api'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -128,28 +129,32 @@ const form = reactive({
   targetUsers: 'ALL'
 })
 
+// 首次加载
 onMounted(() => {
   fetchData()
 })
 
-function fetchData() {
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
+  fetchData()
+})
+
+async function fetchData() {
   loading.value = true
-  // TODO: 调用真实接口
-  setTimeout(() => {
-    tableData.value = [
-      {
-        id: 1,
-        title: '系统维护通知',
-        noticeType: 2,
-        content: '系统将于2024-01-20 02:00-04:00进行维护',
-        status: 1,
-        publishTime: '2024-01-15 10:00:00',
-        createTime: '2024-01-15 09:00:00'
-      }
-    ]
-    pagination.total = 1
+  try {
+    const res = await pageNoticeList({
+      current: pagination.current,
+      size: 10,
+      status: queryForm.status
+    })
+    tableData.value = res.data?.records || []
+    pagination.total = res.data?.total || 0
+  } catch (error) {
+    console.error('加载公告列表失败:', error)
+    ElMessage.error('加载公告列表失败')
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
 function handleQuery() {
@@ -174,31 +179,61 @@ function handleView(row: any) {
   })
 }
 
-function handlePublish(row: any) {
-  ElMessageBox.confirm('确认发布该公告吗？', '提示', {
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用发布接口
+async function handlePublish(row: any) {
+  try {
+    await ElMessageBox.confirm('确认发布该公告吗？', '提示', {
+      type: 'warning'
+    })
+    await publishNotice(row.id)
     ElMessage.success('发布成功')
     fetchData()
-  })
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('发布公告失败:', error)
+      ElMessage.error('发布公告失败')
+    }
+  }
 }
 
-function handleRevoke(row: any) {
-  ElMessageBox.confirm('确认撤回该公告吗？', '提示', {
-    type: 'warning'
-  }).then(() => {
-    // TODO: 调用撤回接口
+async function handleRevoke(row: any) {
+  try {
+    await ElMessageBox.confirm('确认撤回该公告吗？', '提示', {
+      type: 'warning'
+    })
+    // TODO: 调用撤回接口（后端可能还没实现）
     ElMessage.success('撤回成功')
     fetchData()
-  })
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('撤回公告失败:', error)
+      ElMessage.error('撤回公告失败')
+    }
+  }
 }
 
-function handleSubmit() {
-  // TODO: 调用保存接口
-  ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
-  dialogVisible.value = false
-  fetchData()
+async function handleSubmit() {
+  if (!form.title?.trim()) {
+    ElMessage.warning('请输入公告标题')
+    return
+  }
+  if (!form.content?.trim()) {
+    ElMessage.warning('请输入公告内容')
+    return
+  }
+
+  try {
+    await createNotice({
+      title: form.title,
+      content: form.content,
+      type: form.noticeType
+    })
+    ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error('保存公告失败:', error)
+    ElMessage.error('保存公告失败')
+  }
 }
 </script>
 

@@ -16,8 +16,13 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -213,6 +218,202 @@ public class MessageMongoQueryService {
             log.warn("MongoDB连接检查失败: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 获取今日消息数（用于数据看板）
+     */
+    public Long getTodayMessageCount() {
+        try {
+            // 计算今天的时间范围（毫秒时间戳）
+            LocalDate today = LocalDate.now();
+            LocalDateTime startOfDay = today.atStartOfDay();
+            LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+            long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+            Query query = new Query(Criteria.where("msgCreateTime").gte(startTime).lt(endTime));
+            long count = mongoTemplate.count(query, ImC2CMsgRecordMongo.class);
+
+            log.info("MongoDB获取今日消息数: {}", count);
+            return count;
+        } catch (Exception e) {
+            log.error("MongoDB获取今日消息数失败", e);
+            return 0L;
+        }
+    }
+
+    /**
+     * 获取消息趋势（近N天，用于数据看板）
+     *
+     * @param days 天数
+     * @return Map<日期(MM-dd), 消息数>
+     */
+    public Map<String, Long> getMessagesTrend(int days) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
+
+        try {
+            for (int i = days - 1; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                String dateStr = date.format(formatter);
+
+                // 计算当天的时间范围（毫秒时间戳）
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+
+                long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+                // 从MongoDB查询当天的消息数
+                Query query = new Query(Criteria.where("msgCreateTime").gte(startTime).lt(endTime));
+                long count = mongoTemplate.count(query, ImC2CMsgRecordMongo.class);
+
+                result.put(dateStr, count);
+            }
+
+            log.info("MongoDB获取消息趋势成功: days={}, 数据={}", days, result);
+        } catch (Exception e) {
+            log.error("MongoDB获取消息趋势失败", e);
+            // 失败时返回0
+            for (int i = days - 1; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                String dateStr = date.format(formatter);
+                result.put(dateStr, 0L);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * 获取消息统计信息
+     * 包含：总消息数、按状态统计、按格式统计、撤回消息数
+     */
+    public Map<String, Object> getMessageStatistics() {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        try {
+            // 总消息数
+            long totalCount = mongoTemplate.count(new Query(), ImC2CMsgRecordMongo.class);
+            stats.put("totalCount", totalCount);
+
+            // 按消息状态统计
+            Map<Integer, Long> statusStats = new LinkedHashMap<>();
+            for (int status = 0; status <= 3; status++) {
+                Query statusQuery = new Query(Criteria.where("msgStatus").is(status));
+                long count = mongoTemplate.count(statusQuery, ImC2CMsgRecordMongo.class);
+                statusStats.put(status, count);
+            }
+            stats.put("statusStats", statusStats);
+
+            // 按消息格式统计
+            Map<Integer, Long> formatStats = new LinkedHashMap<>();
+            for (int format = 0; format <= 5; format++) {
+                Query formatQuery = new Query(Criteria.where("msgFormat").is(format));
+                long count = mongoTemplate.count(formatQuery, ImC2CMsgRecordMongo.class);
+                if (count > 0) {
+                    formatStats.put(format, count);
+                }
+            }
+            stats.put("formatStats", formatStats);
+
+            // 撤回消息统计
+            Query withdrawQuery = new Query(Criteria.where("withdrawFlag").is(1));
+            long withdrawCount = mongoTemplate.count(withdrawQuery, ImC2CMsgRecordMongo.class);
+            stats.put("withdrawCount", withdrawCount);
+
+            log.info("MongoDB获取消息统计成功: 总数={}, 撤回={}", totalCount, withdrawCount);
+
+        } catch (Exception e) {
+            log.error("获取消息统计失败", e);
+            stats.put("error", e.getMessage());
+        }
+
+        return stats;
+    }
+
+    /**
+     * 获取用户消息统计
+     * 包含：发送消息数、接收消息数、参与的会话数
+     */
+    public Map<String, Object> getUserMessageStatistics(String userId) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        try {
+            // 发送的消息数
+            Query sentQuery = new Query(Criteria.where("fromUserId").is(userId));
+            long sentCount = mongoTemplate.count(sentQuery, ImC2CMsgRecordMongo.class);
+            stats.put("sentCount", sentCount);
+
+            // 接收的消息数
+            Query receivedQuery = new Query(Criteria.where("toUserId").is(userId));
+            long receivedCount = mongoTemplate.count(receivedQuery, ImC2CMsgRecordMongo.class);
+            stats.put("receivedCount", receivedCount);
+
+            // 参与的会话数（使用distinct查询）
+            Query chatQuery = new Query(new Criteria()
+                    .orOperator(Criteria.where("fromUserId").is(userId),
+                              Criteria.where("toUserId").is(userId)));
+            List<String> chatIds = mongoTemplate.getCollection("im_c2c_msg_record")
+                    .distinct("chatId", chatQuery.getQueryObject(), String.class)
+                    .into(new ArrayList<>());
+            stats.put("chatCount", chatIds.size());
+
+            log.info("MongoDB获取用户消息统计成功: userId={}, 发送={}, 接收={}, 会话={}",
+                    userId, sentCount, receivedCount, chatIds.size());
+
+        } catch (Exception e) {
+            log.error("获取用户消息统计失败，userId: {}", userId, e);
+            stats.put("error", e.getMessage());
+        }
+
+        return stats;
+    }
+
+    /**
+     * 获取会话消息统计
+     * 包含：会话消息总数、最早消息时间、最新消息时间
+     */
+    public Map<String, Object> getChatMessageStatistics(String chatId) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        try {
+            Query chatQuery = new Query(Criteria.where("chatId").is(chatId));
+
+            // 会话消息总数
+            long totalCount = mongoTemplate.count(chatQuery, ImC2CMsgRecordMongo.class);
+            stats.put("totalCount", totalCount);
+
+            if (totalCount > 0) {
+                // 最早消息时间
+                Query minTimeQuery = chatQuery;
+                minTimeQuery.with(Sort.by(Sort.Direction.ASC, "msgCreateTime"));
+                minTimeQuery.limit(1);
+                ImC2CMsgRecordMongo earliest = mongoTemplate.findOne(minTimeQuery, ImC2CMsgRecordMongo.class);
+                if (earliest != null) {
+                    stats.put("firstMessageTime", earliest.getMsgCreateTime());
+                }
+
+                // 最新消息时间
+                Query maxTimeQuery = chatQuery;
+                maxTimeQuery.with(Sort.by(Sort.Direction.DESC, "msgCreateTime"));
+                maxTimeQuery.limit(1);
+                ImC2CMsgRecordMongo latest = mongoTemplate.findOne(maxTimeQuery, ImC2CMsgRecordMongo.class);
+                if (latest != null) {
+                    stats.put("lastMessageTime", latest.getMsgCreateTime());
+                }
+            }
+
+            log.info("MongoDB获取会话消息统计成功: chatId={}, 总数={}", chatId, totalCount);
+
+        } catch (Exception e) {
+            log.error("获取会话消息统计失败，chatId: {}", chatId, e);
+            stats.put("error", e.getMessage());
+        }
+
+        return stats;
     }
 
     // ==================== 私有辅助方法 ====================

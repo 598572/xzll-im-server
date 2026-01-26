@@ -63,7 +63,12 @@ public class ImUserDO {
      * 注册时的终端类型：1:android, 2:ios, 3:小程序, 4:web
      */
     private Integer registerTerminalType;
-    
+
+    /**
+     * 用户状态：0-正常，1-禁用
+     */
+    private Integer status;
+
     /**
      * 最后一次登录时间
      */

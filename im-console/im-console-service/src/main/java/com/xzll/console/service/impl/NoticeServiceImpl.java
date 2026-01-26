@@ -40,6 +40,9 @@ public class NoticeServiceImpl implements NoticeService {
         if (notice.getStatus() == null) {
             notice.setStatus(0);
         }
+        // 手动设置创建和更新时间，避免 MyBatis-Plus 自动填充不生效的问题
+        notice.setCreateTime(java.time.LocalDateTime.now());
+        notice.setUpdateTime(java.time.LocalDateTime.now());
         systemNoticeMapper.insert(notice);
         log.info("公告创建成功: title={}, createBy={}", notice.getTitle(), notice.getCreateBy());
     }

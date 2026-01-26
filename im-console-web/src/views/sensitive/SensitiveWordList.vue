@@ -13,20 +13,12 @@
           />
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="queryParams.category" placeholder="全部" clearable style="width: 140px">
-            <el-option label="政治敏感" value="政治敏感" />
-            <el-option label="色情低俗" value="色情低俗" />
-            <el-option label="暴力血腥" value="暴力血腥" />
-            <el-option label="违法违规" value="违法违规" />
-            <el-option label="广告营销" value="广告营销" />
-            <el-option label="其他" value="其他" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="级别">
-          <el-select v-model="queryParams.level" placeholder="全部" clearable style="width: 120px">
-            <el-option label="低" :value="1" />
-            <el-option label="中" :value="2" />
-            <el-option label="高" :value="3" />
+          <el-select v-model="queryParams.wordType" placeholder="全部" clearable style="width: 140px">
+            <el-option label="政治敏感" :value="1" />
+            <el-option label="色情低俗" :value="2" />
+            <el-option label="暴力血腥" :value="3" />
+            <el-option label="广告营销" :value="4" />
+            <el-option label="其他" :value="5" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -69,22 +61,12 @@
         <el-table-column type="selection" width="50" align="center" />
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="word" label="敏感词" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="category" label="分类" width="120">
+        <el-table-column prop="wordType" label="分类" width="120">
           <template #default="{ row }">
-            <el-tag size="small">{{ row.category }}</el-tag>
+            <el-tag size="small">{{ WORD_TYPE_MAP[row.wordType] || '未知' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="levelDesc" label="级别" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag 
-              :type="row.level === 3 ? 'danger' : (row.level === 2 ? 'warning' : 'info')" 
-              size="small"
-            >
-              {{ row.levelDesc }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="statusDesc" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch
               v-model="row.status"
@@ -128,22 +110,14 @@
         <el-form-item label="敏感词" prop="word">
           <el-input v-model="formData.word" placeholder="请输入敏感词" />
         </el-form-item>
-        <el-form-item label="分类" prop="category">
-          <el-select v-model="formData.category" placeholder="请选择分类" style="width: 100%">
-            <el-option label="政治敏感" value="政治敏感" />
-            <el-option label="色情低俗" value="色情低俗" />
-            <el-option label="暴力血腥" value="暴力血腥" />
-            <el-option label="违法违规" value="违法违规" />
-            <el-option label="广告营销" value="广告营销" />
-            <el-option label="其他" value="其他" />
+        <el-form-item label="分类" prop="wordType">
+          <el-select v-model="formData.wordType" placeholder="请选择分类" style="width: 100%">
+            <el-option label="政治敏感" :value="1" />
+            <el-option label="色情低俗" :value="2" />
+            <el-option label="暴力血腥" :value="3" />
+            <el-option label="广告营销" :value="4" />
+            <el-option label="其他" :value="5" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="级别" prop="level">
-          <el-radio-group v-model="formData.level">
-            <el-radio :value="1">低</el-radio>
-            <el-radio :value="2">中</el-radio>
-            <el-radio :value="3">高</el-radio>
-          </el-radio-group>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-switch v-model="formData.status" :active-value="1" :inactive-value="0" />
@@ -164,7 +138,7 @@
         style="margin-bottom: 16px"
       >
         <template #title>
-          每行一个敏感词，导入后默认分类为"其他"，级别为"低"，状态为"启用"
+          每行一个敏感词，导入后默认分类为"其他"，状态为"启用"
         </template>
       </el-alert>
       <el-input
@@ -182,17 +156,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import {
   pageSensitiveWords,
   addSensitiveWord,
   updateSensitiveWord,
   deleteSensitiveWord,
-  batchDeleteSensitiveWords,
-  batchImportSensitiveWords
+  toggleSensitiveWord,
+  batchAddSensitiveWords
 } from '../../api'
-import { SensitiveWord, SensitiveWordQueryParams } from '../../types'
+import { SensitiveWord, SensitiveWordQueryParams, WORD_TYPE_MAP } from '../../types'
 
 const loading = ref(false)
 const tableData = ref<SensitiveWord[]>([])
@@ -203,8 +177,7 @@ const queryParams = reactive<SensitiveWordQueryParams>({
   pageNum: 1,
   pageSize: 10,
   keyword: '',
-  category: undefined,
-  level: undefined,
+  wordType: undefined,
   status: undefined
 })
 
@@ -214,14 +187,13 @@ const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
 const formData = reactive({
   word: '',
-  category: '',
-  level: 1,
+  wordType: 5, // 默认为"其他"
   status: 1
 })
 
 const formRules: FormRules = {
   word: [{ required: true, message: '请输入敏感词', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }]
+  wordType: [{ required: true, message: '请选择分类', trigger: 'change' }]
 }
 
 // 批量导入相关
@@ -236,13 +208,7 @@ const loadData = async () => {
     total.value = res.data?.total || 0
   } catch (error) {
     console.error('加载敏感词失败:', error)
-    // 使用模拟数据
-    tableData.value = [
-      { id: 1, word: '敏感词1', category: '政治敏感', level: 3, levelDesc: '高', status: 1, statusDesc: '启用', createTime: '2026-01-15 10:00:00', updateTime: '' },
-      { id: 2, word: '敏感词2', category: '色情低俗', level: 2, levelDesc: '中', status: 1, statusDesc: '启用', createTime: '2026-01-16 11:00:00', updateTime: '' },
-      { id: 3, word: '广告词', category: '广告营销', level: 1, levelDesc: '低', status: 0, statusDesc: '禁用', createTime: '2026-01-17 12:00:00', updateTime: '' }
-    ]
-    total.value = 3
+    ElMessage.error('加载敏感词失败')
   } finally {
     loading.value = false
   }
@@ -255,8 +221,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   queryParams.keyword = ''
-  queryParams.category = undefined
-  queryParams.level = undefined
+  queryParams.wordType = undefined
   queryParams.status = undefined
   queryParams.pageNum = 1
   loadData()
@@ -269,8 +234,7 @@ const handleSelectionChange = (selection: SensitiveWord[]) => {
 const handleAdd = () => {
   editingId.value = null
   formData.word = ''
-  formData.category = ''
-  formData.level = 1
+  formData.wordType = 5
   formData.status = 1
   formDialogVisible.value = true
 }
@@ -278,8 +242,7 @@ const handleAdd = () => {
 const handleEdit = (row: SensitiveWord) => {
   editingId.value = row.id
   formData.word = row.word
-  formData.category = row.category
-  formData.level = row.level
+  formData.wordType = row.wordType
   formData.status = row.status
   formDialogVisible.value = true
 }
@@ -307,8 +270,8 @@ const handleSubmit = async () => {
 
 const handleStatusChange = async (row: SensitiveWord) => {
   try {
-    await updateSensitiveWord({ id: row.id, status: row.status })
-    ElMessage.success('状态更新成功')
+    await toggleSensitiveWord(row.id, row.status)
+    ElMessage.success(row.status === 1 ? '已启用' : '已禁用')
   } catch (error) {
     ElMessage.error('状态更新失败')
     row.status = row.status === 1 ? 0 : 1
@@ -339,13 +302,19 @@ const handleBatchDelete = async () => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await batchDeleteSensitiveWords(selectedIds.value)
+
+    loading.value = true
+    const promises = selectedIds.value.map(id => deleteSensitiveWord(id))
+    await Promise.all(promises)
     ElMessage.success('批量删除成功')
+    selectedIds.value = []
     loadData()
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('批量删除失败')
     }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -354,14 +323,15 @@ const handleImport = async () => {
     .split('\n')
     .map(w => w.trim())
     .filter(w => w.length > 0)
-  
+
   if (words.length === 0) {
     ElMessage.warning('请输入要导入的敏感词')
     return
   }
-  
+
   try {
-    await batchImportSensitiveWords(words)
+    // wordType参数: 5-其他
+    await batchAddSensitiveWords(words, 5)
     ElMessage.success(`成功导入 ${words.length} 个敏感词`)
     showImportDialog.value = false
     importText.value = ''
@@ -371,7 +341,13 @@ const handleImport = async () => {
   }
 }
 
+// 首次加载
 onMounted(() => {
+  loadData()
+})
+
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
   loadData()
 })
 </script>

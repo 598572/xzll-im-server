@@ -48,12 +48,22 @@ public class UserVO {
      * 性别：0女，1男，-1未知
      */
     private Integer sex;
-    
+
     /**
      * 性别描述
      */
     private String sexDesc;
-    
+
+    /**
+     * 用户状态：0-正常，1-禁用
+     */
+    private Integer status;
+
+    /**
+     * 用户状态描述
+     */
+    private String statusDesc;
+
     /**
      * 注册终端类型
      */

@@ -47,6 +47,9 @@ public class BanServiceImpl implements BanService {
         }
         ban.setBanBy(adminId);
         ban.setStatus(1); // 封禁中
+        // 手动设置创建和更新时间，避免 MyBatis-Plus 自动填充不生效的问题
+        ban.setCreateTime(java.time.LocalDateTime.now());
+        ban.setUpdateTime(java.time.LocalDateTime.now());
         userBanMapper.insert(ban);
         log.info("用户封禁成功: userId={}, banReason={}, adminId={}", userId, banReason, adminId);
     }

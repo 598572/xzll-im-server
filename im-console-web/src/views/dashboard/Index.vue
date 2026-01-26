@@ -166,20 +166,7 @@ const loadDashboardData = async () => {
     updateCharts()
   } catch (error) {
     console.error('加载看板数据失败:', error)
-    // 使用模拟数据
-    stats.value = {
-      totalUsers: 12580,
-      todayNewUsers: 156,
-      onlineUsers: 2345,
-      todayMessages: 85600,
-      totalMessages: 1256800,
-      totalFriendRelations: 45800,
-      messageTps: 128,
-      usersByTerminal: { 'Android': 4500, 'iOS': 3800, '小程序': 2100, 'Web': 2180 },
-      messagesTrend: { '01-14': 12000, '01-15': 15000, '01-16': 18000, '01-17': 14000, '01-18': 22000, '01-19': 19000, '01-20': 17000 },
-      usersTrend: {}
-    }
-    updateCharts()
+    ElMessage.error('加载看板数据失败')
   }
 }
 

@@ -112,8 +112,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, onMounted, onActivated } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { pageReportList, handleReport } from '../../api'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -121,10 +122,10 @@ const dialogVisible = ref(false)
 const currentReport = ref<any>({})
 
 const stats = reactive({
-  pending: 12,
-  processing: 5,
-  handled: 89,
-  rejected: 3
+  pending: 0,
+  processing: 0,
+  handled: 0,
+  rejected: 0
 })
 
 const queryForm = reactive({
@@ -141,29 +142,43 @@ const processForm = reactive({
   result: ''
 })
 
+// 首次加载
 onMounted(() => {
   fetchData()
 })
 
-function fetchData() {
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
+  fetchData()
+})
+
+async function fetchData() {
   loading.value = true
-  // TODO: 调用真实接口
-  setTimeout(() => {
-    tableData.value = [
-      {
-        id: 1,
-        reportId: 'RPT001',
-        reporterId: 'USER001',
-        reportedUserId: 'USER002',
-        reportType: 2,
-        reportContent: '该用户发送欺诈信息，诱导转账',
-        status: 0,
-        createTime: '2024-01-15 10:00:00'
-      }
-    ]
-    pagination.total = 1
+  try {
+    const res = await pageReportList({
+      current: pagination.current,
+      size: 10,
+      status: queryForm.status
+    })
+    tableData.value = res.data?.records || []
+    pagination.total = res.data?.total || 0
+
+    // 计算统计数据
+    updateStats()
+  } catch (error) {
+    console.error('加载举报列表失败:', error)
+    ElMessage.error('加载举报列表失败')
+  } finally {
     loading.value = false
-  }, 500)
+  }
+}
+
+function updateStats() {
+  // 根据当前数据统计各状态数量
+  stats.pending = tableData.value.filter((r: any) => r.status === 0).length
+  stats.processing = tableData.value.filter((r: any) => r.status === 1).length
+  stats.handled = tableData.value.filter((r: any) => r.status === 2).length
+  stats.rejected = tableData.value.filter((r: any) => r.status === 3).length
 }
 
 function handleQuery() {
@@ -186,11 +201,21 @@ function handleProcess(row: any) {
   dialogVisible.value = true
 }
 
-function handleSubmitProcess() {
-  // TODO: 调用处理接口
-  ElMessage.success('处理成功')
-  dialogVisible.value = false
-  fetchData()
+async function handleSubmitProcess() {
+  if (!processForm.result?.trim()) {
+    ElMessage.warning('请输入处理说明')
+    return
+  }
+
+  try {
+    await handleReport(currentReport.value.id, processForm.handleResult, processForm.result)
+    ElMessage.success('处理成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    console.error('处理举报失败:', error)
+    ElMessage.error('处理举报失败')
+  }
 }
 </script>
 

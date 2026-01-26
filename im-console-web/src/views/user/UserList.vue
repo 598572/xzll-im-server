@@ -61,6 +61,13 @@
         </el-table-column>
         <el-table-column prop="phone" label="手机号" width="130" />
         <el-table-column prop="terminalTypeDesc" label="注册终端" width="100" align="center" />
+        <el-table-column prop="status" label="账号状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'danger' : 'success'" size="small">
+              {{ row.statusDesc || '正常' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="在线状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.online ? 'success' : 'info'" size="small">
@@ -69,22 +76,37 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="注册时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="handleDetail(row)">
               详情
             </el-button>
-            <el-button 
-              type="warning" 
-              link 
-              size="small" 
+            <el-button
+              type="warning"
+              link
+              size="small"
               :disabled="!row.online"
               @click="handleKick(row)"
             >
               踢下线
             </el-button>
-            <el-button type="danger" link size="small" @click="handleDisable(row)">
+            <el-button
+              v-if="row.status === 0"
+              type="danger"
+              link
+              size="small"
+              @click="handleDisable(row)"
+            >
               禁用
+            </el-button>
+            <el-button
+              v-else
+              type="success"
+              link
+              size="small"
+              @click="handleEnable(row)"
+            >
+              启用
             </el-button>
           </template>
         </el-table-column>
@@ -125,10 +147,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { pageUsers, kickUser, disableUser } from '../../api'
+import { pageUsers, kickUser, disableUser, enableUser } from '../../api'
 import { User, UserQueryParams } from '../../types'
 
 const router = useRouter()
@@ -148,6 +170,16 @@ const disableDialogVisible = ref(false)
 const disableReason = ref('')
 const currentUser = ref<User | null>(null)
 
+// 首次加载
+onMounted(() => {
+  loadData()
+})
+
+// 页面激活时重新加载（解决 keep-alive 缓存问题）
+onActivated(() => {
+  loadData()
+})
+
 const loadData = async () => {
   loading.value = true
   try {
@@ -156,26 +188,7 @@ const loadData = async () => {
     total.value = res.data?.total || 0
   } catch (error) {
     console.error('加载用户列表失败:', error)
-    // 使用模拟数据
-    tableData.value = [
-      {
-        id: 1, odlId: '', odlName: '', odlIconUrl: '',
-        userId: '111', userName: 'zhangsan', userFullName: '张三',
-        sex: 1, sexDesc: '男', phone: '138****8888',
-        registerTerminalType: 1, terminalTypeDesc: 'Android',
-        createTime: '2026-01-15 10:30:00', updateTime: '',
-        online: true, friendCount: 15
-      },
-      {
-        id: 2, odlId: '', odlName: '', odlIconUrl: '',
-        userId: '222', userName: 'lisi', userFullName: '李四',
-        sex: 0, sexDesc: '女', phone: '139****9999',
-        registerTerminalType: 2, terminalTypeDesc: 'iOS',
-        createTime: '2026-01-16 14:20:00', updateTime: '',
-        online: false, friendCount: 8
-      }
-    ]
-    total.value = 2
+    ElMessage.error('加载用户列表失败')
   } finally {
     loading.value = false
   }
@@ -234,6 +247,23 @@ const confirmDisable = async () => {
     loadData()
   } catch (error) {
     ElMessage.error('操作失败')
+  }
+}
+
+const handleEnable = async (row: User) => {
+  try {
+    await ElMessageBox.confirm(`确定要启用用户 ${row.userName} 吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await enableUser(row.userId)
+    ElMessage.success('启用成功')
+    loadData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
+    }
   }
 }
 

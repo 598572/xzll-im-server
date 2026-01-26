@@ -24,6 +24,9 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -409,30 +412,109 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
     @Override
     public Map<String, Object> getIndexInfo() {
         Map<String, Object> info = new LinkedHashMap<>();
-        
+
         try {
             // 检查索引是否存在
             boolean exists = elasticsearchClient.indices().exists(e -> e.index(INDEX_NAME)).value();
             info.put("indexExists", exists);
-            
+
             if (exists) {
                 // 获取文档数
                 CountRequest countRequest = CountRequest.of(c -> c.index(INDEX_NAME));
                 CountResponse countResponse = elasticsearchClient.count(countRequest);
                 info.put("documentCount", countResponse.count());
-                
+
                 // 获取索引信息
                 GetIndexResponse indexResponse = elasticsearchClient.indices().get(GetIndexRequest.of(g -> g.index(INDEX_NAME)));
                 if (indexResponse.get(INDEX_NAME) != null) {
                     info.put("indexName", INDEX_NAME);
                 }
             }
-            
+
         } catch (IOException e) {
             log.error("获取索引信息失败", e);
             info.put("error", e.getMessage());
         }
-        
+
         return info;
+    }
+
+    @Override
+    public Long getTodayMessageCount() {
+        try {
+            // 计算今天的时间范围（毫秒时间戳）
+            LocalDate today = LocalDate.now();
+            LocalDateTime startOfDay = today.atStartOfDay();
+            LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+            long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+            // 使用ES的count查询
+            CountRequest countRequest = CountRequest.of(c -> c
+                    .index(INDEX_NAME)
+                    .query(q -> q.range(r -> r
+                            .field("msgCreateTime")
+                            .gte(co.elastic.clients.json.JsonData.of(startTime))
+                            .lt(co.elastic.clients.json.JsonData.of(endTime))
+                    ))
+            );
+
+            CountResponse countResponse = elasticsearchClient.count(countRequest);
+            long count = countResponse.count();
+
+            log.info("ES获取今日消息数: {}", count);
+            return count;
+
+        } catch (IOException e) {
+            log.error("ES获取今日消息数失败", e);
+            return 0L;
+        }
+    }
+
+    @Override
+    public Map<String, Long> getMessagesTrend(int days) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
+
+        try {
+            for (int i = days - 1; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                String dateStr = date.format(formatter);
+
+                // 计算当天的时间范围（毫秒时间戳）
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+
+                long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+
+                // 使用ES的count查询统计当天消息数
+                CountRequest countRequest = CountRequest.of(c -> c
+                        .index(INDEX_NAME)
+                        .query(q -> q.range(r -> r
+                                .field("msgCreateTime")
+                                .gte(co.elastic.clients.json.JsonData.of(startTime))
+                                .lt(co.elastic.clients.json.JsonData.of(endTime))
+                        ))
+                );
+
+                CountResponse countResponse = elasticsearchClient.count(countRequest);
+                result.put(dateStr, countResponse.count());
+            }
+
+            log.info("ES获取消息趋势成功: days={}, 数据={}", days, result);
+
+        } catch (IOException e) {
+            log.error("ES获取消息趋势失败", e);
+            // 失败时返回0
+            for (int i = days - 1; i >= 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                String dateStr = date.format(formatter);
+                result.put(dateStr, 0L);
+            }
+        }
+
+        return result;
     }
 }
