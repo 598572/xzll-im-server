@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -27,9 +28,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class UserManageServiceImpl implements UserManageService {
-    
-    private static final String USER_ONLINE_KEY_PREFIX = "im:user:online:";
-    
+
+    // 【修复】使用正确的用户登录状态 key（Hash 结构）
+    private static final String USER_LOGIN_STATUS_KEY = "userLogin:status:";
+
     @Resource
     private ImUserMapper imUserMapper;
 
@@ -195,9 +197,10 @@ public class UserManageServiceImpl implements UserManageService {
                 return false;
             }
 
-            // 2. 删除Redis中的在线状态
-            String onlineKey = USER_ONLINE_KEY_PREFIX + userId;
-            redissonUtils.delete(onlineKey);
+            // 2. 删除Redis中的在线状态（从 Hash 中删除）
+            // userLogin:status: 是一个 Hash，Field 是用户ID，Value 是状态值
+            // 【关键修复】使用默认Codec删除字段（与Lua脚本保持一致，不使用StringCodec）
+            redissonUtils.deleteHash(USER_LOGIN_STATUS_KEY, userId);
 
             // 3. TODO: 通过gRPC通知im-connect断开该用户连接
             // 此处需要扩展gRPC接口来支持踢用户下线功能
@@ -218,8 +221,12 @@ public class UserManageServiceImpl implements UserManageService {
     @Override
     public boolean isUserOnline(String userId) {
         try {
-            String onlineKey = USER_ONLINE_KEY_PREFIX + userId;
-            return redissonUtils.exists(onlineKey);
+            // 【调试】打印用户ID
+            log.info("【DEBUG-isUserOnline】检查用户在线状态: userId={}", userId);
+            // 使用默认Codec（与Lua脚本保持一致）
+            boolean isOnline = redissonUtils.existsHash(USER_LOGIN_STATUS_KEY, userId);
+            log.info("【DEBUG-isUserOnline】检查结果: userId={}, isOnline={}", userId, isOnline);
+            return isOnline;
         } catch (Exception e) {
             log.error("检查用户在线状态失败: userId={}", userId, e);
             return false;
@@ -238,6 +245,9 @@ public class UserManageServiceImpl implements UserManageService {
         UserVO vo = new UserVO();
         BeanUtils.copyProperties(user, vo);
 
+        // 手动映射注册时间：register_time -> createTime（前端期望createTime显示注册时间）
+        vo.setCreateTime(user.getRegisterTime());
+
         // 手机号脱敏
         if (StringUtils.hasText(user.getPhone()) && user.getPhone().length() >= 11) {
             vo.setPhone(user.getPhone().substring(0, 3) + "****" + user.getPhone().substring(7));
@@ -252,6 +262,9 @@ public class UserManageServiceImpl implements UserManageService {
 
         // 终端类型描述
         vo.setTerminalTypeDesc(getTerminalTypeDesc(user.getRegisterTerminalType()));
+
+        //设置在线状态
+        vo.setOnline(isUserOnline(user.getUserId()));
 
         return vo;
     }

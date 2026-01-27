@@ -1,6 +1,7 @@
 package com.xzll.console.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.xzll.console.dto.TerminalTypeCountDTO;
 import com.xzll.console.entity.ImUserDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,24 +16,24 @@ import java.util.List;
  */
 @Mapper
 public interface ImUserMapper extends BaseMapper<ImUserDO> {
-    
+
     /**
      * 统计今日注册用户数
      */
     @Select("SELECT COUNT(*) FROM im_user WHERE DATE(register_time) = CURDATE()")
     Long countTodayRegistered();
-    
+
     /**
      * 统计总用户数
      */
     @Select("SELECT COUNT(*) FROM im_user")
     Long countTotal();
-    
+
     /**
      * 按终端类型统计用户
      */
-    @Select("SELECT register_terminal_type, COUNT(*) as count FROM im_user GROUP BY register_terminal_type")
-    List<Object[]> countByTerminalType();
+    @Select("SELECT register_terminal_type as terminalType, COUNT(*) as count FROM im_user GROUP BY register_terminal_type")
+    List<TerminalTypeCountDTO> countByTerminalType();
 
     /**
      * 统计指定日期范围内的每日注册用户数

@@ -7,7 +7,7 @@
         <span v-if="!isCollapsed" class="logo-text">IM管理后台</span>
       </div>
 
-      <div class="menu-wrapper">
+      <div class="menu-wrapper" ref="menuWrapperRef">
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapsed"
@@ -160,13 +160,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const isCollapsed = ref(false)
+const menuWrapperRef = ref<HTMLElement | null>(null)
 
 const activeMenu = computed(() => route.path)
 
@@ -184,6 +185,102 @@ const handleLogout = () => {
     router.push('/login')
   })
 }
+
+// 自动滚动相关变量
+let scrollAnimationId: number | null = null
+let lastScrollTime = 0
+const SCROLL_THRESHOLD = 50 // 距离底部多少像素时触发滚动
+const SCROLL_SPEED = 2 // 滚动速度（像素/帧）
+const SCROLL_INTERVAL = 16 // 滚动间隔（约60fps）
+
+// 处理鼠标移动，实现自动滚动
+const handleMouseMove = (event: MouseEvent) => {
+  if (!menuWrapperRef.value) return
+
+  const wrapper = menuWrapperRef.value
+  const rect = wrapper.getBoundingClientRect()
+  const scrollTop = wrapper.scrollTop
+  const scrollHeight = wrapper.scrollHeight
+  const clientHeight = wrapper.clientHeight
+  const maxScroll = scrollHeight - clientHeight
+
+  // 鼠标在侧边栏内的相对位置
+  const mouseY = event.clientY - rect.top
+
+  // 如果没有可滚动内容，不执行
+  if (maxScroll <= 0) return
+
+  // 检查鼠标是否接近底部区域
+  if (mouseY > clientHeight - SCROLL_THRESHOLD && scrollTop < maxScroll) {
+    // 启动向下滚动
+    startScrollDown(wrapper)
+  } else if (mouseY < SCROLL_THRESHOLD && scrollTop > 0) {
+    // 启动向上滚动
+    startScrollUp(wrapper)
+  } else {
+    // 停止滚动
+    stopScroll()
+  }
+}
+
+// 向下滚动
+const startScrollDown = (element: HTMLElement) => {
+  stopScroll() // 先停止之前的滚动
+
+  const scroll = () => {
+    const maxScroll = element.scrollHeight - element.clientHeight
+    if (element.scrollTop < maxScroll) {
+      element.scrollTop += SCROLL_SPEED
+      scrollAnimationId = requestAnimationFrame(scroll)
+    }
+  }
+
+  scrollAnimationId = requestAnimationFrame(scroll)
+}
+
+// 向上滚动
+const startScrollUp = (element: HTMLElement) => {
+  stopScroll() // 先停止之前的滚动
+
+  const scroll = () => {
+    if (element.scrollTop > 0) {
+      element.scrollTop -= SCROLL_SPEED
+      scrollAnimationId = requestAnimationFrame(scroll)
+    }
+  }
+
+  scrollAnimationId = requestAnimationFrame(scroll)
+}
+
+// 停止滚动
+const stopScroll = () => {
+  if (scrollAnimationId !== null) {
+    cancelAnimationFrame(scrollAnimationId)
+    scrollAnimationId = null
+  }
+}
+
+// 鼠标离开时停止滚动
+const handleMouseLeave = () => {
+  stopScroll()
+}
+
+onMounted(() => {
+  const wrapper = menuWrapperRef.value
+  if (wrapper) {
+    wrapper.addEventListener('mousemove', handleMouseMove)
+    wrapper.addEventListener('mouseleave', handleMouseLeave)
+  }
+})
+
+onUnmounted(() => {
+  const wrapper = menuWrapperRef.value
+  if (wrapper) {
+    wrapper.removeEventListener('mousemove', handleMouseMove)
+    wrapper.removeEventListener('mouseleave', handleMouseLeave)
+  }
+  stopScroll()
+})
 </script>
 
 <style scoped>
@@ -236,6 +333,25 @@ const handleLogout = () => {
   overflow-y: auto;
   overflow-x: hidden;
   background-color: #ffffff;
+  position: relative;
+}
+
+/* 底部渐变提示 - 表示可以向下滚动 */
+.menu-wrapper::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.05));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.menu-wrapper:hover::after {
+  opacity: 1;
 }
 
 .menu-wrapper::-webkit-scrollbar {

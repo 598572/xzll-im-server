@@ -42,7 +42,20 @@ import java.util.Date;
     // 按接收者查询（包含chatId避免跨分片）
     @CompoundIndex(name = "idx_toUserId_chatId_msgCreateTime", def = "{'toUserId': 1, 'chatId': 1, 'msgCreateTime': -1}"),
     // 内容模糊搜索（包含chatId避免跨分片，需配合文本索引使用）
-    @CompoundIndex(name = "idx_chatId_msgContent", def = "{'chatId': 1, 'msgContent': 1}")
+    @CompoundIndex(name = "idx_chatId_msgContent", def = "{'chatId': 1, 'msgContent': 1}"),
+
+    // ========== 新增索引：支持高级搜索功能 ==========
+    // 按消息状态查询（包含分片键chatId，避免跨分片查询）
+    @CompoundIndex(name = "idx_chatId_msgStatus_msgCreateTime", def = "{'chatId': 1, 'msgStatus': 1, 'msgCreateTime': -1}"),
+
+    // 按消息格式查询（包含分片键chatId，避免跨分片查询）
+    @CompoundIndex(name = "idx_chatId_msgFormat_msgCreateTime", def = "{'chatId': 1, 'msgFormat': 1, 'msgCreateTime': -1}"),
+
+    // 按撤回标志查询（包含分片键chatId，避免跨分片查询）
+    @CompoundIndex(name = "idx_chatId_withdrawFlag_msgCreateTime", def = "{'chatId': 1, 'withdrawFlag': 1, 'msgCreateTime': -1}"),
+
+    // 综合查询索引：支持按状态+格式+撤回标志的多条件查询（包含分片键chatId）
+    @CompoundIndex(name = "idx_chatId_status_format_withdraw", def = "{'chatId': 1, 'msgStatus': 1, 'msgFormat': 1, 'withdrawFlag': 1, 'msgCreateTime': -1}")
 })
 public class ImC2CMsgRecordMongo implements Serializable {
 

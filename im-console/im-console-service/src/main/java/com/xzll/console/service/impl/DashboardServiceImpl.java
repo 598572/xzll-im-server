@@ -1,6 +1,7 @@
 package com.xzll.console.service.impl;
 
 import com.xzll.common.utils.RedissonUtils;
+import com.xzll.console.dto.TerminalTypeCountDTO;
 import com.xzll.console.entity.mongo.ImC2CMsgRecordMongo;
 import com.xzll.console.mapper.ImFriendRelationMapper;
 import com.xzll.console.mapper.ImUserMapper;
@@ -9,7 +10,6 @@ import com.xzll.console.service.MessageQueryRouter;
 import com.xzll.console.vo.DashboardVO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -19,7 +19,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @Author: hzz
@@ -72,7 +71,8 @@ public class DashboardServiceImpl implements DashboardService {
             // Field: 用户ID, Value: 状态值
             // Hash的大小即为在线用户数
             String loginStatusKey = "userLogin:status:";
-            long count = redissonUtils.sizeHashWithStringCodec(loginStatusKey);
+            // 【关键修复】使用默认Codec（与Lua脚本保持一致，不使用StringCodec）
+            long count = redissonUtils.sizeHash(loginStatusKey);
 
             log.info("获取在线用户数成功: count={}", count);
             return count;
@@ -149,19 +149,19 @@ public class DashboardServiceImpl implements DashboardService {
         result.put("iOS", 0L);
         result.put("小程序", 0L);
         result.put("Web", 0L);
-        
+
         try {
-            List<Object[]> stats = imUserMapper.countByTerminalType();
-            for (Object[] row : stats) {
-                Integer type = (Integer) row[0];
-                Long count = ((Number) row[1]).longValue();
+            List<TerminalTypeCountDTO> stats = imUserMapper.countByTerminalType();
+            for (TerminalTypeCountDTO stat : stats) {
+                Integer type = stat.getTerminalType();
+                Long count = stat.getCount();
                 String typeName = getTerminalTypeName(type);
                 result.put(typeName, count);
             }
         } catch (Exception e) {
             log.error("按终端类型统计用户失败", e);
         }
-        
+
         return result;
     }
     

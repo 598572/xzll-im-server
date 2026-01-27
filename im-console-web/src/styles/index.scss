@@ -1,7 +1,7 @@
 /* 全局样式入口 */
-@import './variables.scss';
-@import './transition.scss';
-@import './element-plus.scss';
+@use './variables.scss';
+@use './transition.scss';
+@use './element-plus.scss';
 
 /* 基础样式重置 */
 * {

@@ -18,6 +18,18 @@
             <el-option label="群聊" :value="2" />
           </el-select>
         </el-form-item>
+        <el-form-item label="创建时间">
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+            style="width: 260px"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="Search" @click="handleSearch">搜索</el-button>
           <el-button icon="Refresh" @click="handleReset">重置</el-button>
@@ -165,9 +177,14 @@ const total = ref(0)
 const queryParams = reactive({
   userId: '',
   chatType: undefined as number | undefined,
+  startTime: undefined as string | undefined,
+  endTime: undefined as string | undefined,
   pageNum: 1,
   pageSize: 20
 })
+
+// 日期范围
+const dateRange = ref<[string, string]>([])
 
 const detailDialogVisible = ref(false)
 const currentSession = ref<Session | null>(null)
@@ -218,9 +235,11 @@ const loadData = async () => {
       current: queryParams.pageNum,
       size: queryParams.pageSize,
       userId: queryParams.userId || undefined,
-      chatType: queryParams.chatType
+      chatType: queryParams.chatType,
+      startTime: queryParams.startTime,
+      endTime: queryParams.endTime
     })
-    
+
     // 注意: 拦截器已经检查了 code=1，这里直接获取 data
     const pageData = res.data
     if (pageData && pageData.records) {
@@ -242,6 +261,15 @@ const loadData = async () => {
 
 // 搜索
 const handleSearch = () => {
+  // 处理日期范围
+  if (dateRange.value && dateRange.value.length === 2) {
+    queryParams.startTime = dateRange.value[0]
+    queryParams.endTime = dateRange.value[1]
+  } else {
+    queryParams.startTime = undefined
+    queryParams.endTime = undefined
+  }
+
   queryParams.pageNum = 1
   loadData()
 }
@@ -250,6 +278,9 @@ const handleSearch = () => {
 const handleReset = () => {
   queryParams.userId = ''
   queryParams.chatType = undefined
+  queryParams.startTime = undefined
+  queryParams.endTime = undefined
+  dateRange.value = []
   queryParams.pageNum = 1
   loadData()
 }

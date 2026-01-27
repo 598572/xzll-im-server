@@ -45,15 +45,17 @@ public class SessionManageController {
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "20") Integer size,
             @RequestParam(required = false) String userId,
-            @RequestParam(required = false) Integer chatType) {
-        
+            @RequestParam(required = false) Integer chatType,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
+
         try {
-            log.info("分页查询会话列表: current={}, size={}, userId={}, chatType={}", 
-                    current, size, userId, chatType);
-            
+            log.info("分页查询会话列表: current={}, size={}, userId={}, chatType={}, startTime={}, endTime={}",
+                    current, size, userId, chatType, startTime, endTime);
+
             // 构建查询条件
             LambdaQueryWrapper<ImChatDO> queryWrapper = new LambdaQueryWrapper<>();
-            
+
             // 按用户ID过滤（会话的任一方包含该用户）
             if (StrUtil.isNotBlank(userId)) {
                 queryWrapper.and(wrapper -> wrapper
@@ -62,12 +64,22 @@ public class SessionManageController {
                         .eq(ImChatDO::getToUserId, userId)
                 );
             }
-            
+
             // 按会话类型过滤
             if (chatType != null) {
                 queryWrapper.eq(ImChatDO::getChatType, chatType);
             }
-            
+
+            // 按创建时间范围过滤
+            if (StrUtil.isNotBlank(startTime)) {
+                queryWrapper.ge(ImChatDO::getCreateTime, startTime);
+            }
+            if (StrUtil.isNotBlank(endTime)) {
+                // 结束日期加一天，确保包含当天数据
+                String endDate = endTime + " 23:59:59";
+                queryWrapper.le(ImChatDO::getCreateTime, endDate);
+            }
+
             // 按创建时间倒序
             queryWrapper.orderByDesc(ImChatDO::getCreateTime);
             
