@@ -12,20 +12,23 @@ import jakarta.annotation.Resource;
 import java.util.List;
 
 /**
- * 消息查询路由服务
- * 根据配置和查询条件智能选择最优存储进行查询
+ * 消息查询路由服务（智能路由版本）
+ * 根据查询条件和配置自动选择最优数据源
  *
  * 路由策略:
  * ┌─────────────────────────────────────────────────────────────────┐
- * │  配置项                        │  ES开启  │  ES关闭              │
+ * │  查询条件       │  ES开启  │  ES关闭                             │
  * ├─────────────────────────────────────────────────────────────────┤
- * │  syncEnabled=true              │  使用ES   │  -                  │
- * │  syncEnabled=false             │  -       │  使用MongoDB         │
+ * │  有chatId      │  MongoDB │  MongoDB（分片键，性能最优）         │
+ * │  无chatId      │  ES      │  MongoDB（跨分片查询，性能较差）     │
  * └─────────────────────────────────────────────────────────────────┘
  *
- * 注意：
- * 1. 一次查询只使用一种数据源，不会混合查询
- * 2. 支持运行时动态切换（通过Nacos配置刷新）
+ * 路由说明：
+ * 1. 有chatId：走MongoDB（分片键，单分片查询）
+ * 2. 无chatId + ES开启：走ES（避免MongoDB跨分片scatter-gather）
+ * 3. 无chatId + ES关闭：走MongoDB（兜底）
+ * 4. 一次查询只使用一种数据源，不会混合查询
+ * 5. 支持运行时动态切换（通过Nacos配置刷新）
  *
  * @Author: hzz
  * @Date: 2024/12/20
@@ -58,33 +61,53 @@ public class MessageQueryRouter {
     }
 
     /**
-     * 智能路由查询
-     * 根据 syncEnabled 配置选择数据源
+     * 智能路由查询（核心逻辑）
+     * 根据查询条件自动选择最优数据源
+     *
+     * 路由规则：
+     * 1. 有chatId -> MongoDB（分片键，性能最优）
+     * 2. 无chatId + ES开启 -> ES（避免MongoDB跨分片查询）
+     * 3. 无chatId + ES关闭 -> MongoDB（兜底）
      *
      * @param searchDTO 搜索条件
      * @return 搜索结果
      */
     public MessageSearchResultVO smartSearch(MessageSearchDTO searchDTO) {
         long startTime = System.currentTimeMillis();
+        boolean hasChatId = StrUtil.isNotBlank(searchDTO.getChatId());
 
-        // 根据配置选择数据源
-        if (isESEnabled()) {
-            log.info("查询路由决策: {} -> ES", summarizeConditions(searchDTO));
-            MessageSearchResultVO result = esQueryService.search(searchDTO);
-            result.setDataSource(SOURCE_ES);
-            result.setCostMs(System.currentTimeMillis() - startTime);
-            return result;
+        // 智能路由决策
+        String dataSource;
+        MessageSearchResultVO result;
+
+        if (hasChatId) {
+            // 有chatId：走MongoDB（分片键，单分片查询，性能最优）
+            log.info("智能路由: 有chatId({}) -> MongoDB（分片键查询）", searchDTO.getChatId());
+            result = mongoQueryService.search(searchDTO);
+            dataSource = SOURCE_MONGODB;
+        } else if (isESEnabled()) {
+            // 无chatId + ES开启：走ES（避免MongoDB跨分片scatter-gather）
+            log.info("智能路由: 无chatId + ES开启 -> ES（避免跨分片查询）");
+            result = esQueryService.search(searchDTO);
+            dataSource = SOURCE_ES;
         } else {
-            log.info("查询路由决策: {} -> MongoDB", summarizeConditions(searchDTO));
-            MessageSearchResultVO result = mongoQueryService.search(searchDTO);
-            result.setDataSource(SOURCE_MONGODB);
-            result.setCostMs(System.currentTimeMillis() - startTime);
-            return result;
+            // 无chatId + ES关闭：走MongoDB（兜底，会有性能警告）
+            log.warn("智能路由: 无chatId + ES关闭 -> MongoDB（跨分片查询，性能较差）");
+            result = mongoQueryService.search(searchDTO);
+            dataSource = SOURCE_MONGODB;
         }
+
+        result.setDataSource(dataSource);
+        result.setCostMs(System.currentTimeMillis() - startTime);
+
+        log.info("查询完成: 数据源={}, 条件={}, 耗时={}ms",
+                dataSource, summarizeConditions(searchDTO), result.getCostMs());
+
+        return result;
     }
 
     /**
-     * 按 chatId 查询
+     * 按 chatId 查询（有chatId，直接走MongoDB）
      *
      * @param chatId   会话ID
      * @param pageNum  页码
@@ -92,15 +115,23 @@ public class MessageQueryRouter {
      * @return 搜索结果
      */
     public MessageSearchResultVO searchByChatId(String chatId, int pageNum, int pageSize) {
+        long startTime = System.currentTimeMillis();
+
+        log.info("按chatId查询 -> MongoDB（分片键）: chatId={}", chatId);
         MessageSearchDTO dto = new MessageSearchDTO();
         dto.setChatId(chatId);
         dto.setPageNum(pageNum);
         dto.setPageSize(pageSize);
-        return smartSearch(dto);
+
+        MessageSearchResultVO result = mongoQueryService.search(dto);
+        result.setDataSource(SOURCE_MONGODB);
+        result.setCostMs(System.currentTimeMillis() - startTime);
+
+        return result;
     }
 
     /**
-     * 按用户ID查询（发送方或接收方）
+     * 按用户ID查询（发送方或接收方）- 无chatId，根据ES配置智能路由
      *
      * @param userId   用户ID
      * @param pageNum  页码
@@ -110,6 +141,12 @@ public class MessageQueryRouter {
     public MessageSearchResultVO searchByUserId(String userId, int pageNum, int pageSize) {
         long startTime = System.currentTimeMillis();
 
+        MessageSearchDTO dto = new MessageSearchDTO();
+        dto.setFromUserId(userId);
+        dto.setPageNum(pageNum);
+        dto.setPageSize(pageSize);
+
+        // 无chatId，根据ES配置选择
         if (isESEnabled()) {
             log.info("按用户ID查询 -> ES: userId={}", userId);
             MessageSearchResultVO result = esQueryService.searchByFromUserId(userId, pageNum, pageSize);
@@ -117,11 +154,7 @@ public class MessageQueryRouter {
             result.setCostMs(System.currentTimeMillis() - startTime);
             return result;
         } else {
-            log.info("按用户ID查询 -> MongoDB: userId={}", userId);
-            MessageSearchDTO dto = new MessageSearchDTO();
-            dto.setFromUserId(userId);
-            dto.setPageNum(pageNum);
-            dto.setPageSize(pageSize);
+            log.warn("按用户ID查询 -> MongoDB（跨分片）: userId={}", userId);
             MessageSearchResultVO result = mongoQueryService.search(dto);
             result.setDataSource(SOURCE_MONGODB);
             result.setCostMs(System.currentTimeMillis() - startTime);
@@ -130,7 +163,7 @@ public class MessageQueryRouter {
     }
 
     /**
-     * 消息内容搜索
+     * 消息内容搜索 - 无chatId，根据ES配置智能路由
      *
      * @param content  搜索关键词
      * @param pageNum  页码
@@ -140,6 +173,7 @@ public class MessageQueryRouter {
     public MessageSearchResultVO searchByContent(String content, int pageNum, int pageSize) {
         long startTime = System.currentTimeMillis();
 
+        // 无chatId，根据ES配置选择
         if (isESEnabled()) {
             log.info("内容搜索 -> ES: content={}", content);
             MessageSearchResultVO result = esQueryService.searchByContent(content, pageNum, pageSize);
@@ -147,7 +181,7 @@ public class MessageQueryRouter {
             result.setCostMs(System.currentTimeMillis() - startTime);
             return result;
         } else {
-            log.info("内容搜索 -> MongoDB: content={}", content);
+            log.warn("内容搜索 -> MongoDB（跨分片）: content={}", content);
             MessageSearchResultVO result = mongoQueryService.searchByContent(content, pageNum, pageSize);
             result.setDataSource(SOURCE_MONGODB);
             result.setCostMs(System.currentTimeMillis() - startTime);
@@ -156,7 +190,7 @@ public class MessageQueryRouter {
     }
 
     /**
-     * 获取最新消息
+     * 获取最新消息 - 无chatId，根据ES配置智能路由
      *
      * @param limit 数量限制
      * @return 消息列表
@@ -166,13 +200,13 @@ public class MessageQueryRouter {
             log.info("获取最新消息 -> ES: limit={}", limit);
             return esQueryService.getLatestMessages(limit);
         } else {
-            log.info("获取最新消息 -> MongoDB: limit={}", limit);
+            log.warn("获取最新消息 -> MongoDB（跨分片）: limit={}", limit);
             return mongoQueryService.getLatestMessages(limit);
         }
     }
 
     /**
-     * 获取消息统计信息
+     * 获取消息统计信息 - 无chatId，根据ES配置智能路由
      */
     public java.util.Map<String, Object> getMessageStatistics() {
         if (isESEnabled()) {
@@ -181,7 +215,7 @@ public class MessageQueryRouter {
             stats.put("dataSource", SOURCE_ES);
             return stats;
         } else {
-            log.info("获取消息统计 -> MongoDB");
+            log.warn("获取消息统计 -> MongoDB（跨分片）");
             java.util.Map<String, Object> stats = mongoQueryService.getMessageStatistics();
             stats.put("dataSource", SOURCE_MONGODB);
             return stats;
@@ -189,7 +223,7 @@ public class MessageQueryRouter {
     }
 
     /**
-     * 获取用户消息统计
+     * 获取用户消息统计 - 无chatId，根据ES配置智能路由
      */
     public java.util.Map<String, Object> getUserMessageStatistics(String userId) {
         if (isESEnabled()) {
@@ -198,7 +232,7 @@ public class MessageQueryRouter {
             stats.put("dataSource", SOURCE_ES);
             return stats;
         } else {
-            log.info("获取用户消息统计 -> MongoDB: userId={}", userId);
+            log.warn("获取用户消息统计 -> MongoDB（跨分片）: userId={}", userId);
             java.util.Map<String, Object> stats = mongoQueryService.getUserMessageStatistics(userId);
             stats.put("dataSource", SOURCE_MONGODB);
             return stats;
@@ -206,37 +240,30 @@ public class MessageQueryRouter {
     }
 
     /**
-     * 获取会话消息统计
+     * 获取会话消息统计（有chatId，直接走MongoDB）
      */
     public java.util.Map<String, Object> getChatMessageStatistics(String chatId) {
-        if (isESEnabled()) {
-            log.info("获取会话消息统计 -> ES: chatId={}", chatId);
-            java.util.Map<String, Object> stats = esQueryService.getChatMessageStatistics(chatId);
-            stats.put("dataSource", SOURCE_ES);
-            return stats;
-        } else {
-            log.info("获取会话消息统计 -> MongoDB: chatId={}", chatId);
-            java.util.Map<String, Object> stats = mongoQueryService.getChatMessageStatistics(chatId);
-            stats.put("dataSource", SOURCE_MONGODB);
-            return stats;
-        }
+        log.info("获取会话消息统计 -> MongoDB（分片键）: chatId={}", chatId);
+        java.util.Map<String, Object> stats = mongoQueryService.getChatMessageStatistics(chatId);
+        stats.put("dataSource", SOURCE_MONGODB);
+        return stats;
     }
 
     /**
-     * 获取今日消息数（用于数据看板）
+     * 获取今日消息数 - 无chatId，根据ES配置智能路由
      */
     public Long getTodayMessageCount() {
         if (isESEnabled()) {
             log.info("获取今日消息数 -> ES");
             return esQueryService.getTodayMessageCount();
         } else {
-            log.info("获取今日消息数 -> MongoDB");
+            log.warn("获取今日消息数 -> MongoDB（跨分片）");
             return mongoQueryService.getTodayMessageCount();
         }
     }
 
     /**
-     * 获取消息趋势（用于数据看板）
+     * 获取消息趋势 - 无chatId，根据ES配置智能路由
      *
      * @param days 天数
      * @return Map<日期(MM-dd), 消息数>
@@ -246,7 +273,7 @@ public class MessageQueryRouter {
             log.info("获取消息趋势 -> ES: days={}", days);
             return esQueryService.getMessagesTrend(days);
         } else {
-            log.info("获取消息趋势 -> MongoDB: days={}", days);
+            log.warn("获取消息趋势 -> MongoDB（跨分片）: days={}", days);
             return mongoQueryService.getMessagesTrend(days);
         }
     }

@@ -3,6 +3,14 @@
     <!-- 搜索表单 -->
     <el-card shadow="never" class="search-card">
       <el-form :model="queryParams" inline>
+        <el-form-item label="消息内容">
+          <el-input
+            v-model="queryParams.content"
+            placeholder="请输入消息内容关键字"
+            clearable
+            style="width: 200px"
+          />
+        </el-form-item>
         <el-form-item label="发送方ID">
           <el-input
             v-model="queryParams.fromUserId"
@@ -31,8 +39,62 @@
           <el-button type="primary" icon="Search" @click="handleSearch">搜索</el-button>
           <el-button icon="Refresh" @click="handleReset">重置</el-button>
           <el-button type="success" icon="Download" @click="loadLatestMessages">最新消息</el-button>
+          <el-button
+            :icon="showAdvancedSearch ? 'ArrowUp' : 'ArrowDown'"
+            @click="showAdvancedSearch = !showAdvancedSearch"
+          >
+            {{ showAdvancedSearch ? '收起' : '高级搜索' }}
+          </el-button>
         </el-form-item>
       </el-form>
+
+      <!-- 高级搜索折叠面板 -->
+      <el-collapse-transition>
+        <div v-show="showAdvancedSearch" class="advanced-search">
+          <el-divider style="margin: 12px 0" />
+          <el-form :model="queryParams" inline>
+            <el-form-item label="消息状态">
+              <el-select v-model="queryParams.msgStatus" placeholder="全部" clearable style="width: 140px">
+                <el-option label="待发送" :value="0" />
+                <el-option label="已发送" :value="1" />
+                <el-option label="已送达" :value="2" />
+                <el-option label="已读" :value="3" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="消息格式">
+              <el-select v-model="queryParams.msgFormat" placeholder="全部" clearable style="width: 140px">
+                <el-option label="文本" :value="1" />
+                <el-option label="图片" :value="2" />
+                <el-option label="语音" :value="3" />
+                <el-option label="视频" :value="4" />
+                <el-option label="文件" :value="5" />
+                <el-option label="位置" :value="6" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="撤回状态">
+              <el-select v-model="queryParams.withdrawFlag" placeholder="全部" clearable style="width: 120px">
+                <el-option label="正常" :value="0" />
+                <el-option label="已撤回" :value="1" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="时间范围">
+              <el-date-picker
+                v-model="dateRange"
+                type="datetimerange"
+                range-separator="至"
+                start-placeholder="开始时间"
+                end-placeholder="结束时间"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 360px"
+              />
+            </el-form-item>
+          </el-form>
+        </div>
+      </el-collapse-transition>
     </el-card>
 
     <!-- 数据表格 -->
@@ -63,7 +125,7 @@
               <el-tag v-else-if="row.msgFormat === 2" type="warning" size="small">图片</el-tag>
               <el-tag v-else-if="row.msgFormat === 3" type="success" size="small">语音</el-tag>
               <el-tag v-else type="info" size="small">其他</el-tag>
-              <span class="content-text">{{ row.msgContent }}</span>
+              <span class="content-text" v-html="highlightContent(row.msgContent)"></span>
             </div>
           </template>
         </el-table-column>
@@ -71,6 +133,13 @@
           <template #default="{ row }">
             <el-tag :type="getMsgStatusType(row.msgStatus)" size="small">
               {{ getMsgStatusText(row.msgStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="撤回状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.withdrawFlag === 1 ? 'danger' : 'success'" size="small">
+              {{ row.withdrawFlag === 1 ? '已撤回' : '正常' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -118,7 +187,7 @@
           {{ formatTime(currentMessage?.msgCreateTime) }}
         </el-descriptions-item>
         <el-descriptions-item label="消息内容" :span="2">
-          <div class="detail-content">{{ currentMessage?.msgContent }}</div>
+          <div class="detail-content" v-html="highlightContent(currentMessage?.msgContent)"></div>
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -148,11 +217,24 @@ const tableData = ref<Message[]>([])
 const hasMore = ref(false)
 const lastRowKey = ref('')
 
+// 显示高级搜索
+const showAdvancedSearch = ref(false)
+
+// 搜索表单
 const queryParams = reactive({
+  content: '',
   fromUserId: '',
   toUserId: '',
-  chatId: ''
+  chatId: '',
+  msgStatus: undefined as number | undefined,
+  msgFormat: undefined as number | undefined,
+  withdrawFlag: undefined as number | undefined,
+  startTime: undefined as number | undefined,
+  endTime: undefined as number | undefined
 })
+
+// 日期范围
+const dateRange = ref<[string, string]>([])
 
 const detailDialogVisible = ref(false)
 const currentMessage = ref<Message | null>(null)
@@ -207,6 +289,19 @@ const getMsgStatusType = (status: number | undefined) => {
   return typeMap[status || 0] || 'info'
 }
 
+// 高亮消息内容中的搜索关键字
+const highlightContent = (content: string | undefined) => {
+  if (!content) return ''
+  if (!queryParams.content) return content
+
+  // 转义特殊字符
+  const escapedKeyword = queryParams.content.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  // 使用正则替换高亮显示
+  const regex = new RegExp(`(${escapedKeyword})`, 'gi')
+  return content.replace(regex, '<mark style="background-color: #ffeb3b; padding: 0 2px; border-radius: 2px;">$1</mark>')
+}
+
 // 加载最新消息
 const loadLatestMessages = async () => {
   loading.value = true
@@ -235,18 +330,37 @@ const loadLatestMessages = async () => {
 
 // 搜索
 const handleSearch = async () => {
-  if (!queryParams.fromUserId && !queryParams.toUserId && !queryParams.chatId) {
-    ElMessage.warning('请至少输入一个搜索条件')
+  // 至少需要一个搜索条件
+  if (!queryParams.content &&
+      !queryParams.fromUserId &&
+      !queryParams.toUserId &&
+      !queryParams.chatId) {
+    ElMessage.warning('请至少输入一个搜索条件（消息内容/会话ID/发送方ID/接收方ID）')
     return
   }
-  
+
+  // 处理日期范围
+  if (dateRange.value && dateRange.value.length === 2) {
+    queryParams.startTime = new Date(dateRange.value[0]).getTime()
+    queryParams.endTime = new Date(dateRange.value[1]).getTime()
+  } else {
+    queryParams.startTime = undefined
+    queryParams.endTime = undefined
+  }
+
   loading.value = true
   try {
     // 返回格式: { code: 1, msg: "...", data: { data: [...], total: ..., ... } }
     const res = await searchMessages({
+      content: queryParams.content || undefined,
       fromUserId: queryParams.fromUserId || undefined,
       toUserId: queryParams.toUserId || undefined,
-      chatId: queryParams.chatId || undefined
+      chatId: queryParams.chatId || undefined,
+      msgStatus: queryParams.msgStatus,
+      msgFormat: queryParams.msgFormat,
+      withdrawFlag: queryParams.withdrawFlag,
+      startTime: queryParams.startTime,
+      endTime: queryParams.endTime
     })
     const resultVO = res.data
     if (resultVO && resultVO.data) {
@@ -266,9 +380,16 @@ const handleSearch = async () => {
 
 // 重置
 const handleReset = () => {
+  queryParams.content = ''
   queryParams.fromUserId = ''
   queryParams.toUserId = ''
   queryParams.chatId = ''
+  queryParams.msgStatus = undefined
+  queryParams.msgFormat = undefined
+  queryParams.withdrawFlag = undefined
+  queryParams.startTime = undefined
+  queryParams.endTime = undefined
+  dateRange.value = []
   loadLatestMessages()
 }
 

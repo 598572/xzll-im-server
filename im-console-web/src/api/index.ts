@@ -134,7 +134,17 @@ export const getMessagesByChatId = (chatId: string, limit: number = 50) => {
 }
 
 // 条件搜索消息
-export const searchMessages = (params: { fromUserId?: string; toUserId?: string; chatId?: string }) => {
+export const searchMessages = (params: {
+  fromUserId?: string
+  toUserId?: string
+  chatId?: string
+  content?: string
+  msgStatus?: number
+  msgFormat?: number
+  withdrawFlag?: number
+  startTime?: number
+  endTime?: number
+}) => {
   return request.get('/c2c/message/history/search', { params })
 }
 

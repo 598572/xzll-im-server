@@ -6,86 +6,81 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.Setting;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
-
-import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
 
 /**
- * C2C消息记录ES实体类
- * 与 im-data-sync 模块的实体保持一致
- * 
- * 字段映射说明:
- * - Keyword类型: 用于精确匹配，不分词（userId、chatId、msgId）
- * - Text类型: 用于全文搜索，支持分词（msgContent）
- * - Long类型: 用于范围查询（msgCreateTime）
- * - Integer类型: 用于状态过滤（msgStatus、msgFormat）
+ * C2C消息记录 ES文档实体类
+ * 对应ES索引: im_c2c_msg_record
  *
  * @Author: hzz
  * @Date: 2024/12/20
  */
 @Data
-@Document(indexName = IM_C2C_MSG_RECORD)
+@Document(indexName = "im_c2c_msg_record")
+@Setting(shards = 3, replicas = 1, refreshInterval = "1s")
 public class ImC2CMsgRecordES implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * ES文档ID
-     * 格式: chatId_msgId（确保唯一性）
+     * 文档ID（使用chatId_msgId作为_id）
      */
     @Id
     private String id;
 
     /**
-     * HBase的RowKey
-     * 用于关联HBase原始数据
+     * 会话ID（用于精确查询）
+     * 格式: bizType-smallerUserId-largerUserId
      */
     @Field(type = FieldType.Keyword)
-    private String rowkey;
+    private String chatId;
 
     /**
-     * 发送方用户ID
-     * Keyword类型，支持精确匹配
-     */
-    @Field(type = FieldType.Keyword)
-    private String fromUserId;
-
-    /**
-     * 接收方用户ID
-     * Keyword类型，支持精确匹配
-     */
-    @Field(type = FieldType.Keyword)
-    private String toUserId;
-
-    /**
-     * 消息ID
-     * 业务唯一标识
+     * 消息唯一ID
      */
     @Field(type = FieldType.Keyword)
     private String msgId;
 
     /**
+     * 发送人ID
+     */
+    @Field(type = FieldType.Keyword)
+    private String fromUserId;
+
+    /**
+     * 接收人ID
+     */
+    @Field(type = FieldType.Keyword)
+    private String toUserId;
+
+    /**
      * 消息格式
-     * 1-文本 2-图片 3-语音 4-视频 等
+     * 1-文本 2-图片 3-语音 4-视频 5-文件
      */
     @Field(type = FieldType.Integer)
     private Integer msgFormat;
 
     /**
-     * 消息内容
-     * Text类型，使用ik_max_word分词器，支持中文全文搜索
+     * 消息内容（支持全文搜索，中文分词）
+     * 使用ik_max_word分词器进行最细粒度分词
      */
-    @Field(type = FieldType.Text, analyzer = "ik_max_word")
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String msgContent;
 
     /**
-     * 消息创建时间（时间戳）
-     * 用于时间范围查询和排序
+     * 消息创建时间（毫秒时间戳）
      */
     @Field(type = FieldType.Long)
     private Long msgCreateTime;
+
+    /**
+     * 消息状态
+     * 1-服务端已接收 2-已送达 3-已读 4-离线
+     */
+    @Field(type = FieldType.Integer)
+    private Integer msgStatus;
 
     /**
      * 重试次数
@@ -94,65 +89,59 @@ public class ImC2CMsgRecordES implements Serializable {
     private Integer retryCount;
 
     /**
-     * 消息状态
-     * 0-待发送 1-已发送 2-已送达 3-已读
-     */
-    @Field(type = FieldType.Integer)
-    private Integer msgStatus;
-
-    /**
      * 撤回标志
-     * 0-正常 1-已撤回
+     * 0-未撤回 1-已撤回
      */
     @Field(type = FieldType.Integer)
     private Integer withdrawFlag;
 
     /**
-     * 聊天ID（会话ID）
-     * Keyword类型，用于按会话查询
-     */
-    @Field(type = FieldType.Keyword)
-    private String chatId;
-
-    /**
      * 创建时间
      */
-    @Field(type = FieldType.Date)
-    private LocalDateTime createTime;
+    @Field(type = FieldType.Long)
+    private Long createTime;
 
     /**
      * 更新时间
      */
-    @Field(type = FieldType.Date)
-    private LocalDateTime updateTime;
+    @Field(type = FieldType.Long)
+    private Long updateTime;
 
     /**
-     * 构建ES文档ID
-     * 格式: chatId_msgId
-     */
-    public void buildId() {
-        this.id = this.chatId + "_" + this.msgId;
-    }
-
-    /**
-     * 转换为普通实体对象
-     * 用于统一返回格式
+     * 转换为通用的 ImC2CMsgRecord 对象
      */
     public ImC2CMsgRecord toRecord() {
         ImC2CMsgRecord record = new ImC2CMsgRecord();
-        record.setRowkey(this.rowkey);
+        record.setRowkey(this.id);
+        record.setChatId(this.chatId);
+        record.setMsgId(this.msgId);
         record.setFromUserId(this.fromUserId);
         record.setToUserId(this.toUserId);
-        record.setMsgId(this.msgId);
         record.setMsgFormat(this.msgFormat);
         record.setMsgContent(this.msgContent);
         record.setMsgCreateTime(this.msgCreateTime);
-        record.setRetryCount(this.retryCount);
         record.setMsgStatus(this.msgStatus);
+        record.setRetryCount(this.retryCount);
         record.setWithdrawFlag(this.withdrawFlag);
-        record.setChatId(this.chatId);
-        record.setCreateTime(this.createTime);
-        record.setUpdateTime(this.updateTime);
         return record;
+    }
+
+    /**
+     * 从 ImC2CMsgRecord 转换为 ES文档
+     */
+    public static ImC2CMsgRecordES fromRecord(ImC2CMsgRecord record) {
+        ImC2CMsgRecordES es = new ImC2CMsgRecordES();
+        es.setId(record.getRowkey());
+        es.setChatId(record.getChatId());
+        es.setMsgId(record.getMsgId());
+        es.setFromUserId(record.getFromUserId());
+        es.setToUserId(record.getToUserId());
+        es.setMsgFormat(record.getMsgFormat());
+        es.setMsgContent(record.getMsgContent());
+        es.setMsgCreateTime(record.getMsgCreateTime());
+        es.setMsgStatus(record.getMsgStatus());
+        es.setRetryCount(record.getRetryCount());
+        es.setWithdrawFlag(record.getWithdrawFlag());
+        return es;
     }
 }

@@ -8,6 +8,7 @@ import com.xzll.console.config.nacos.ElasticSearchNacosConfig;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
@@ -19,15 +20,20 @@ import jakarta.annotation.Resource;
 /**
  * ES配置类（Spring Boot 3.x + Spring Data Elasticsearch 5.x）
  * 同时支持新版 ElasticsearchClient 和旧版 RestHighLevelClient
- * 
+ *
  * - ElasticsearchClient: 用于现代化查询（推荐）
  * - RestHighLevelClient: 用于需要精细控制的批量操作
  * - ElasticsearchTemplate: 用于 Spring Data 风格的操作
+ *
+ * 条件加载：
+ * - 只有在 im.elasticsearch.sync-enabled=true 时才会创建Bean
+ * - 避免在不需要ES时创建ES连接
  *
  * @Author: hzz
  * @Date: 2024/12/20
  */
 @Configuration
+@ConditionalOnProperty(prefix = "im.elasticsearch", name = "sync-enabled", havingValue = "true")
 public class ElasticSearchConfig {
 
     @Resource

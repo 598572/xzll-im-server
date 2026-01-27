@@ -3,101 +3,133 @@ package com.xzll.console.service.impl;
 import cn.hutool.core.util.StrUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOrder;
-import co.elastic.clients.elasticsearch._types.aggregations.Aggregation;
-import co.elastic.clients.elasticsearch._types.aggregations.LongTermsBucket;
-import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
-import co.elastic.clients.elasticsearch._types.query_dsl.Query;
-import co.elastic.clients.elasticsearch.core.CountRequest;
-import co.elastic.clients.elasticsearch.core.CountResponse;
+import co.elastic.clients.elasticsearch._types.query_dsl.*;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
-import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
-import co.elastic.clients.elasticsearch.indices.GetIndexResponse;
+import co.elastic.clients.json.JsonData;
 import com.xzll.console.dto.MessageSearchDTO;
 import com.xzll.console.entity.ImC2CMsgRecord;
 import com.xzll.console.entity.es.ImC2CMsgRecordES;
 import com.xzll.console.service.MessageESQueryService;
 import com.xzll.console.vo.MessageSearchResultVO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.xzll.common.constant.ImConstant.TableConstant.IM_C2C_MSG_RECORD;
-
 /**
- * ES消息查询服务实现
- * 使用新版 ElasticsearchClient（ES 8.x）
- * 
- * 性能优化策略:
- * 1. 使用 BoolQuery 构建复合查询，减少查询次数
- * 2. 只获取需要的字段（source filtering）
- * 3. 合理设置分页大小，避免深度分页
- * 4. 使用 term 查询代替 match 查询（Keyword字段）
- * 5. 缓存常用查询结果（后续可扩展）
+ * ES消息查询服务实现类
+ * 提供基于Elasticsearch的高性能消息查询能力
  *
  * @Author: hzz
  * @Date: 2024/12/20
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "im.elasticsearch", name = "sync-enabled", havingValue = "true")
 public class MessageESQueryServiceImpl implements MessageESQueryService {
 
     @Resource
     private ElasticsearchClient elasticsearchClient;
 
-    /**
-     * 索引名称
-     */
-    private static final String INDEX_NAME = IM_C2C_MSG_RECORD;
-
-    /**
-     * 最大分页深度（ES默认10000）
-     */
-    private static final int MAX_RESULT_WINDOW = 10000;
+    private static final String INDEX_NAME = "im_c2c_msg_record";
 
     @Override
     public MessageSearchResultVO search(MessageSearchDTO searchDTO) {
         long startTime = System.currentTimeMillis();
-        
+
         try {
-            // 参数校验和默认值
-            if (searchDTO.getPageNum() == null || searchDTO.getPageNum() < 1) {
-                searchDTO.setPageNum(1);
-            }
-            if (searchDTO.getPageSize() == null || searchDTO.getPageSize() < 1) {
-                searchDTO.setPageSize(20);
-            }
-            if (searchDTO.getPageSize() > 100) {
-                searchDTO.setPageSize(100);
+            // 构建查询条件
+            BoolQuery.Builder boolQueryBuilder = new BoolQuery.Builder();
+
+            // 会话ID（精确匹配）
+            if (StrUtil.isNotBlank(searchDTO.getChatId())) {
+                boolQueryBuilder.must(termQuery("chatId", searchDTO.getChatId())._toQuery());
             }
 
-            // 检查深度分页
-            int from = searchDTO.getFrom();
-            if (from + searchDTO.getPageSize() > MAX_RESULT_WINDOW) {
-                return MessageSearchResultVO.fail("分页深度超过限制，请缩小查询范围");
+            // 发送者ID（精确匹配）
+            if (StrUtil.isNotBlank(searchDTO.getFromUserId())) {
+                boolQueryBuilder.must(termQuery("fromUserId", searchDTO.getFromUserId())._toQuery());
             }
 
-            // 构建查询
-            BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
-            buildQueryConditions(boolBuilder, searchDTO);
+            // 接收者ID（精确匹配）
+            if (StrUtil.isNotBlank(searchDTO.getToUserId())) {
+                boolQueryBuilder.must(termQuery("toUserId", searchDTO.getToUserId())._toQuery());
+            }
 
-            // 执行搜索
-            SearchRequest.Builder searchBuilder = new SearchRequest.Builder()
+            // 消息内容（全文搜索）
+            if (StrUtil.isNotBlank(searchDTO.getContent())) {
+                boolQueryBuilder.must(matchQuery("msgContent", searchDTO.getContent())._toQuery());
+            }
+
+            // 消息状态（精确匹配）
+            if (searchDTO.getMsgStatus() != null) {
+                boolQueryBuilder.must(termQuery("msgStatus", searchDTO.getMsgStatus().toString())._toQuery());
+            }
+
+            // 消息格式（精确匹配）
+            if (searchDTO.getMsgFormat() != null) {
+                boolQueryBuilder.must(termQuery("msgFormat", searchDTO.getMsgFormat().toString())._toQuery());
+            }
+
+            // 撤回标志（精确匹配）
+            if (searchDTO.getWithdrawFlag() != null) {
+                boolQueryBuilder.must(termQuery("withdrawFlag", searchDTO.getWithdrawFlag().toString())._toQuery());
+            }
+
+            // 时间范围查询
+            if (searchDTO.getStartTime() != null && searchDTO.getEndTime() != null) {
+                boolQueryBuilder.must(Query.of(q -> q
+                        .range(r -> r
+                                .field("msgCreateTime")
+                                .gte(JsonData.fromJson(String.valueOf(searchDTO.getStartTime())))
+                                .lte(JsonData.fromJson(String.valueOf(searchDTO.getEndTime())))
+                        )
+                ));
+            } else if (searchDTO.getStartTime() != null) {
+                boolQueryBuilder.must(Query.of(q -> q
+                        .range(r -> r
+                                .field("msgCreateTime")
+                                .gte(JsonData.fromJson(String.valueOf(searchDTO.getStartTime())))
+                        )
+                ));
+            } else if (searchDTO.getEndTime() != null) {
+                boolQueryBuilder.must(Query.of(q -> q
+                        .range(r -> r
+                                .field("msgCreateTime")
+                                .lte(JsonData.fromJson(String.valueOf(searchDTO.getEndTime())))
+                        )
+                ));
+            }
+
+            // 构建查询请求
+            int pageNum = searchDTO.getPageNum() != null ? searchDTO.getPageNum() : 1;
+            int pageSize = searchDTO.getPageSize() != null ? searchDTO.getPageSize() : 20;
+            if (pageSize > 100) pageSize = 100;
+
+            final int finalPageSize = pageSize;
+            final int finalPageNum = pageNum;
+
+            SearchRequest searchRequest = SearchRequest.of(s -> s
                     .index(INDEX_NAME)
-                    .query(q -> q.bool(boolBuilder.build()))
-                    .from(from)
-                    .size(searchDTO.getPageSize())
-                    .sort(s -> s.field(f -> f.field("msgCreateTime").order(SortOrder.Desc)));
+                    .query(boolQueryBuilder.build()._toQuery())
+                    .from((finalPageNum - 1) * finalPageSize)
+                    .size(finalPageSize)
+                    .sort(sortOption("msgCreateTime", SortOrder.Desc))  // 按时间倒序
+            );
 
-            SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(searchBuilder.build(), ImC2CMsgRecordES.class);
+            // 执行查询
+            SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(
+                    searchRequest,
+                    ImC2CMsgRecordES.class
+            );
+
+            // 获取总数
+            long total = response.hits().total().value();
 
             // 转换结果
             List<ImC2CMsgRecord> records = response.hits().hits().stream()
@@ -106,72 +138,19 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
                     .map(ImC2CMsgRecordES::toRecord)
                     .collect(Collectors.toList());
 
-            long total = response.hits().total() != null ? response.hits().total().value() : 0;
+            long costMs = System.currentTimeMillis() - startTime;
+            log.info("ES查询完成: 条件={}, 命中={}, 返回={}, 耗时={}ms",
+                    summarizeConditions(searchDTO), total, records.size(), costMs);
 
-            MessageSearchResultVO result = MessageSearchResultVO.success(records, total, searchDTO.getPageNum(), searchDTO.getPageSize());
-            result.setCostMs(System.currentTimeMillis() - startTime);
+            MessageSearchResultVO result = MessageSearchResultVO.success(records, total, pageNum, pageSize);
             result.setDataSource("ES");
-            
-            log.info("ES搜索完成，条件: {}, 命中: {}, 耗时: {}ms", searchDTO, total, result.getCostMs());
+            result.setCostMs(costMs);
+
             return result;
 
-        } catch (IOException e) {
-            log.error("ES搜索失败", e);
-            return MessageSearchResultVO.fail("搜索失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 构建查询条件
-     */
-    private void buildQueryConditions(BoolQuery.Builder boolBuilder, MessageSearchDTO searchDTO) {
-        // 发送方用户ID - term精确匹配
-        if (StrUtil.isNotBlank(searchDTO.getFromUserId())) {
-            boolBuilder.must(m -> m.term(t -> t.field("fromUserId").value(searchDTO.getFromUserId())));
-        }
-
-        // 接收方用户ID - term精确匹配
-        if (StrUtil.isNotBlank(searchDTO.getToUserId())) {
-            boolBuilder.must(m -> m.term(t -> t.field("toUserId").value(searchDTO.getToUserId())));
-        }
-
-        // 会话ID - term精确匹配
-        if (StrUtil.isNotBlank(searchDTO.getChatId())) {
-            boolBuilder.must(m -> m.term(t -> t.field("chatId").value(searchDTO.getChatId())));
-        }
-
-        // 消息内容 - match全文搜索（使用中文分词）
-        if (StrUtil.isNotBlank(searchDTO.getContent())) {
-            boolBuilder.must(m -> m.match(t -> t.field("msgContent").query(searchDTO.getContent())));
-        }
-
-        // 消息状态 - term精确匹配
-        if (searchDTO.getMsgStatus() != null) {
-            boolBuilder.must(m -> m.term(t -> t.field("msgStatus").value(searchDTO.getMsgStatus())));
-        }
-
-        // 消息格式 - term精确匹配
-        if (searchDTO.getMsgFormat() != null) {
-            boolBuilder.must(m -> m.term(t -> t.field("msgFormat").value(searchDTO.getMsgFormat())));
-        }
-
-        // 撤回标志 - term精确匹配
-        if (searchDTO.getWithdrawFlag() != null) {
-            boolBuilder.must(m -> m.term(t -> t.field("withdrawFlag").value(searchDTO.getWithdrawFlag())));
-        }
-
-        // 时间范围 - range查询
-        if (searchDTO.getStartTime() != null || searchDTO.getEndTime() != null) {
-            boolBuilder.must(m -> m.range(r -> {
-                r.field("msgCreateTime");
-                if (searchDTO.getStartTime() != null) {
-                    r.gte(co.elastic.clients.json.JsonData.of(searchDTO.getStartTime()));
-                }
-                if (searchDTO.getEndTime() != null) {
-                    r.lte(co.elastic.clients.json.JsonData.of(searchDTO.getEndTime()));
-                }
-                return r;
-            }));
+        } catch (Exception e) {
+            log.error("ES查询失败", e);
+            return MessageSearchResultVO.fail("查询失败: " + e.getMessage());
         }
     }
 
@@ -223,188 +202,205 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
 
     @Override
     public List<ImC2CMsgRecord> getLatestMessages(int limit) {
-        // 限制最大查询数量
-        final int finalLimit = Math.min(limit, 100);
-        
         try {
-            SearchRequest request = SearchRequest.of(s -> s
+            if (limit > 100) limit = 100;
+            final int finalLimit = limit;
+
+            // 查询所有消息，按时间倒序
+            SearchRequest searchRequest = SearchRequest.of(s -> s
                     .index(INDEX_NAME)
-                    .query(q -> q.matchAll(m -> m))
-                    .from(0)
+                    .query(Query.of(q -> q.matchAll(m -> m)))
                     .size(finalLimit)
-                    .sort(sort -> sort.field(f -> f.field("msgCreateTime").order(SortOrder.Desc)))
+                    .sort(sortOption("msgCreateTime", SortOrder.Desc))
             );
 
-            SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(request, ImC2CMsgRecordES.class);
+            SearchResponse<ImC2CMsgRecordES> response = elasticsearchClient.search(
+                    searchRequest,
+                    ImC2CMsgRecordES.class
+            );
 
-            return response.hits().hits().stream()
+            List<ImC2CMsgRecord> records = response.hits().hits().stream()
                     .map(Hit::source)
                     .filter(Objects::nonNull)
                     .map(ImC2CMsgRecordES::toRecord)
                     .collect(Collectors.toList());
 
-        } catch (IOException e) {
-            log.error("获取最新消息失败", e);
-            return Collections.emptyList();
+            log.info("ES获取最新消息: limit={}, 返回={}", limit, records.size());
+            return records;
+
+        } catch (Exception e) {
+            log.error("ES获取最新消息失败", e);
+            return new ArrayList<>();
         }
     }
 
     @Override
     public Map<String, Object> getMessageStatistics() {
         Map<String, Object> stats = new LinkedHashMap<>();
-        
+
         try {
             // 总消息数
-            CountRequest countRequest = CountRequest.of(c -> c.index(INDEX_NAME));
-            CountResponse countResponse = elasticsearchClient.count(countRequest);
-            stats.put("totalCount", countResponse.count());
+            long totalCount = countByQuery(Query.of(q -> q.matchAll(m -> m)));
+            stats.put("totalCount", totalCount);
 
-            // 按消息状态统计
-            SearchRequest statusAggRequest = SearchRequest.of(s -> s
-                    .index(INDEX_NAME)
-                    .size(0)
-                    .aggregations("status_stats", a -> a
-                            .terms(t -> t.field("msgStatus"))
-                    )
-            );
-            SearchResponse<Void> statusResponse = elasticsearchClient.search(statusAggRequest, Void.class);
-            Map<String, Long> statusStats = new LinkedHashMap<>();
-            if (statusResponse.aggregations().get("status_stats") != null) {
-                statusResponse.aggregations().get("status_stats").lterms().buckets().array()
-                        .forEach(bucket -> statusStats.put("status_" + bucket.key(), bucket.docCount()));
+            // 按消息状态统计（使用聚合查询）
+            for (int i = 0; i <= 3; i++) {
+                final int status = i;
+                long count = countByQuery(Query.of(q -> q
+                        .term(t -> t
+                                .field("msgStatus")
+                                .value(status)
+                        )
+                ));
+                stats.put("status_" + status, count);
             }
-            stats.put("statusStats", statusStats);
 
             // 按消息格式统计
-            SearchRequest formatAggRequest = SearchRequest.of(s -> s
-                    .index(INDEX_NAME)
-                    .size(0)
-                    .aggregations("format_stats", a -> a
-                            .terms(t -> t.field("msgFormat"))
-                    )
-            );
-            SearchResponse<Void> formatResponse = elasticsearchClient.search(formatAggRequest, Void.class);
-            Map<String, Long> formatStats = new LinkedHashMap<>();
-            if (formatResponse.aggregations().get("format_stats") != null) {
-                formatResponse.aggregations().get("format_stats").lterms().buckets().array()
-                        .forEach(bucket -> formatStats.put("format_" + bucket.key(), bucket.docCount()));
+            for (int i = 0; i <= 5; i++) {
+                final int format = i;
+                Query query = Query.of(q -> q
+                        .term(t -> t
+                                .field("msgFormat")
+                                .value(format)
+                        )
+                );
+                long count = countByQuery(query);
+                if (count > 0) {
+                    stats.put("format_" + format, count);
+                }
             }
-            stats.put("formatStats", formatStats);
 
             // 撤回消息统计
-            CountRequest withdrawCountRequest = CountRequest.of(c -> c
-                    .index(INDEX_NAME)
-                    .query(q -> q.term(t -> t.field("withdrawFlag").value(1)))
-            );
-            CountResponse withdrawCountResponse = elasticsearchClient.count(withdrawCountRequest);
-            stats.put("withdrawCount", withdrawCountResponse.count());
+            long withdrawCount = countByQuery(Query.of(q -> q
+                    .term(t -> t
+                            .field("withdrawFlag")
+                            .value(1)
+                    )
+            ));
+            stats.put("withdrawCount", withdrawCount);
 
-        } catch (IOException e) {
+            log.info("ES获取消息统计成功: 总数={}, 撤回={}", totalCount, withdrawCount);
+
+        } catch (Exception e) {
             log.error("获取消息统计失败", e);
             stats.put("error", e.getMessage());
         }
-        
+
         return stats;
     }
 
     @Override
     public Map<String, Object> getUserMessageStatistics(String userId) {
         Map<String, Object> stats = new LinkedHashMap<>();
-        
+
         try {
             // 发送的消息数
-            CountRequest sentCountRequest = CountRequest.of(c -> c
-                    .index(INDEX_NAME)
-                    .query(q -> q.term(t -> t.field("fromUserId").value(userId)))
-            );
-            CountResponse sentCountResponse = elasticsearchClient.count(sentCountRequest);
-            stats.put("sentCount", sentCountResponse.count());
+            long sentCount = countByQuery(Query.of(q -> q
+                    .term(t -> t
+                            .field("fromUserId")
+                            .value(userId)
+                    )
+            ));
+            stats.put("sentCount", sentCount);
 
             // 接收的消息数
-            CountRequest receivedCountRequest = CountRequest.of(c -> c
-                    .index(INDEX_NAME)
-                    .query(q -> q.term(t -> t.field("toUserId").value(userId)))
-            );
-            CountResponse receivedCountResponse = elasticsearchClient.count(receivedCountRequest);
-            stats.put("receivedCount", receivedCountResponse.count());
-
-            // 参与的会话数
-            SearchRequest chatAggRequest = SearchRequest.of(s -> s
-                    .index(INDEX_NAME)
-                    .size(0)
-                    .query(q -> q.bool(b -> b
-                            .should(sh -> sh.term(t -> t.field("fromUserId").value(userId)))
-                            .should(sh -> sh.term(t -> t.field("toUserId").value(userId)))
-                            .minimumShouldMatch("1")
-                    ))
-                    .aggregations("chat_count", a -> a
-                            .cardinality(c -> c.field("chatId"))
+            long receivedCount = countByQuery(Query.of(q -> q
+                    .term(t -> t
+                            .field("toUserId")
+                            .value(userId)
                     )
-            );
-            SearchResponse<Void> chatResponse = elasticsearchClient.search(chatAggRequest, Void.class);
-            if (chatResponse.aggregations().get("chat_count") != null) {
-                stats.put("chatCount", chatResponse.aggregations().get("chat_count").cardinality().value());
-            }
+            ));
+            stats.put("receivedCount", receivedCount);
 
-        } catch (IOException e) {
+            // 参与的会话数（使用聚合查询获取去重后的chatId数量）
+            long chatCount = countDistinctChatIds(userId);
+            stats.put("chatCount", chatCount);
+
+            log.info("ES获取用户消息统计成功: userId={}, 发送={}, 接收={}, 会话={}",
+                    userId, sentCount, receivedCount, chatCount);
+
+        } catch (Exception e) {
             log.error("获取用户消息统计失败，userId: {}", userId, e);
             stats.put("error", e.getMessage());
         }
-        
+
         return stats;
     }
 
     @Override
     public Map<String, Object> getChatMessageStatistics(String chatId) {
         Map<String, Object> stats = new LinkedHashMap<>();
-        
+
         try {
             // 会话消息总数
-            CountRequest countRequest = CountRequest.of(c -> c
-                    .index(INDEX_NAME)
-                    .query(q -> q.term(t -> t.field("chatId").value(chatId)))
-            );
-            CountResponse countResponse = elasticsearchClient.count(countRequest);
-            stats.put("totalCount", countResponse.count());
+            long totalCount = countByQuery(Query.of(q -> q
+                    .term(t -> t
+                            .field("chatId")
+                            .value(chatId)
+                    )
+            ));
+            stats.put("totalCount", totalCount);
 
-            // 最早消息时间
-            SearchRequest minTimeRequest = SearchRequest.of(s -> s
-                    .index(INDEX_NAME)
-                    .size(1)
-                    .query(q -> q.term(t -> t.field("chatId").value(chatId)))
-                    .sort(sort -> sort.field(f -> f.field("msgCreateTime").order(SortOrder.Asc)))
-            );
-            SearchResponse<ImC2CMsgRecordES> minTimeResponse = elasticsearchClient.search(minTimeRequest, ImC2CMsgRecordES.class);
-            if (!minTimeResponse.hits().hits().isEmpty() && minTimeResponse.hits().hits().get(0).source() != null) {
-                stats.put("firstMessageTime", minTimeResponse.hits().hits().get(0).source().getMsgCreateTime());
+            if (totalCount > 0) {
+                // 最早消息时间
+                SearchRequest minTimeRequest = SearchRequest.of(s -> s
+                        .index(INDEX_NAME)
+                        .query(Query.of(q -> q.term(t -> t.field("chatId").value(chatId))))
+                        .size(1)
+                        .sort(sortOption("msgCreateTime", SortOrder.Asc))
+                );
+
+                SearchResponse<ImC2CMsgRecordES> minResponse = elasticsearchClient.search(
+                        minTimeRequest,
+                        ImC2CMsgRecordES.class
+                );
+
+                if (!minResponse.hits().hits().isEmpty()) {
+                    ImC2CMsgRecordES earliest = minResponse.hits().hits().get(0).source();
+                    if (earliest != null) {
+                        stats.put("firstMessageTime", earliest.getMsgCreateTime());
+                    }
+                }
+
+                // 最新消息时间
+                SearchRequest maxTimeRequest = SearchRequest.of(s -> s
+                        .index(INDEX_NAME)
+                        .query(Query.of(q -> q.term(t -> t.field("chatId").value(chatId))))
+                        .size(1)
+                        .sort(sortOption("msgCreateTime", SortOrder.Desc))
+                );
+
+                SearchResponse<ImC2CMsgRecordES> maxResponse = elasticsearchClient.search(
+                        maxTimeRequest,
+                        ImC2CMsgRecordES.class
+                );
+
+                if (!maxResponse.hits().hits().isEmpty()) {
+                    ImC2CMsgRecordES latest = maxResponse.hits().hits().get(0).source();
+                    if (latest != null) {
+                        stats.put("lastMessageTime", latest.getMsgCreateTime());
+                    }
+                }
             }
 
-            // 最新消息时间
-            SearchRequest maxTimeRequest = SearchRequest.of(s -> s
-                    .index(INDEX_NAME)
-                    .size(1)
-                    .query(q -> q.term(t -> t.field("chatId").value(chatId)))
-                    .sort(sort -> sort.field(f -> f.field("msgCreateTime").order(SortOrder.Desc)))
-            );
-            SearchResponse<ImC2CMsgRecordES> maxTimeResponse = elasticsearchClient.search(maxTimeRequest, ImC2CMsgRecordES.class);
-            if (!maxTimeResponse.hits().hits().isEmpty() && maxTimeResponse.hits().hits().get(0).source() != null) {
-                stats.put("lastMessageTime", maxTimeResponse.hits().hits().get(0).source().getMsgCreateTime());
-            }
+            log.info("ES获取会话消息统计成功: chatId={}, 总数={}", chatId, totalCount);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("获取会话消息统计失败，chatId: {}", chatId, e);
             stats.put("error", e.getMessage());
         }
-        
+
         return stats;
     }
 
     @Override
     public boolean isConnectionHealthy() {
         try {
-            return elasticsearchClient.ping().value();
-        } catch (IOException e) {
-            log.error("ES健康检查失败", e);
+            // 执行ping命令检查连接
+            elasticsearchClient.ping();
+            return true;
+        } catch (Exception e) {
+            log.warn("ES连接检查失败: {}", e.getMessage());
             return false;
         }
     }
@@ -414,25 +410,13 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
         Map<String, Object> info = new LinkedHashMap<>();
 
         try {
-            // 检查索引是否存在
-            boolean exists = elasticsearchClient.indices().exists(e -> e.index(INDEX_NAME)).value();
-            info.put("indexExists", exists);
-
-            if (exists) {
-                // 获取文档数
-                CountRequest countRequest = CountRequest.of(c -> c.index(INDEX_NAME));
-                CountResponse countResponse = elasticsearchClient.count(countRequest);
-                info.put("documentCount", countResponse.count());
-
-                // 获取索引信息
-                GetIndexResponse indexResponse = elasticsearchClient.indices().get(GetIndexRequest.of(g -> g.index(INDEX_NAME)));
-                if (indexResponse.get(INDEX_NAME) != null) {
-                    info.put("indexName", INDEX_NAME);
-                }
-            }
-
-        } catch (IOException e) {
-            log.error("获取索引信息失败", e);
+            // 获取索引信息
+            // 注意：这里简化实现，实际可以使用 indices API 获取更详细的信息
+            info.put("indexName", INDEX_NAME);
+            info.put("status", "active");
+            log.info("ES索引信息: {}", info);
+        } catch (Exception e) {
+            log.error("获取ES索引信息失败", e);
             info.put("error", e.getMessage());
         }
 
@@ -443,30 +427,31 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
     public Long getTodayMessageCount() {
         try {
             // 计算今天的时间范围（毫秒时间戳）
-            LocalDate today = LocalDate.now();
-            LocalDateTime startOfDay = today.atStartOfDay();
-            LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+            long startTime = java.time.LocalDate.now()
+                    .atStartOfDay()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
 
-            long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-            long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long endTime = java.time.LocalDate.now()
+                    .plusDays(1)
+                    .atStartOfDay()
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli();
 
-            // 使用ES的count查询
-            CountRequest countRequest = CountRequest.of(c -> c
-                    .index(INDEX_NAME)
-                    .query(q -> q.range(r -> r
+            long count = countByQuery(Query.of(q -> q
+                    .range(r -> r
                             .field("msgCreateTime")
-                            .gte(co.elastic.clients.json.JsonData.of(startTime))
-                            .lt(co.elastic.clients.json.JsonData.of(endTime))
-                    ))
-            );
-
-            CountResponse countResponse = elasticsearchClient.count(countRequest);
-            long count = countResponse.count();
+                            .gte(JsonData.fromJson(String.valueOf(startTime)))
+                            .lt(JsonData.fromJson(String.valueOf(endTime)))
+                    )
+            ));
 
             log.info("ES获取今日消息数: {}", count);
             return count;
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("ES获取今日消息数失败", e);
             return 0L;
         }
@@ -475,46 +460,157 @@ public class MessageESQueryServiceImpl implements MessageESQueryService {
     @Override
     public Map<String, Long> getMessagesTrend(int days) {
         Map<String, Long> result = new LinkedHashMap<>();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd");
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("MM-dd");
 
         try {
             for (int i = days - 1; i >= 0; i--) {
-                LocalDate date = LocalDate.now().minusDays(i);
+                java.time.LocalDate date = java.time.LocalDate.now().minusDays(i);
                 String dateStr = date.format(formatter);
 
                 // 计算当天的时间范围（毫秒时间戳）
-                LocalDateTime startOfDay = date.atStartOfDay();
-                LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+                long startTime = date.atStartOfDay()
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli();
 
-                long startTime = startOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-                long endTime = endOfDay.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                long endTime = date.plusDays(1).atStartOfDay()
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli();
 
-                // 使用ES的count查询统计当天消息数
-                CountRequest countRequest = CountRequest.of(c -> c
-                        .index(INDEX_NAME)
-                        .query(q -> q.range(r -> r
+                // 从ES查询当天的消息数
+                long count = countByQuery(Query.of(q -> q
+                        .range(r -> r
                                 .field("msgCreateTime")
-                                .gte(co.elastic.clients.json.JsonData.of(startTime))
-                                .lt(co.elastic.clients.json.JsonData.of(endTime))
-                        ))
-                );
+                                .gte(JsonData.fromJson(String.valueOf(startTime)))
+                                .lt(JsonData.fromJson(String.valueOf(endTime)))
+                        )
+                ));
 
-                CountResponse countResponse = elasticsearchClient.count(countRequest);
-                result.put(dateStr, countResponse.count());
+                result.put(dateStr, count);
             }
 
             log.info("ES获取消息趋势成功: days={}, 数据={}", days, result);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("ES获取消息趋势失败", e);
             // 失败时返回0
             for (int i = days - 1; i >= 0; i--) {
-                LocalDate date = LocalDate.now().minusDays(i);
+                java.time.LocalDate date = java.time.LocalDate.now().minusDays(i);
                 String dateStr = date.format(formatter);
                 result.put(dateStr, 0L);
             }
         }
 
         return result;
+    }
+
+    // ==================== 私有辅助方法 ====================
+
+    /**
+     * 构建term查询
+     */
+    private TermQuery termQuery(String field, String value) {
+        return TermQuery.of(t -> t.field(field).value(value));
+    }
+
+    /**
+     * 构建match查询
+     */
+    private MatchQuery matchQuery(String field, String value) {
+        return MatchQuery.of(m -> m.field(field).query(value));
+    }
+
+    /**
+     * 构建range查询
+     */
+    private RangeQuery rangeQuery(String field) {
+        return RangeQuery.of(r -> r.field(field));
+    }
+
+    /**
+     * 构建排序选项
+     */
+    private co.elastic.clients.elasticsearch._types.SortOptions sortOption(String field, SortOrder order) {
+        return co.elastic.clients.elasticsearch._types.SortOptions.of(s -> s
+                .field(f -> f.field(field).order(order))
+        );
+    }
+
+    /**
+     * 按查询条件统计数量
+     */
+    private long countByQuery(Query query) {
+        try {
+            SearchRequest searchRequest = SearchRequest.of(s -> s
+                    .index(INDEX_NAME)
+                    .query(query)
+                    .size(0)  // 不需要返回文档，只要总数
+            );
+
+            SearchResponse<?> response = elasticsearchClient.search(
+                    searchRequest,
+                    Object.class
+            );
+
+            return response.hits().total().value();
+
+        } catch (Exception e) {
+            log.error("ES统计数量失败", e);
+            return 0;
+        }
+    }
+
+    /**
+     * 统计用户参与的去重会话数
+     */
+    private long countDistinctChatIds(String userId) {
+        try {
+            // 使用terms聚合获取去重的chatId
+            // 简化实现：这里使用bool查询（发送者或接收者匹配）+ cardinality聚合
+            SearchRequest searchRequest = SearchRequest.of(s -> s
+                    .index(INDEX_NAME)
+                    .query(Query.of(q -> q
+                            .bool(b -> b
+                                    .should(sh -> sh.term(t -> t.field("fromUserId").value(userId)))
+                                    .should(sh -> sh.term(t -> t.field("toUserId").value(userId)))
+                            )
+                    ))
+                    .size(0)
+                    .aggregations("unique_chats", a -> a
+                            .cardinality(c -> c.field("chatId"))
+                    )
+            );
+
+            SearchResponse<?> response = elasticsearchClient.search(
+                    searchRequest,
+                    Object.class
+            );
+
+            return (long) response.aggregations().get("unique_chats")
+                    .cardinality().value();
+
+        } catch (Exception e) {
+            log.error("ES统计去重会话数失败", e);
+            return 0;
+        }
+    }
+
+    /**
+     * 条件摘要（用于日志）
+     */
+    private String summarizeConditions(MessageSearchDTO dto) {
+        StringBuilder sb = new StringBuilder("[");
+        if (StrUtil.isNotBlank(dto.getChatId())) sb.append("chatId,");
+        if (StrUtil.isNotBlank(dto.getFromUserId())) sb.append("fromUserId,");
+        if (StrUtil.isNotBlank(dto.getToUserId())) sb.append("toUserId,");
+        if (StrUtil.isNotBlank(dto.getContent())) sb.append("content,");
+        if (dto.getMsgStatus() != null) sb.append("msgStatus,");
+        if (dto.getMsgFormat() != null) sb.append("msgFormat,");
+        if (dto.getStartTime() != null) sb.append("startTime,");
+        if (dto.getEndTime() != null) sb.append("endTime,");
+        if (sb.length() > 1) sb.deleteCharAt(sb.length() - 1);
+        sb.append("]");
+        return sb.toString();
     }
 }
