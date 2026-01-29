@@ -110,7 +110,7 @@ import { ref, reactive, onMounted, onActivated } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { pageFriendRelations, checkFriendship } from '../../api'
-import { FriendRelation, FriendQueryParams } from '../../types'
+import type { FriendRelation, FriendQueryParams } from '../../types'
 
 const route = useRoute()
 const router = useRouter()

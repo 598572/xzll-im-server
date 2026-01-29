@@ -146,7 +146,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getDashboardStats, checkSensitiveContent, filterSensitiveContent } from '../../api'
-import { DashboardStats } from '../../types'
+import type { DashboardStats } from '../../types'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 

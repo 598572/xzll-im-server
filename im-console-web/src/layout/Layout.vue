@@ -3,8 +3,7 @@
     <!-- 侧边栏 -->
     <aside class="sidebar" :class="{ collapsed: isCollapsed }">
       <div class="logo">
-        <img src="../assets/vue.svg" alt="Logo" class="logo-img" />
-        <span v-if="!isCollapsed" class="logo-text">IM管理后台</span>
+        <span class="logo-text">OkIM 管理后台</span>
       </div>
 
       <div class="menu-wrapper" ref="menuWrapperRef">
@@ -14,7 +13,7 @@
         :collapse-transition="false"
         background-color="#ffffff"
         text-color="#4b5563"
-        active-text-color="#409EFF"
+        active-text-color="#8b5cf6"
         router
         class="sidebar-menu"
       >
@@ -116,8 +115,8 @@
       <!-- 顶部导航 -->
       <header class="header">
         <div class="header-left">
-          <el-icon 
-            class="collapse-btn" 
+          <el-icon
+            class="collapse-btn"
             @click="toggleCollapse"
           >
             <Expand v-if="isCollapsed" />
@@ -130,7 +129,7 @@
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
-        
+
         <div class="header-right">
           <el-dropdown>
             <span class="user-info">
@@ -149,10 +148,15 @@
         </div>
       </header>
 
+      <!-- 标签页 -->
+      <TabsView />
+
       <!-- 内容区 -->
       <main class="content">
         <router-view v-slot="{ Component }">
-          <component :is="Component" :key="$route.fullPath" />
+          <keep-alive :include="cacheRoutes">
+            <component :is="Component" :key="$route.fullPath" />
+          </keep-alive>
         </router-view>
       </main>
     </div>
@@ -160,16 +164,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import TabsView from '../components/TabsView.vue'
+import { useTabsStore } from '../stores/tabs'
 
 const route = useRoute()
 const router = useRouter()
+const tabsStore = useTabsStore()
 const isCollapsed = ref(false)
 const menuWrapperRef = ref<HTMLElement | null>(null)
 
 const activeMenu = computed(() => route.path)
+
+// 路由缓存
+const cacheRoutes = computed(() => {
+  return tabsStore.tabs.map(tab => tab.name)
+})
+
+// 监听路由变化，自动添加标签
+watch(
+  () => route.path,
+  (newPath) => {
+    // 不缓存隐藏的路由（如详情页）
+    if (route.meta.hidden) return
+
+    const tab = {
+      path: route.path,
+      title: (route.meta.title as string) || '未知页面',
+      name: route.name as string || route.path,
+      closable: route.path !== '/dashboard' // 首页不可关闭
+    }
+    tabsStore.addTab(tab)
+  },
+  { immediate: true }
+)
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
@@ -306,26 +336,26 @@ onUnmounted(() => {
 }
 
 .logo {
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 20px;
-  background-color: #ffffff;
+  background-color: #f3f0ff;
   border-bottom: 1px solid #e5e7eb;
+  transition: all 0.3s;
 }
 
-.logo-img {
-  width: 32px;
-  height: 32px;
+.sidebar.collapsed .logo {
+  padding: 0;
 }
 
 .logo-text {
-  margin-left: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: 20px;
+  font-weight: 700;
+  color: #7c3aed;
   white-space: nowrap;
+  letter-spacing: 1px;
 }
 
 .menu-wrapper {
@@ -430,5 +460,6 @@ onUnmounted(() => {
   padding: 20px;
   background-color: #f0f2f5;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

@@ -151,7 +151,7 @@ import { ref, reactive, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { pageUsers, kickUser, disableUser, enableUser } from '../../api'
-import { User, UserQueryParams } from '../../types'
+import type { User, UserQueryParams } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)

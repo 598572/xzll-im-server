@@ -83,7 +83,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserDetail, getUserFriends, kickUser } from '../../api'
-import { User, FriendRelation } from '../../types'
+import type { User, FriendRelation } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
