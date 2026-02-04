@@ -1,6 +1,6 @@
-<mxfile host="Electron" modified="2025-09-18T22:02:30.742Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.18 Chrome/120.0.6099.199 Electron/28.1.2 Safari/537.36" etag="1d7x5OXKO_zhimbX1mMW" version="22.1.18" type="device">
+<mxfile host="Electron" modified="2026-01-29T04:35:58.871Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.18 Chrome/120.0.6099.199 Electron/28.1.2 Safari/537.36" etag="-wKLQocfxc2lvTU05OKy" version="22.1.18" type="device">
   <diagram name="XZLL-IM系统架构图" id="system-architecture">
-    <mxGraphModel dx="1405" dy="861" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1546" dy="947" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -51,23 +51,23 @@
         <mxCell id="console-service" value="控制台服务&lt;br&gt;im-console:8084&lt;br&gt;管理后台" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E8;strokeColor=#388E3C;fontSize=11;" parent="services-layer" vertex="1">
           <mxGeometry x="570" y="40" width="160" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="datasync-service" value="数据同步服务&lt;br&gt;im-data-sync:8085&lt;br&gt;HBase→ES同步" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E8;strokeColor=#388E3C;fontSize=11;" parent="services-layer" vertex="1">
+        <mxCell id="datasync-service" value="数据同步服务&lt;br&gt;im-data-sync:8085&lt;br&gt;MongoDB→ES同步" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E8;strokeColor=#388E3C;fontSize=11;" parent="services-layer" vertex="1">
           <mxGeometry x="750" y="40" width="160" height="80" as="geometry" />
         </mxCell>
         <mxCell id="middleware-layer" value="⚙️ 中间件层" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#F57C00;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" vertex="1">
           <mxGeometry x="40" y="400" width="580" height="140" as="geometry" />
         </mxCell>
         <mxCell id="nacos" value="Nacos&lt;br&gt;服务发现+配置中心&lt;br&gt;:8848" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#F57C00;fontSize=11;" parent="middleware-layer" vertex="1">
-          <mxGeometry x="20" y="40" width="110" height="80" as="geometry" />
-        </mxCell>
-        <mxCell id="zookeeper" value="ZooKeeper&lt;br&gt;HBase+Hadoop协调&lt;br&gt;:2181" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#F57C00;fontSize=11;" parent="middleware-layer" vertex="1">
-          <mxGeometry x="150" y="40" width="110" height="80" as="geometry" />
+          <mxGeometry x="20" y="40" width="130" height="80" as="geometry" />
         </mxCell>
         <mxCell id="grpc" value="gRPC通信层&lt;br&gt;微服务RPC&lt;br&gt;HTTP/2+ProtoBuf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0277BD;fontSize=11;" parent="middleware-layer" vertex="1">
-          <mxGeometry x="280" y="40" width="110" height="80" as="geometry" />
+          <mxGeometry x="170" y="40" width="130" height="80" as="geometry" />
         </mxCell>
         <mxCell id="rocketmq" value="RocketMQ&lt;br&gt;异步消息处理&lt;br&gt;:9876" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#F57C00;fontSize=11;" parent="middleware-layer" vertex="1">
-          <mxGeometry x="410" y="40" width="110" height="80" as="geometry" />
+          <mxGeometry x="320" y="40" width="130" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="smart-router" value="智能路由层&lt;br&gt;MessageQueryRouter&lt;br&gt;MongoDB/ES" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#0277BD;fontSize=11;" vertex="1" parent="middleware-layer">
+          <mxGeometry x="470" y="40" width="110" height="80" as="geometry" />
         </mxCell>
         <mxCell id="storage-layer" value="💾 存储层" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#D81B60;strokeWidth=2;fontStyle=1;fontSize=14;" parent="1" vertex="1">
           <mxGeometry x="640" y="400" width="400" height="140" as="geometry" />
@@ -75,7 +75,7 @@
         <mxCell id="mysql" value="MySQL&lt;br&gt;用户信息/会话数据&lt;br&gt;:3306" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#D81B60;fontSize=11;" parent="storage-layer" vertex="1">
           <mxGeometry x="20" y="40" width="80" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="hbase" value="HBase&lt;br&gt;消息存储&lt;br&gt;集群部署" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#D81B60;fontSize=11;" parent="storage-layer" vertex="1">
+        <mxCell id="mongodb" value="MongoDB&lt;br&gt;3节点分片集群&lt;br&gt;按会话ID分片" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#D81B60;fontSize=11;" vertex="1" parent="storage-layer">
           <mxGeometry x="115" y="40" width="80" height="80" as="geometry" />
         </mxCell>
         <mxCell id="redis" value="Redis&lt;br&gt;缓存/分布式锁&lt;br&gt;:6379" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#D81B60;fontSize=11;" parent="storage-layer" vertex="1">

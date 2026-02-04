@@ -53,9 +53,9 @@
 | **192.168.1.101** | 负载均衡+代理 | Nginx, FRP Client, IM服务(规划) | 80/443 | 流量入口、内网穿透 |
 | **192.168.1.102** | 监控节点 | Prometheus, Grafana, Skywalking, IM服务(规划) | 9090/3000/8080 | 系统监控、链路追踪 |
 | **192.168.1.150** | 应用服务 | IM微服务群、Nacos、Jenkins、Docker | 8081-8085/10001/8848 | 核心业务逻辑 |
-| **192.168.1.130** | 集群主节点 | ZK Master, RMQ Master, HBase Master, HDFS NameNode, MySQL Master | 2181/9876/3306 | 集群协调、数据管理、主数据库 |
-| **192.168.1.131** | 集群从节点1 | ZK Follower, RMQ Follower, HBase RegionServer, Redis, MySQL Slave | 2181/9876/6379/3306 | 数据存储、缓存、从数据库 |
-| **192.168.1.132** | 集群从节点2 | ZK Follower, RMQ Follower, HBase RegionServer, ES | 2181/9876/9200 | 数据存储、搜索 |
+| **192.168.1.130** | 集群主节点 | RMQ Master, MongoDB Shard1, MySQL Master | 9876/27017/3306 | 消息队列、数据存储、主数据库 |
+| **192.168.1.131** | 集群从节点1 | RMQ Follower, MongoDB Shard2, Redis, MySQL Slave | 9876/27017/6379/3306 | 消息队列、数据存储、缓存、从数据库 |
+| **192.168.1.132** | 集群从节点2 | RMQ Follower, MongoDB Shard3, ES | 9876/27017/9200 | 消息队列、数据存储、搜索 |
 
 ---
 
@@ -104,7 +104,7 @@ flowchart LR
     G --> H[C2CSendMsgHandler处理]
     H --> I{并行数据存储}
     I --> J[MySQL存储会话信息]
-    I --> K[HBase存储消息记录]
+    I --> K[MongoDB存储消息记录]
     K --> L[触发ES数据同步]
     L --> M[DataSync批量写入ES]
     J --> N[增加未读计数Redis]
@@ -120,7 +120,7 @@ flowchart LR
     
     S --> U[目标机器推送消息]
     T --> V[Business处理离线消息]
-    V --> W[更新HBase状态为离线]
+    V --> W[更新MongoDB状态为离线]
     W --> X[存储离线消息到Redis]
     X --> Y[伪造未读ACK给发送方]
     
@@ -129,7 +129,7 @@ flowchart LR
     U --> Z
     Z --> AA[Connect转发ACK到MQ]
     AA --> BB[Business处理ACK]
-    BB --> CC[更新HBase消息状态]
+    BB --> CC[更新MongoDB消息状态]
     CC --> DD[触发状态更新ES同步]
     CC --> EE[清零未读计数if已读]
     EE --> FF[gRPC发送ACK给发送方]
@@ -157,7 +157,7 @@ sequenceDiagram
     participant MQ as RocketMQ
     participant BIZ as Business服务
     participant M as MySQL
-    participant H as HBase
+    participant MG as MongoDB
     participant R as Redis
     participant DS as DataSync服务
     participant ES as Elasticsearch
@@ -166,7 +166,7 @@ sequenceDiagram
     Note over C1,C2: 1. 消息接收与策略分发
     C1->>CON: 发送消息(WebSocket)
     CON->>CON: 策略分发(C2CMsgSendStrategyImpl)
-    
+
     Note over CON,C2: 2. 核心并行处理：异步数据持久化 & 实时消息推送
     par 异步数据持久化流程
         CON->>MQ: 发送到RocketMQ(异步削峰)
@@ -174,9 +174,9 @@ sequenceDiagram
         BIZ->>BIZ: C2CSendMsgHandler处理
         par 并行数据存储
             BIZ->>M: 更新/创建会话信息
-        and 
-            BIZ->>H: 存储消息记录
-            H->>BIZ: HBase存储成功
+        and
+            BIZ->>MG: 存储消息记录
+            MG->>BIZ: MongoDB存储成功
             BIZ->>MQ: 发送ES同步消息
             MQ->>DS: im-data-sync消费消息
             DS->>ES: 批量写入搜索引擎
@@ -194,21 +194,21 @@ sequenceDiagram
         else 接收方离线
             CON->>MQ: 发送离线消息事件
             MQ->>BIZ: 处理离线消息(C2COffLineMsgHandler)
-            BIZ->>H: 更新消息状态为离线
-            H->>BIZ: 更新成功确认
+            BIZ->>MG: 更新消息状态为离线
+            MG->>BIZ: 更新成功确认
             BIZ->>MQ: 发送状态更新同步消息
             BIZ->>R: 存储离线消息缓存
             BIZ->>CON: 伪造未读ACK给发送方
             CON->>C1: 推送未读ACK
         end
     end
-    
+
     Note over C2,C1: 3. 消息确认阶段(异步处理)
     C2->>CON: 发送已读/未读ACK
     CON->>MQ: 转发ACK到RocketMQ
     MQ->>BIZ: 处理ACK(C2CClientReceivedAckMsgHandler)
-    BIZ->>H: 更新消息状态
-    H->>BIZ: 更新成功确认
+    BIZ->>MG: 更新消息状态
+    MG->>BIZ: 更新成功确认
     BIZ->>MQ: 发送状态更新同步消息
     BIZ->>R: 清零未读计数(如果已读)
     BIZ->>CON: gRPC发送ACK给发送方
@@ -217,11 +217,40 @@ sequenceDiagram
 
 ---
 
-## 1.4、表设计
+## 💾 1.4、MongoDB 分片集群架构
 
-目前表结构详见：[表结构](script/sql/ddl/xzll_im_ddl.sql)
+### 🏗️ 分片设计
 
-## 1.5 接口文档（使用Apifox管理接口文档，[戳这里](https://s.apifox.cn/0432ee50-3aa3-47e8-b29f-d7d232108340/355316511e0)）
+- **集群规模**: 3 节点分片集群
+- **分片键**: 会话 ID (conversation_id)
+- **版本**: MongoDB 6.0
+- **优势**:
+  - 按会话分片，同一会话的消息在同一分片，查询效率高
+  - 支持水平扩展，轻松应对海量消息存储
+  - 自动负载均衡，充分利用集群资源
+
+### 🎯 智能路由机制
+
+**MessageQueryRouter** 实现了查询层面的智能路由，根据查询条件自动选择最优数据源：
+
+| 查询场景 | 路由目标 | 说明 |
+|---------|---------|------|
+| **按会话 ID 查询** | MongoDB | 精确查询，利用分片键直接定位，性能最优 |
+| **全文搜索** | Elasticsearch | 关键词检索，支持模糊匹配、高亮显示 |
+| **复杂组合查询** | Elasticsearch | 多条件筛选、范围查询、聚合统计 |
+
+**技术优势**:
+- ✅ **高性能**: 精确查询走 MongoDB，避免 ES 过度消耗
+- ✅ **低成本**: 减少 ES 集群压力，降低资源使用
+- ✅ **可扩展**: 双引擎互补，各展所长
+
+---
+
+## 1.5、表设计
+
+表结构见：[表结构](script/sql)
+
+## 1.6 接口文档（使用Apifox管理接口文档，[戳这里](https://s.apifox.cn/0432ee50-3aa3-47e8-b29f-d7d232108340/355316511e0)）
 
 
 # 2、技术栈与功能总结
@@ -240,7 +269,7 @@ sequenceDiagram
 | **🔗 通信层** | Netty + WebSocket + gRPC | ✅ | 长连接通信、高性能RPC服务调用 |
 | **🔐 安全层** | OAuth2 + Spring Security + JWT | ✅ | 身份认证、权限控制、令牌管理 |
 | **⚙️ 中间件层** | Nacos + RocketMQ | ✅ | 服务注册发现、消息队列、配置管理 |
-| **💾 存储层** | MySQL + HBase + Redis + ES | ✅ | 关系数据、大数据、缓存、搜索 |
+| **💾 存储层** | MySQL + MongoDB + Redis + ES | ✅ | 关系数据、文档存储、缓存、搜索 |
 | **📊 监控层** | Prometheus + Grafana + Skywalking | ✅/⏳ | 性能监控、链路追踪、可视化 |
 | **🚀 部署层** | Jenkins + Docker Compose | ✅ | CI/CD流水线、容器编排部署 |
 
@@ -277,12 +306,10 @@ sequenceDiagram
 | **⚙️ 中间件** | **RocketMQ** | 5.3.0    | ✅ | 分布式消息队列、削峰填谷 |
 | **⚙️ 中间件** | **Nginx** | 1.24.0   | ✅ | 负载均衡、反向代理 |
 | **💾 存储** | **MySQL** | 8.3.0   | ✅ | 关系型数据库、主从复制 |
-| **💾 存储** | **HBase** | 2.5.7-hadoop3    | ✅ | 分布式NoSQL、海量消息存储 |
+| **💾 存储** | **MongoDB** | 6.0 (3节点分片集群) | ✅ | 文档数据库、按会话ID分片、海量消息存储 |
 | **💾 存储** | **Redis** | 6.2.6    | ✅ | 内存数据库、缓存、分布式锁 |
 | **💾 存储** | **Redisson** | 3.40.2   | ✅ | Redis Java客户端、分布式锁实现 |
 | **💾 存储** | **Elasticsearch** | 7.17.18   | ✅ | 搜索引擎、消息全文检索 |
-| **💾 存储** | **HDFS** | 3.2.4    | ✅ | 分布式文件系统、HBase底层存储 |
-| **💾 存储** | **Hadoop** | 3.2.4    | ✅ | 分布式计算存储框架 |
 | **📊 运维** | **Prometheus** | Latest   | ✅ | 系统监控、指标采集 |
 | **📊 运维** | **Grafana** | Latest   | ✅ | 监控数据可视化 |
 | **📊 运维** | **Skywalking** | 8.x      | ⏳ | APM性能监控、链路追踪 |
@@ -319,7 +346,8 @@ sequenceDiagram
 ### ✅ **已实现功能**
 - 🔐 **用户认证**: 注册、登录（OAuth2 + JWT）
 - 💬 **单聊消息**: 文字消息发送、撤回、ACK确认
-- 📊 **消息存储**: HBase分布式存储 + Elasticsearch搜索
+- 📊 **消息存储**: MongoDB 3节点分片集群 + Elasticsearch搜索
+- 🎯 **智能路由**: 根据查询条件自动路由 MongoDB（按会话ID精确查询）或 ES（全文检索）
 - 🔄 **离线消息**: Push推送机制（Pull拉取开发中）
 - ⚡ **实时通信**: WebSocket长连接 + Netty高性能
 - 🆔 **消息ID**: 分布式唯一ID生成算法
@@ -335,7 +363,7 @@ sequenceDiagram
 - 📢 **系统公告**: 创建、发布、撤回公告
 - 📝 **操作日志**: 管理员操作记录查询
 - 🔍 **敏感词管理**: CRUD、批量导入、DFA算法检测
-- 💬 **历史消息**: HBase分页查询、消息检索
+- 💬 **历史消息**: MongoDB/ES智能路由查询、消息检索
 
 ### 🤖 **AI智能功能** (NEW!)
 - 💬 **AI智能客服**: 对话界面、实时回复
