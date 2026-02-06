@@ -7,7 +7,7 @@
     "dev": "vite --mode development",
     "dev:remote": "vite --mode development.remote",
     "build": "vue-tsc -b && vite build",
-    "build:prod": "vue-tsc -b && vite build --mode production",
+    "build:prod": "vite build --mode production",
     "preview": "vite preview"
   },
   "dependencies": {

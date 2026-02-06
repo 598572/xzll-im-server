@@ -7,6 +7,7 @@ import com.xzll.gateway.config.nacos.IgnoreUrlsConfig;
 import com.xzll.gateway.constant.AuthConstant;
 import com.xzll.gateway.filter.IgnoreUrlsRemoveJwtFilter;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -16,8 +17,6 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
@@ -30,6 +29,7 @@ import reactor.core.publisher.Mono;
  * @Description: 资源服务配置（jwt 白名单 认证 或者权限相关的配置）
  */
 @AllArgsConstructor
+@Slf4j
 @Configuration
 @EnableWebFluxSecurity
 public class ResourceServerConfig {

@@ -72,6 +72,7 @@ public class AuthorizationServerConfig {
         RSAKey rsaKey = new RSAKey.Builder(publicKey)
                 .privateKey(privateKey)
                 .keyID("im-auth-key")
+                .algorithm(com.nimbusds.jose.JWSAlgorithm.RS256)  // 显式指定签名算法为 RS256
                 .build();
 
         JWKSet jwkSet = new JWKSet(rsaKey);

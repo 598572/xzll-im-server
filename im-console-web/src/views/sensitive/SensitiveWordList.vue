@@ -157,7 +157,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import {
   pageSensitiveWords,
   addSensitiveWord,
@@ -166,7 +167,8 @@ import {
   toggleSensitiveWord,
   batchAddSensitiveWords
 } from '../../api'
-import { SensitiveWord, SensitiveWordQueryParams, WORD_TYPE_MAP } from '../../types'
+import type { SensitiveWord, SensitiveWordQueryParams } from '../../types'
+import { WORD_TYPE_MAP } from '../../types'
 
 const loading = ref(false)
 const tableData = ref<SensitiveWord[]>([])

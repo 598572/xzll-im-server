@@ -7,6 +7,7 @@ import com.xzll.auth.util.DeviceTypeContext;
 import com.xzll.common.constant.enums.ImTerminalType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
@@ -59,6 +60,21 @@ public class JwtTokenService {
                 .expiresAt(expiresAt)
                 .claim(AuthConstant.JWT_USER_ID_KEY, securityUser.getId());
 
+        // 添加用户权限/角色到JWT中（重要：Gateway需要从此字段提取权限）
+        if (securityUser.getAuthorities() != null && !securityUser.getAuthorities().isEmpty()) {
+            // 将权限列表转换为字符串数组
+            String[] authorities = securityUser.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .toArray(String[]::new);
+            claimsBuilder.claim("authorities", authorities);
+            log.info("将用户权限添加到JWT中: userId={}, authorities={}", securityUser.getId(), authorities);
+        } else {
+            // 如果没有权限，添加默认角色（ROLE_ 前缀是Gateway的权限前缀）
+            String[] defaultAuthorities = new String[]{"ROLE_ADMIN"};
+            claimsBuilder.claim("authorities", defaultAuthorities);
+            log.warn("用户没有配置权限，使用默认角色: userId={}, authorities={}", securityUser.getId(), defaultAuthorities);
+        }
+
         // 添加设备类型到JWT中
         if (deviceType != null && deviceType != ImTerminalType.UNKNOWN) {
             claimsBuilder.claim(AuthConstant.JWT_DEVICE_TYPE_KEY, deviceType.getCode());
@@ -68,7 +84,7 @@ public class JwtTokenService {
             ImTerminalType deviceTypeFromContext = DeviceTypeContext.getDeviceType();
             if (deviceTypeFromContext != null && deviceTypeFromContext != ImTerminalType.UNKNOWN) {
                 claimsBuilder.claim(AuthConstant.JWT_DEVICE_TYPE_KEY, deviceTypeFromContext.getCode());
-                log.info("从ThreadLocal中获取到设备类型并添加到JWT: userId={}, deviceType={}", 
+                log.info("从ThreadLocal中获取到设备类型并添加到JWT: userId={}, deviceType={}",
                         securityUser.getId(), deviceTypeFromContext.getDescription());
             } else {
                 log.warn("未找到设备类型信息，userId={}", securityUser.getId());
@@ -76,10 +92,10 @@ public class JwtTokenService {
         }
 
         JwtClaimsSet claims = claimsBuilder.build();
-        
+
         // 编码JWT
         Jwt jwt = jwtEncoder.encode(JwtEncoderParameters.from(claims));
-        
+
         log.debug("生成访问令牌成功，userId={}, expiresAt={}", securityUser.getId(), expiresAt);
         return jwt.getTokenValue();
     }

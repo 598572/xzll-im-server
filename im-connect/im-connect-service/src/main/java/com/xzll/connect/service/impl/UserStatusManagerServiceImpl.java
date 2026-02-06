@@ -4,6 +4,7 @@ package com.xzll.connect.service.impl;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.util.NettyAttrUtil;
 import com.xzll.connect.service.UserStatusManagerService;
+import com.xzll.connect.service.GroupServerMemberService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -18,7 +19,7 @@ import java.util.Arrays;
 /**
  * @Author: hzz
  * @Date: 2024/6/18 16:04:34
- * @Description: 用户状态管理 使用lua 保证原子性
+ * @Description: 用户状态管理&用户群信息 使用lua 保证原子性
  */
 @Slf4j
 @Service
@@ -35,6 +36,9 @@ public class UserStatusManagerServiceImpl implements UserStatusManagerService, I
 
     @Resource
     private RedissonUtils redissonUtils;
+
+    @Resource
+    private GroupServerMemberService groupServerMemberService;
 
     /**
      * 放到这里，确保只加载一次
@@ -63,10 +67,20 @@ public class UserStatusManagerServiceImpl implements UserStatusManagerService, I
     @Override
     public void userConnectSuccessAfter(Integer status, String uidStr) {
         try {
-            Long execute = redissonUtils.executeLuaScriptAsLong(setUserStatusScript, 
+            Long execute = redissonUtils.executeLuaScriptAsLong(setUserStatusScript,
                     Arrays.asList(ImConstant.RedisKeyConstant.ROUTE_PREFIX, ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX),
                     uidStr, NettyAttrUtil.getIpPortStr(), status.toString());
             log.info("客户端握手成功后设置用户状态结果:{}", execute);
+
+            // 触发群分片更新（异步执行，不阻塞主流程）
+            try {
+                String serverIp = NettyAttrUtil.getIpPortStr();
+                groupServerMemberService.onUserOnline(uidStr, serverIp);
+                log.info("客户端握手成功后触发群分片更新 - userId:{}, server:{}", uidStr, serverIp);
+            } catch (Exception e) {
+                log.error("客户端握手成功后触发群分片更新失败 - userId:{}", uidStr, e);
+            }
+
         } catch (Exception e) {
             log.error("客户端握手成功后设置用户状态异常:", e);
         }
@@ -84,6 +98,15 @@ public class UserStatusManagerServiceImpl implements UserStatusManagerService, I
             Long execute = redissonUtils.executeLuaScriptAsLong(clearUserStatusScript,
                     Arrays.asList(ImConstant.RedisKeyConstant.ROUTE_PREFIX, ImConstant.RedisKeyConstant.LOGIN_STATUS_PREFIX), uid);
             log.info("客户端断连后清除用户状态结果:{}", execute);
+
+            // 触发群分片更新（异步执行，不阻塞主流程）
+            try {
+                groupServerMemberService.onUserOffline(uid);
+                log.info("客户端断连后触发群分片更新 - userId:{}", uid);
+            } catch (Exception e) {
+                log.error("客户端断连后触发群分片更新失败 - userId:{}", uid, e);
+            }
+
         } catch (Exception e) {
             log.error("客户端断连后清除用户状态异常:", e);
         }

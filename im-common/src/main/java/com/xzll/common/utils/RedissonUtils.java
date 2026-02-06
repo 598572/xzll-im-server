@@ -1061,11 +1061,89 @@ public class RedissonUtils {
         try {
             List<Object> keyObjects = new ArrayList<>(keys);
             return redissonClient.getScript(org.redisson.client.codec.StringCodec.INSTANCE)
-                    .eval(org.redisson.api.RScript.Mode.READ_WRITE, script, 
+                    .eval(org.redisson.api.RScript.Mode.READ_WRITE, script,
                     org.redisson.api.RScript.ReturnType.INTEGER, keyObjects, args);
         } catch (Exception e) {
             log.error("执行Lua脚本失败(StringCodec): script={}, keys={}, args={}", script, keys, Arrays.toString(args), e);
             throw e;
+        }
+    }
+
+    // ==================== Pipeline批量操作 ====================
+
+    /**
+     * 批量执行Lua脚本（使用Pipeline，减少网络往返）
+     * 适用场景：用户上线时需要更新多个群的分片信息
+     *
+     * @param tasks 批量任务列表，每个任务包含脚本、keys、args
+     * @return 每个任务的执行结果列表
+     */
+    public List<Long> executeLuaScriptsBatch(List<LuaScriptTask> tasks) {
+        try {
+            if (tasks == null || tasks.isEmpty()) {
+                return new ArrayList<>();
+            }
+
+            // 创建Batch对象
+            RBatch batch = redissonClient.createBatch();
+
+            // 添加所有任务到Batch
+            for (LuaScriptTask task : tasks) {
+                List<Object> keyObjects = new ArrayList<>(task.getKeys());
+                // 使用RScript对象执行eval
+                batch.getScript(org.redisson.client.codec.StringCodec.INSTANCE)
+                    .evalAsync(org.redisson.api.RScript.Mode.READ_WRITE,
+                          task.getScript(),
+                          org.redisson.api.RScript.ReturnType.INTEGER,
+                          keyObjects,
+                          task.getArgs());
+            }
+
+            // 批量执行
+            BatchResult<?> result = batch.execute();
+
+            // 提取结果
+            List<Long> results = new ArrayList<>(tasks.size());
+            for (Object res : result.getResponses()) {
+                if (res instanceof Long) {
+                    results.add((Long) res);
+                } else {
+                    results.add(0L);
+                }
+            }
+
+            return results;
+
+        } catch (Exception e) {
+            log.error("批量执行Lua脚本失败: tasks count={}", tasks != null ? tasks.size() : 0, e);
+            throw e;
+        }
+    }
+
+    /**
+     * Lua脚本任务封装类
+     */
+    public static class LuaScriptTask {
+        private final String script;
+        private final List<String> keys;
+        private final Object[] args;
+
+        public LuaScriptTask(String script, List<String> keys, Object... args) {
+            this.script = script;
+            this.keys = keys;
+            this.args = args;
+        }
+
+        public String getScript() {
+            return script;
+        }
+
+        public List<String> getKeys() {
+            return keys;
+        }
+
+        public Object[] getArgs() {
+            return args;
         }
     }
 } 
