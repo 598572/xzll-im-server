@@ -69,6 +69,8 @@ public class WebSecurityConfig {
                         .requestMatchers("/user/register").permitAll()
                         // 健康检查接口放行
                         .requestMatchers("/actuator/**").permitAll()
+                        // RSA公钥接口放行（Gateway需要获取公钥验证JWT）
+                        .requestMatchers("/rsa/publicKey").permitAll()
                         // JWK接口放行（用于获取公钥）
                         .requestMatchers("/.well-known/jwks.json").permitAll()
                         // Swagger文档放行

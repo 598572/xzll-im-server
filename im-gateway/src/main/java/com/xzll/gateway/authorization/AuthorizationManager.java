@@ -65,10 +65,9 @@ public class AuthorizationManager implements ReactiveAuthorizationManager<Author
             log.info("绕过接口权限验证，但保留Token认证 - 路径: {}", requestPath);
         }
         
-        // 从Redis中获取当前路径可访问角色列表
-        Object obj = redissonUtils.getHash(RedisConstant.RESOURCE_ROLES_MAP, requestPath);
-        List<String> authorities = Convert.toList(String.class, obj);
-        
+        // 从Redis中获取当前路径可访问角色列表（支持通配符匹配）
+        List<String> authorities = findMatchedAuthorities(requestPath);
+
         // 如果没有配置权限且未绕过权限检查，记录警告并拒绝访问
         if (authorities == null || authorities.isEmpty()) {
             if (!bypassPermissionCheck) {
@@ -267,10 +266,100 @@ public class AuthorizationManager implements ReactiveAuthorizationManager<Author
             }
             
             return tokenExists;
-            
+
         } catch (Exception e) {
             log.error("兼容模式检查Redis中token存在性时发生异常", e);
             return false;
         }
+    }
+
+    /**
+     * 查找匹配的权限规则（支持通配符）
+     * <p>
+     * 匹配逻辑：
+     * 1. 先尝试精确匹配 requestPath
+     * 2. 如果找不到，则遍历 Redis Hash 中的所有 key，找到匹配的通配符模式
+     * 3. 支持的通配符：*（匹配任意字符）
+     * <p>
+     * 示例：
+     * - Redis 中存储：/im-business/group/info/*
+     * - 请求路径：/im-business/group/info/123
+     * - 匹配成功
+     *
+     * @param requestPath 请求路径
+     * @return 权限列表，如果找不到返回 null
+     */
+    private List<String> findMatchedAuthorities(String requestPath) {
+        try {
+            // 1. 先尝试精确匹配
+            Object obj = redissonUtils.getHash(RedisConstant.RESOURCE_ROLES_MAP, requestPath);
+            List<String> authorities = Convert.toList(String.class, obj);
+
+            if (authorities != null && !authorities.isEmpty()) {
+                log.debug("精确匹配权限规则 - 路径: {}, 权限: {}", requestPath, authorities);
+                return authorities;
+            }
+
+            // 2. 精确匹配失败，尝试通配符匹配
+            // 获取 Redis Hash 中所有的 key
+            java.util.Set<Object> allKeys = redissonClient.getMap(RedisConstant.RESOURCE_ROLES_MAP).readAllKeySet();
+
+            // 遍历所有 key，找到匹配的通配符模式
+            for (Object keyObj : allKeys) {
+                String pattern = String.valueOf(keyObj);
+                if (matchesPattern(requestPath, pattern)) {
+                    Object matchedObj = redissonUtils.getHash(RedisConstant.RESOURCE_ROLES_MAP, pattern);
+                    List<String> matchedAuthorities = Convert.toList(String.class, matchedObj);
+
+                    if (matchedAuthorities != null && !matchedAuthorities.isEmpty()) {
+                        log.info("通配符匹配权限规则 - 请求路径: {}, 匹配模式: {}, 权限: {}",
+                                requestPath, pattern, matchedAuthorities);
+                        return matchedAuthorities;
+                    }
+                }
+            }
+
+            log.debug("未找到匹配的权限规则 - 路径: {}", requestPath);
+            return null;
+
+        } catch (Exception e) {
+            log.error("查找匹配权限规则时发生异常 - 路径: {}", requestPath, e);
+            return null;
+        }
+    }
+
+    /**
+     * 判断请求路径是否匹配通配符模式
+     * <p>
+     * 支持的通配符：
+     * - * : 匹配任意字符（不包括路径分隔符 /）
+     * <p>
+     * 示例：
+     * - /im-business/group/info/[star] 匹配 /im-business/group/info/123
+     * - /im-business/[star]/info 匹配 /im-business/group/info
+     * - /im-business/[star][star] 不支持（请使用 [star]）
+     * <p>
+     * 注：[star] 表示通配符星号
+     *
+     * @param requestPath 请求路径
+     * @param pattern    通配符模式
+     * @return true 表示匹配，false 表示不匹配
+     */
+    private boolean matchesPattern(String requestPath, String pattern) {
+        if (pattern == null || requestPath == null) {
+            return false;
+        }
+
+        // 如果模式不包含通配符，直接进行字符串比较
+        if (!pattern.contains("*")) {
+            return pattern.equals(requestPath);
+        }
+
+        // 将通配符模式转换为正则表达式
+        // * -> [^/]* (匹配任意字符，但不包括 /)
+        String regex = pattern.replace("*", "[^/]*");
+        regex = "^" + regex + "$";  // 添加开始和结束锚点
+
+        return requestPath.matches(regex);
     }
 }

@@ -27,7 +27,13 @@ public class KeyPairController {
     public Map<String, Object> getKey() {
         log.info("====获取公钥====");
         RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-        RSAKey key = new RSAKey.Builder(publicKey).build();
+
+        // 构建完整的 RSAKey，包含 kid 和 algorithm（必须与 AuthorizationServerConfig 中的配置一致）
+        RSAKey key = new RSAKey.Builder(publicKey)
+                .keyID("im-auth-key")  // 必须与 AuthorizationServerConfig 中的 keyID 一致
+                .algorithm(com.nimbusds.jose.JWSAlgorithm.RS256)  // 必须与 AuthorizationServerConfig 中的算法一致
+                .build();
+
         return new JWKSet(key).toJSONObject();
     }
 

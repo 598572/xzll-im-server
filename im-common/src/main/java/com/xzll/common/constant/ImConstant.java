@@ -81,6 +81,35 @@ public interface ImConstant {
     public static class TopicConstant {
         public static final String XZLL_C2CMSG_TOPIC = "XZLL-C2CMSG-TOPIC";
         public static final String XZLL_DATA_SYNC_TOPIC = "IM_C2CMSG-SYNC-ES-TOPIC";
+
+        /**
+         * 群聊消息 Topic（Mq广播方案）
+         */
+        public static final String XZLL_GROUPMSG_TOPIC = "XZLL-GROUPMSG-TOPIC";
+    }
+
+    /**
+     * RocketMQ 消费者组
+     */
+    public static class ConsumerGroupConstant {
+        /**
+         * 群聊消息消费者组
+         */
+        public static final String GROUP_MSG_CONSUMER = "GROUP-MSG-CONSUMER";
+    }
+
+    /**
+     * RocketMQ Tag 标签
+     */
+    public static class TagConstant {
+        /**
+         * 群聊发送消息 Tag
+         */
+        public static final String GROUP_SEND_MSG = "GROUP_SEND_MSG";
+        /**
+         * 群离线消息 Tag
+         */
+        public static final String GROUP_OFF_LINE_MSG = "GROUP_OFF_LINE_MSG";
     }
 
     public static class RedisKeyConstant {
@@ -138,6 +167,21 @@ public interface ImConstant {
          */
         public static final String C2C_MSG_RETRY_INDEX = "C2C_MSG_RETRY_INDEX";
 
+        //=======================群聊相关 key =======================
+        /**
+         * 群成员列表缓存 key
+         */
+        public static final String GROUP_MEMBERS_PREFIX = "group:members:";
+
+        /**
+         * 群信息缓存 key
+         */
+        public static final String GROUP_INFO_PREFIX = "group:info:";
+
+        /**
+         * 群离线消息 key（读扩散，按群存储）
+         */
+        public static final String GROUP_OFFLINE_MSG_PREFIX = "group:offline:";
 
     }
 
@@ -160,6 +204,16 @@ public interface ImConstant {
         public static final int SERVER_ACK_RETRY = 80;
         //C2C消息重试消息
         public static final int C2C_MSG_RETRY = 90;
+
+        //=======================群聊相关事件类型 =======================
+        /**
+         * 群聊发送消息
+         */
+        public static final int GROUP_SEND_MSG = 100;
+        /**
+         * 群离线消息
+         */
+        public static final int GROUP_OFF_LINE_MSG = 110;
     }
 
 
