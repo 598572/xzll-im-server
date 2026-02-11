@@ -50,28 +50,43 @@ public class MongoDBConfig {
     @Bean
     public MongoClient mongoClient() {
         String uri = mongoDBNacosConfig.getUri();
-        
-        log.info("正在创建 MongoDB 连接, URI: {}", uri.replaceAll(":[^:@]+@", ":***@"));
-        
-        // 构建连接配置
-        MongoClientSettings settings = MongoClientSettings.builder()
+        String deploymentMode = mongoDBNacosConfig.getDeploymentMode();
+
+        log.info("正在创建 MongoDB 连接, URI: {}, 部署模式: {}",
+                uri.replaceAll(":[^:@]+@", ":***@"), deploymentMode);
+
+        MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder()
                 .applyConnectionString(new ConnectionString(uri))
                 // 连接池配置
                 .applyToConnectionPoolSettings(builder -> builder
                         .minSize(mongoDBNacosConfig.getMinPoolSize())
                         .maxSize(mongoDBNacosConfig.getMaxPoolSize())
                         .maxWaitTime(mongoDBNacosConfig.getMaxWaitTime(), TimeUnit.MILLISECONDS)
+                        // ✅ 维护连接，避免频繁重建
+                        .maintenanceInitialDelay(mongoDBNacosConfig.getConnectTimeout(), TimeUnit.MILLISECONDS)
+                        .maintenanceFrequency(60000, TimeUnit.MILLISECONDS)  // 每60秒维护一次
                 )
                 // 超时配置
                 .applyToSocketSettings(builder -> builder
                         .connectTimeout(mongoDBNacosConfig.getConnectTimeout(), TimeUnit.MILLISECONDS)
                         .readTimeout(mongoDBNacosConfig.getReadTimeout(), TimeUnit.MILLISECONDS)
-                )
-                .build();
-        
-        MongoClient client = MongoClients.create(settings);
+                );
+
+        // ✅ 根据部署模式动态配置SDAM（仅在非单机模式下应用）
+        if (!"standalone".equalsIgnoreCase(deploymentMode)) {
+            // 集群模式：启用SDAM，支持自动发现和故障转移
+            log.info("📌 使用集群模式（{}）：启用SDAM服务发现", deploymentMode);
+            settingsBuilder.applyToClusterSettings(builder -> builder
+                    .serverSelectionTimeout(mongoDBNacosConfig.getConnectTimeout(), TimeUnit.MILLISECONDS)
+            );
+        } else {
+            // 单机模式：使用默认配置
+            log.info("📌 使用单机模式");
+        }
+
+        MongoClient client = MongoClients.create(settingsBuilder.build());
         log.info("MongoDB 连接创建成功, 数据库: {}", mongoDBNacosConfig.getDatabase());
-        
+
         return client;
     }
 

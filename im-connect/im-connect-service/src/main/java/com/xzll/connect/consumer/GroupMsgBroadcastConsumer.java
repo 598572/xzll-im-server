@@ -3,6 +3,7 @@ package com.xzll.connect.consumer;
 import cn.hutool.json.JSONUtil;
 import com.xzll.common.constant.ImConstant;
 import com.xzll.common.pojo.request.GroupSendMsgAO;
+import com.xzll.common.rocketmq.ClusterEvent;
 import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.connect.config.RocketMqConfig;
 import com.xzll.connect.netty.channel.LocalChannelManager;
@@ -28,8 +29,6 @@ import com.xzll.grpc.GroupMsgPush;
 import com.xzll.grpc.MsgType;
 import com.xzll.common.constant.ProtoResponseCode;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -146,9 +145,15 @@ public class GroupMsgBroadcastConsumer implements InitializingBean {
         long startTime = System.currentTimeMillis();
 
         try {
-            // 1. 解析MQ消息
-            GroupSendMsgAO packet = JSONUtil.toBean(messageJson, GroupSendMsgAO.class);
-            log.debug("{}【步骤1-解析成功】msgId:{}, groupId:{}, fromUserId:{}",
+            // 1. 解析ClusterEvent包装
+            ClusterEvent clusterEvent = JSONUtil.toBean(messageJson, ClusterEvent.class);
+            log.debug("{}【步骤1-解析ClusterEvent成功】eventType:{}, dataLength:{}",
+                TAG, clusterEvent.getClusterEventType(),
+                clusterEvent.getData() != null ? clusterEvent.getData().length() : 0);
+
+            // 2. 解析真正的业务数据
+            GroupSendMsgAO packet = JSONUtil.toBean(clusterEvent.getData(), GroupSendMsgAO.class);
+            log.info("{}【步骤1-解析成功】msgId:{}, groupId:{}, fromUserId:{}",
                 TAG, packet.getMsgId(), packet.getGroupId(), packet.getFromUserId());
 
             // 2. 查询本地在线成员（Hash分片方案）

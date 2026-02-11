@@ -58,4 +58,12 @@ public class MongoDBNacosConfig {
      * 最大等待时间（毫秒）
      */
     private Integer maxWaitTime = 10000;
+
+    /**
+     * 部署模式
+     * standalone: 单机模式（禁用SDAM，避免服务发现延迟）
+     * replicaset: 副本集模式（启用SDAM，支持自动故障转移）
+     * sharded: 分片集群模式（启用SDAM，支持自动发现）
+     */
+    private String deploymentMode = "standalone";
 }

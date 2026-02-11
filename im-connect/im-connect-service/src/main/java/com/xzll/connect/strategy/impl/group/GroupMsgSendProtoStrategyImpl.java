@@ -8,6 +8,8 @@ import com.xzll.common.util.ChatIdUtils;
 import com.xzll.common.util.ProtoConverterUtil;
 import com.xzll.common.utils.RedissonUtils;
 import com.xzll.connect.cluster.provider.GroupMsgProvider;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.StringCodec;
 import com.xzll.connect.strategy.MsgHandlerCommonAbstract;
 import com.xzll.connect.strategy.ProtoMsgHandlerStrategy;
 import com.xzll.grpc.GroupSendReq;
@@ -47,7 +49,7 @@ public class GroupMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract impl
     private static final String TAG = "[群聊消息发送策略]_";
 
     @Resource
-    private RedissonUtils redissonUtils;
+    private RedissonClient redissonClient;
     @Resource
     private GroupMsgProvider groupMsgProvider;
     @Resource
@@ -91,17 +93,13 @@ public class GroupMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract impl
                 TAG, packet.getMsgId(), packet.getGroupId(), packet.getFromUserId());
 
             // 【步骤3】校验用户是否在群中
-            // 开发阶段暂时跳过校验，直接通过
-            // TODO: 生产环境必须启用校验，取消下面注释
-            /*
             if (!isGroupMember(packet.getGroupId(), packet.getFromUserId())) {
                 log.warn("{}【步骤3-校验失败】用户不在群中 - groupId:{}, userId:{}",
                     TAG, packet.getGroupId(), packet.getFromUserId());
                 sendErrorResponse(ctx, "您不在该群中");
                 return;
             }
-            */
-            log.debug("{}【步骤3-跳过校验】开发阶段暂未校验群成员 - groupId:{}, userId:{}",
+            log.debug("{}【步骤3-校验通过】用户在群中 - groupId:{}, userId:{}",
                 TAG, packet.getGroupId(), packet.getFromUserId());
 
             // 【步骤4】发送MQ广播消息
@@ -163,17 +161,49 @@ public class GroupMsgSendProtoStrategyImpl extends MsgHandlerCommonAbstract impl
 
     /**
      * 校验用户是否在群中
-     * 注意：此方法暂时未实现，需要后续补充
+     *
+     * 实现策略：
+     * 1. 查询用户的群列表缓存：user:groups:{userId} (Sorted Set)
+     * 2. 检查该用户的群列表是否包含目标群ID
+     *
+     * 优点：
+     * - 不需要维护额外的 group:members:{groupId} 缓存
+     * - 复用现有的 user:groups:{userId} 缓存
+     *
+     * 注意：如果缓存过期，用户会被拒绝发送消息，重新登录后会触发缓存重建流程
      *
      * @param groupId 群ID
      * @param userId  用户ID
-     * @return true-在群中，false-不在群中
+     * @return true-在群中，false-不在群中或缓存未命中
      */
     private boolean isGroupMember(String groupId, String userId) {
-        // TODO: 实现群成员校验逻辑
-        // 1. 查询Redis缓存
-        // 2. 缓存未命中时查询数据库
-        return true; // 暂时返回true
+        try {
+            // 构建缓存Key：user:groups:{userId}
+            String cacheKey = ImConstant.RedisKeyConstant.USER_GROUPS_CACHE_PREFIX + userId;
+
+            // 查询用户的群列表缓存（Sorted Set）
+            org.redisson.api.RScoredSortedSet<String> sortedSet =
+                redissonClient.getScoredSortedSet(cacheKey, StringCodec.INSTANCE);
+
+            // 检查该用户的群列表中是否包含目标群
+            boolean isMember = sortedSet.contains(groupId);
+
+            if (!isMember) {
+                log.warn("{}【群成员校验】用户不在群中或缓存未命中 - userId:{}, groupId:{}",
+                    TAG, userId, groupId);
+            } else {
+                log.debug("{}【群成员校验】校验通过 - userId:{}, groupId:{}",
+                    TAG, userId, groupId);
+            }
+
+            return isMember;
+
+        } catch (Exception e) {
+            log.error("{}【群成员校验】校验异常 - userId:{}, groupId:{}",
+                TAG, userId, groupId, e);
+            // 异常情况下返回false，拒绝发送消息（安全优先）
+            return false;
+        }
     }
 
     /**

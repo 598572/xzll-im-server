@@ -86,6 +86,16 @@ public interface ImConstant {
          * 群聊消息 Topic（Mq广播方案）
          */
         public static final String XZLL_GROUPMSG_TOPIC = "XZLL-GROUPMSG-TOPIC";
+
+        /**
+         * 用户群组缓存重建 Topic（异步重建缓存）
+         */
+        public static final String USER_GROUP_CACHE_REBUILD_TOPIC = "USER-GROUP-CACHE-REBUILD-TOPIC";
+
+        /**
+         * 用户群组缓存已更新 Topic（广播到所有 im-connect）
+         */
+        public static final String USER_GROUP_CACHE_UPDATED_TOPIC = "USER-GROUP-CACHE-UPDATED-TOPIC";
     }
 
     /**
@@ -96,6 +106,16 @@ public interface ImConstant {
          * 群聊消息消费者组
          */
         public static final String GROUP_MSG_CONSUMER = "GROUP-MSG-CONSUMER";
+
+        /**
+         * 用户群组缓存重建消费者组（im-business）
+         */
+        public static final String USER_GROUP_CACHE_REBUILD_CONSUMER = "USER-GROUP-CACHE-REBUILD-CONSUMER";
+
+        /**
+         * 用户群组缓存已更新消费者组（im-connect）
+         */
+        public static final String USER_GROUP_CACHE_UPDATED_CONSUMER = "USER-GROUP-CACHE-UPDATED-CONSUMER";
     }
 
     /**
@@ -169,6 +189,11 @@ public interface ImConstant {
 
         //=======================群聊相关 key =======================
         /**
+         * 用户群列表缓存 key（用户加入的所有群）
+         */
+        public static final String USER_GROUPS_CACHE_PREFIX = "user:groups:";
+
+        /**
          * 群成员列表缓存 key
          */
         public static final String GROUP_MEMBERS_PREFIX = "group:members:";
@@ -214,6 +239,16 @@ public interface ImConstant {
          * 群离线消息
          */
         public static final int GROUP_OFF_LINE_MSG = 110;
+
+        //=======================缓存管理相关事件类型 =======================
+        /**
+         * 用户群组缓存重建
+         */
+        public static final int USER_GROUP_CACHE_REBUILD = 200;
+        /**
+         * 用户群组缓存已更新
+         */
+        public static final int USER_GROUP_CACHE_UPDATED = 210;
     }
 
 
