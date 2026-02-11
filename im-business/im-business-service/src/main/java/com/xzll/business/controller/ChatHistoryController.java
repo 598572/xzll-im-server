@@ -27,7 +27,7 @@ public class ChatHistoryController extends BaseController {
     private ImC2CMsgRecordMongoServiceImpl imC2CMsgRecordMongoService;
 
     /**
-     * 查询聊天历史记录
+     * 查询某个会话的历史聊天记录
      * POST /im-business/api/chat/history
      * 
      * @param queryDTO 查询条件

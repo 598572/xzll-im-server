@@ -31,7 +31,7 @@ public class GroupMemberServiceImpl implements GroupMemberService {
     private RedissonUtils redissonUtils;
 
     private static final String USER_GROUPS_CACHE_PREFIX = "user:groups:";
-    private static final int CACHE_TTL_SECONDS = 1800; // 30分钟
+    private static final int CACHE_TTL_SECONDS = 86400; // 24小时
 
     @Override
     public List<String> selectGroupIdsByUserId(String userId) {

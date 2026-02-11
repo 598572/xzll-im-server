@@ -79,6 +79,9 @@ public class GroupChatClientHandler extends SimpleChannelInboundHandler<Object> 
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
         Channel ch = ctx.channel();
 
+        // 【调试日志】收到任何消息
+        System.out.println("[" + getTime() + "] 🔍 [DEBUG] channelRead0 收到消息，类型: " + msg.getClass().getSimpleName());
+
         // 处理握手阶段
         if (!handshaker.isHandshakeComplete()) {
             handshaker.finishHandshake(ch, (FullHttpResponse) msg);
@@ -115,10 +118,14 @@ public class GroupChatClientHandler extends SimpleChannelInboundHandler<Object> 
             // 处理二进制帧
             if (frame instanceof BinaryWebSocketFrame) {
                 BinaryWebSocketFrame binaryFrame = (BinaryWebSocketFrame) frame;
+                System.out.println("[" + getTime() + "] 🔍 [DEBUG] 收到二进制帧，开始处理");
                 handleBinaryMessage(ctx, binaryFrame);
                 return;
             }
         }
+
+        // 【调试日志】未处理的消息类型
+        System.out.println("[" + getTime() + "] ⚠️ [DEBUG] 未处理的消息类型: " + msg.getClass().getName());
     }
 
     /**
@@ -130,25 +137,36 @@ public class GroupChatClientHandler extends SimpleChannelInboundHandler<Object> 
             byte[] bytes = new byte[content.readableBytes()];
             content.getBytes(content.readerIndex(), bytes);
 
+            System.out.println("[" + getTime() + "] 🔍 [DEBUG] 解析Protobuf，字节长度: " + bytes.length);
+
             ImProtoResponse protoResponse = ImProtoResponse.parseFrom(bytes);
             MsgType msgType = protoResponse.getType();
+
+            System.out.println("[" + getTime() + "] 🔍 [DEBUG] 解析成功，消息类型: " + msgType + " (" + msgType.getNumber() + ")");
 
             receivedCount.incrementAndGet();
 
             switch (msgType) {
                 case GROUP_MSG_PUSH:
+                    System.out.println("[" + getTime() + "] ✅ [DEBUG] 进入 GROUP_MSG_PUSH 分支");
                     printGroupMessage(protoResponse);
                     break;
                 case C2C_ACK:
+                    System.out.println("[" + getTime() + "] ✅ [DEBUG] 进入 C2C_ACK 分支");
                     printC2CAckMessage(protoResponse);
                     break;
+//                case GROUP_SEND_ACK:
+//                    System.out.println("[" + getTime() + "] ✅ [DEBUG] 进入 GROUP_SEND_ACK 分支");
+//                    printGroupSendAckMessage(protoResponse);
+//                    break;
                 default:
-                    System.out.println("[" + getTime() + "] 📦 收到消息类型: " + msgType);
+                    System.out.println("[" + getTime() + "] 📦 [DEBUG] 收到未知消息类型: " + msgType + " (" + msgType.getNumber() + ")");
                     break;
             }
 
         } catch (InvalidProtocolBufferException e) {
             System.err.println("[" + getTime() + "] ❌ 解析Protobuf消息失败: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -202,6 +220,30 @@ public class GroupChatClientHandler extends SimpleChannelInboundHandler<Object> 
             System.err.println("解析C2C ACK失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 打印群聊发送ACK
+     */
+//    private void printGroupSendAckMessage(ImProtoResponse protoResponse) {
+//        try {
+//            GroupSendAck ack = GroupSendAck.parseFrom(protoResponse.getPayload());
+//
+//            String msgId = ProtoConverterUtil.longToSnowflakeString(ack.getMsgId());
+//            String groupId = ProtoConverterUtil.longToSnowflakeString(ack.getGroupId());
+//
+//            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+//            System.out.println("[" + getTime() + "] ✅ 群聊消息发送ACK");
+//            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+//            System.out.println("消息ID: " + msgId);
+//            System.out.println("群ID: " + groupId);
+//            System.out.println("状态: " + ack.getStatus());
+//            System.out.println("失败原因: " + (ack.hasFailReason() ? ack.getFailReason() : "无"));
+//            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+//        } catch (Exception e) {
+//            System.err.println("解析群聊发送ACK失败: " + e.getMessage());
+//            e.printStackTrace();
+//        }
+//    }
 
     /**
      * 发送群聊消息
